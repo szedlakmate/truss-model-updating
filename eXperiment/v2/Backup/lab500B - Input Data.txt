@@ -1,0 +1,4 @@
+Input data of 'lab500B':
+
+Start Time: 2016-12-14 13:21:25
+Base: None

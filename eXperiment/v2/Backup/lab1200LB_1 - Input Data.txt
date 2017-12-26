@@ -1,0 +1,4 @@
+Input data of 'lab1200LB_1':
+
+Start Time: 2016-12-14 14:23:21
+Base: None

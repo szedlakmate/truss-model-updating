@@ -1,0 +1,5 @@
+0Z
+#13X,13Y
+
+Spacebars are forbidden. Strictly write in the first line in this form:
+NumberCharacter,NumberCharacter,NumberCharacter,...
