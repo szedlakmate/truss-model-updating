@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Oct 30 18:49:40 2016
+Created on Sat Dec 30 18:49:40 2018
 
-3D truss model updater program created by Máté Szedlák (2016, 2017).
-Copyright GNU GPL v3.0, Máté Szedlák 2016, 2017.
+3D truss model updater program created by Máté Szedlák (2016-2018).
+Copyright MIT, Máté Szedlák 2016-2018.
 """
 ### Code for "Processing" only
 #size(640, 360)
@@ -14,10 +14,10 @@ import itertools
 from copy import deepcopy
 from extra_math import mat_vec_mult as mat_vec_mult
 from extra_math import invert as invert
-from extra_math import check_for_all_zeros as check_for_all_zeros
-from extra_math import swap_row as swap_row
+#from extra_math import check_for_all_zeros as check_for_all_zeros
+#from extra_math import swap_row as swap_row
 from extra_math import swap_col as swap_col
-from extra_math import make_identity as make_identity
+#from extra_math import make_identity as make_identity
 
 
 
@@ -30,7 +30,7 @@ from extra_math import make_identity as make_identity
 
 _COMPATIBLE_MODE = 0
 
-_SIMULATION = 0                     # Simulating measurements based on input file
+_SIMULATION = 1                     # Simulating measurements based on input file
 
 PORTS = ['COM1', 'COM2', 'COM3']      # List of possible communication ports
 PORTNUMBER = 0                      # Applied communication port
@@ -41,17 +41,17 @@ if _COMPATIBLE_MODE == 0:
     _MODE_NAME = "User defined"
     _LOG = 1                 # Logging time
     _GRAPHICS = 1            # Graphical features
-    _SOLVER = 0              # 0: Basic solver, 1: NumPy solver
+    _SOLVER = 1              # 0: Basic solver, 1: NumPy solver
     _OSLIBRARYAVAILABLE = 1  # Basic OS file features (e.g. file size)
     _UPDATING = 0            # Model Updating: On/ Off
     _ARDUINO = 0             # Arduino input: On/Off
-    _DEBUG = 1               # Debugging mode
+    _DEBUG = 0               # Debugging mode
     _REALISTICSIMULATION = 0 # Wait as long as it was originally. Only valid with _SIMULATION = 1
 
 ##############################################
            ###  DO NOT MODIFY ###            #
                                              #
-elif _COMPATIBLE_MODE == 1:                 #
+elif _COMPATIBLE_MODE == 1:                  #
     ### "Processing 3" mode ###              #
     _MODE_NAME = "Processing 3"              #
     _LOG = 1*1                               #
@@ -63,7 +63,7 @@ elif _COMPATIBLE_MODE == 1:                 #
     _DEBUG = 0*0                             #
     _REALISTICSIMULATION = 1*1               #
                                              #
-elif _COMPATIBLE_MODE == 2:                 #
+elif _COMPATIBLE_MODE == 2:                  #
     ### Android mode ###                     #
     # DO NOT MODIFY                          #
     _MODE_NAME = "Android"                   #
@@ -76,7 +76,7 @@ elif _COMPATIBLE_MODE == 2:                 #
     _DEBUG = 0*0                             #
     _REALISTICSIMULATION = 1*1               #
                                              #
-elif _COMPATIBLE_MODE == 3:                 #
+elif _COMPATIBLE_MODE == 3:                  #
     ### Informative ###                      #
     # DO NOT MODIFY                          #
     _MODE_NAME = "Informative mode"          #
