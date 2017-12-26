@@ -23,28 +23,28 @@ from copy import deepcopy
 
 _COMPATIBLE_MODE = 0
 
-_SIMULATION = 1                     # Simulating measurements based on input file
+_SIMULATION = 0                     # Simulating measurements based on input file
 
 PORTS = ['COM1', 'COM2', 'COM3']      # List of possible communication ports
 PORTNUMBER = 0                      # Applied communication port
 
-if _COMPATIBLE_MODE == 00:
+if _COMPATIBLE_MODE == 0:
     ### User defined ###
     # Modify as needed #
     _MODE_NAME = "User defined"
     _LOG = 1                 # Logging time
     _GRAPHICS = 1            # Graphical features
-    _SOLVER = 1              # 0: Basic solver, 1: NumPy solver
+    _SOLVER = 0              # 0: Basic solver, 1: NumPy solver
     _OSLIBRARYAVAILABLE = 1  # Basic OS file features (e.g. file size)
-    _UPDATING = 1            # Model Updating: On/ Off
+    _UPDATING = 0            # Model Updating: On/ Off
     _ARDUINO = 0             # Arduino input: On/Off
-    _DEBUG = 0               # Debugging mode
+    _DEBUG = 1               # Debugging mode
     _REALISTICSIMULATION = 0 # Wait as long as it was originally. Only valid with _SIMULATION = 1
 
 ##############################################
            ###  DO NOT MODIFY ###            #
                                              #
-elif _COMPATIBLE_MODE == 01:                 #
+elif _COMPATIBLE_MODE == 1:                 #
     ### "Processing 3" mode ###              #
     _MODE_NAME = "Processing 3"              #
     _LOG = 1*1                               #
@@ -56,7 +56,7 @@ elif _COMPATIBLE_MODE == 01:                 #
     _DEBUG = 0*0                             #
     _REALISTICSIMULATION = 1*1               #
                                              #
-elif _COMPATIBLE_MODE == 02:                 #
+elif _COMPATIBLE_MODE == 2:                 #
     ### Android mode ###                     #
     # DO NOT MODIFY                          #
     _MODE_NAME = "Android"                   #
@@ -69,7 +69,7 @@ elif _COMPATIBLE_MODE == 02:                 #
     _DEBUG = 0*0                             #
     _REALISTICSIMULATION = 1*1               #
                                              #
-elif _COMPATIBLE_MODE == 03:                 #
+elif _COMPATIBLE_MODE == 3:                 #
     ### Informative ###                      #
     # DO NOT MODIFY                          #
     _MODE_NAME = "Informative mode"          #
@@ -112,23 +112,23 @@ if _LOG:
     import time
     import datetime
     TIC = time.time()
-    print '------------------------------------'
-    print 'Truss calculational program'
-    print 'Created by Máté Szedlák (23/11/2016)'
-    print 'Compatibility mode: ' + _MODE_NAME
+    print('------------------------------------')
+    print('Truss calculational program')
+    print('Created by Máté Szedlák (23/11/2016)')
+    print('Compatibility mode: ' + _MODE_NAME)
     if _SOLVER == 0:
-        print '- Solver is set to default'
+        print('- Solver is set to default')
     elif _SOLVER == 1:
-        print '- Solver is set to NumPy'
+        print('- Solver is set to NumPy')
     else:
         raise Exception("Solver settings are invalid!")
     if _UPDATING:
-        print '+ Model updating is turned ON'
+        print('+ Model updating is turned ON')
         if _SIMULATION:
-            print 'Input data is SIMULATED!'
+            print('Input data is SIMULATED!')
     else:
-        print '- Model updating is turned OFF'
-    print '------------------------------------'
+        print('- Model updating is turned OFF')
+    print('------------------------------------')
 
 
 if _ARDUINO:
@@ -136,8 +136,8 @@ if _ARDUINO:
     try:
         import serial
     except ImportError:
-        print "You tried to import \'serial\' in Windows mode without installing \'pySerial\'."
-        print "Please first install pySerial: http://playground.arduino.cc/Interfacing/Python"
+        print("You tried to import \'serial\' in Windows mode without installing \'pySerial\'.")
+        print("Please first install pySerial: http://playground.arduino.cc/Interfacing/Python")
         raise Exception('Android mode denied: pyserial not found')
 
     PORTNUMBER -= 1
@@ -146,7 +146,7 @@ if _ARDUINO:
         if PORTNUMBER >= len(PORTS):
             PORTNUMBER = 0
         time.sleep(0.6)
-        print 'Opening serial at port ' + str(PORTS[PORTNUMBER])
+        print('Opening serial at port ' + str(PORTS[PORTNUMBER]))
         try:
             SER.close()
         except Exception:
@@ -225,11 +225,11 @@ def invert(mat_x):
     #Get the identity matrix and append it to the right of mat_x
     #This is done because our row operations will make the identity into the inverse
     identity = make_identity(rows, cols)
-    for i in xrange(0, rows):
+    for i in range(0, rows):
         mat_x[i] += identity[i]
 
     i = 0
-    for j in xrange(0, cols):
+    for j in range(0, cols):
         #print("On col {0} and row {1}".format(j, i))
         #Check to see if there are any nonzero values below the current row in the current column
         zero_sum, first_non_zero = check_for_all_zeros(mat_x, i, j)
@@ -245,17 +245,17 @@ def invert(mat_x):
         mat_x[i] = [m/mat_x[i][j] for m in mat_x[i]]
 
         #Rescale all other rows to make their values 0 below mat_x[i][j]
-        for k in xrange(0, rows):
+        for k in range(0, rows):
             if k != i:
                 scaled_row = [mat_x[k][j] * m for m in mat_x[i]]
-                mat_x[k] = [mat_x[k][m] - scaled_row[m] for m in xrange(0, len(scaled_row))]
+                mat_x[k] = [mat_x[k][m] - scaled_row[m] for m in range(0, len(scaled_row))]
         #If either of these is true, we have iterated through the matrix, and are done
         if i == rows or j == cols:
             break
         i += 1
 
     #Get just the right hand matrix, which is now our inverse
-    for i in xrange(0, rows):
+    for i in range(0, rows):
         mat_x[i] = mat_x[i][cols:len(mat_x[i])]
     return mat_x
 
@@ -271,7 +271,7 @@ def check_for_all_zeros(mat_x, i, j):
     """
     non_zeros = []
     first_non_zero = -1
-    for k in xrange(i, len(mat_x)):
+    for k in range(i, len(mat_x)):
         non_zero = mat_x[k][j] != 0
         non_zeros.append(non_zero)
         if first_non_zero == -1 and non_zero:
@@ -310,9 +310,9 @@ def make_identity(row_num, col_num):
     returns - list of lists corresponding to  the identity matrix
     """
     identity = []
-    for i in xrange(0, row_num):
+    for i in range(0, row_num):
         row = []
-        for j in xrange(0, col_num):
+        for j in range(0, col_num):
             elem = 0
             if i == j:
                 elem = 1
@@ -409,12 +409,12 @@ if _GRAPHICS:
         else:
             plotname += ' - Unnamed'
 
-        print plotname + ": "
+        print(plotname + ": ")
         if showresult:
             dipslaydisplacement = deepcopy(struct.nodalcoord_def)
             if scaledisp != 1.0:
                 if _LOG:
-                    print('Displacements are scaled with factor: ') + str(scaledisp)
+                    print('Displacements are scaled with factor: ' + str(scaledisp))
                 for i in range(struct.nodenum):
                     for j in range(3):
                         dipslaydisplacement[i][j] = (struct.nodalcoord_def[i][j] -\
@@ -458,7 +458,7 @@ if _GRAPHICS:
                         else:
                             rgb_col = [1, 0, 0]
                 else:
-                    print 'Stresses are not calculated'
+                    print('Stresses are not calculated')
                     rgb_col = [1, 0, 0]
                 _ax.plot([dipslaydisplacement[struct.node[i][1]][0], dipslaydisplacement[struct.node[i][0]][0]], \
                         [dipslaydisplacement[struct.node[i][1]][1], dipslaydisplacement[struct.node[i][0]][1]], \
@@ -543,8 +543,8 @@ if _GRAPHICS:
         plt.show()
         if saveplot:
             fig.savefig(plotname + '.png')
-            print '\'' + plotname +'.png\' is saved.'
-            print '------------------------------------'
+            print('\'' + plotname +'.png\' is saved.')
+            print('------------------------------------')
         return
 
 def endoffile(givenfile, line):
@@ -566,9 +566,9 @@ def logtime(prev_time, title):
     """
     if _LOG:
         new_time = time.time()
-        print title
-        print 'Time: ' + str("{:10.3f}".format(new_time - prev_time))
-        print '------------------------------------'
+        print(title)
+        print('Time: ' + str("{:10.3f}".format(new_time - prev_time)))
+        print('------------------------------------')
         return new_time
     else:
         return 0
@@ -672,7 +672,7 @@ class Truss(object):
 
         with open(filename, "r") as sourcefile:
             sourceline = ""
-            while endoffile(sourcefile, sourceline):
+            while sourceline != "EOF":
                 sourceline = sourcefile.readline().strip()
 
                 if sourceline.upper() == "_ORIGIN":
@@ -779,7 +779,7 @@ class Truss(object):
             if i > 0 and (i < 8 or _UPDATING):
             #if i > 0:
                 if value == 0:
-                    print "The following was not found: " + readelementnames[i]
+                    print("The following was not found: " + readelementnames[i])
                     terminate = True
         if terminate:
             raise Exception
@@ -801,7 +801,7 @@ class Truss(object):
         _showvalues = 1     # Show values of forces
 
         if self._postprocessed == 0:
-            print 'Postprocess is needed before plotting structure!'
+            print('Postprocess is needed before plotting structure!')
         else:
             if scaledisplacement == 0:
                 scaledisplacement = 1.0           # Scale drwaing of displacements
@@ -825,7 +825,7 @@ class Truss(object):
             if ignorable == 0:
                 raise Exception('Coordinate list has repeating items. Calculation is terminated')
             else:
-                print "This node already exists. Input is ignored."
+                print("This node already exists. Input is ignored.")
             return 0
         else:
             return 1
@@ -975,12 +975,12 @@ class Truss(object):
                     self.analysis[dofname] = node*3+2
                     self.keypoint.append(node*3+2)
                 else:
-                    print "Z-direction is not allowed in 2D structures. Please check the \'MEASUREMENTS\' section in the input file."
+                    print("Z-direction is not allowed in 2D structures. Please check the \'MEASUREMENTS\' section in the input file.")
                     raise Exception
 
         self.keypnum = len(self.analysis)
         if self.keypnum == 0 and _UPDATING:
-            print "There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file."
+            print("There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file.")
             raise Exception
 
 
@@ -1084,7 +1084,7 @@ class Truss(object):
         """
         if self._stiffisfresh == 0:
             if _LOG:
-                print 'Stiffness matrix is recalculated'
+                print('Stiffness matrix is recalculated')
             self.calcstiffness()
 
         self.dis_new = [0.]*(self.nodenum*3-len(self.constraint))
@@ -1104,11 +1104,11 @@ class Truss(object):
         # SOLVING THE STRUCTURE
         if _SOLVER == 0:
             if _LOG:
-                print 'Built-in solver'
+                print('Built-in solver')
             self.dis_new = mat_vec_mult(invert(self.stiff_new), self.force_new)
         else:
             if _LOG:
-                print 'NumPy solver'
+                print('NumPy solver')
             self.dis_new = np.linalg.solve(np.array(self.stiff_new), np.array(self.force_new))
 
         self.displacement = deepcopy(self.init_disp)
@@ -1183,8 +1183,8 @@ class Truss(object):
                     self.effect[modnum] = [x for x in effect_temp]
                     self.toteffect[j] += abs(self.effect[modnum][j])
                 except IndexError:
-                    print "Maybe the mapping data is invalid."
-                    print "Please check the \'arduino_mapping.txt\' input whether the given DOFs are correct or not."
+                    print("Maybe the mapping data is invalid.")
+                    print("Please check the \'arduino_mapping.txt\' input whether the given DOFs are correct or not.")
                     raise IndexError
 
         self.effectratio = deepcopy(self.effect)
@@ -1195,7 +1195,7 @@ class Truss(object):
                 else:
                     self.effectratio[i][j] = 0
 
-        #print "   \'effectratio\' is not used yet"
+        #print("   \'effectratio\' is not used yet")
 
         # Sort by effectiveness
         for i in range(self.keypnum):
@@ -1225,7 +1225,7 @@ class Truss(object):
 
             MEASUREMENT: [[13X, -2.154], [16Y, 5.256], ...]
         """
-        #Print nodenumber option should be added! <XXX>
+        #print(nodenumber option should be added! <XXX>)
 
         delta = []
 
@@ -1233,9 +1233,9 @@ class Truss(object):
             try:
                 dof = self.analysis[loc.upper()]
             except KeyError:
-                print 'The given measurement location cannot be matched with the input data.'
-                print 'The available nodes are: {\'NAMES\': mapping addresses}'
-                print self.analysis
+                print('The given measurement location cannot be matched with the input data.')
+                print('The available nodes are: {\'NAMES\': mapping addresses}')
+                print(self.analysis)
                 SER.close()
                 raise Exception('Watchpoint name error')
 
@@ -1261,15 +1261,15 @@ class Truss(object):
         newdelta = delta
         j = 0
 
-        print "-----"
-        print "Step: 0/"+ str(self.iterationlimit)
+        print("-----")
+        print("Step: 0/"+ str(self.iterationlimit))
 
         while (error(newdelta) > self.errorlimit and j <= self.iterationlimit and (self.capable() or j <= 1)):     # Optimization loop
             j += 1
 
-            print "Error: " + str(error(newdelta))
-            print "-----"
-            print "Step: " + str(j) + "/"+ str(self.iterationlimit)
+            print("Error: " + str(error(newdelta)))
+            print("-----")
+            print("Step: " + str(j) + "/"+ str(self.iterationlimit))
 
             ratio = [0.]*modnum
             unit = 0
@@ -1289,8 +1289,8 @@ class Truss(object):
 
             for i, effect in enumerate(self.toteffect):
                 if effect == 0.0:
-                    print "None of the variables has effect on " + str(self.arduino_mapping[i])
-                    print "Model updating has no solution."
+                    print("None of the variables has effect on " + str(self.arduino_mapping[i]))
+                    print("Model updating has no solution.")
                     raise Exception
 
             for i in range(self.elenum):
@@ -1305,13 +1305,13 @@ class Truss(object):
                     *math.copysign(1, prevmodifications[modificationnumber] - self.unitmodification*ratio[modificationnumber])
                     # the last part is already the sign itself without the sign function
 
-            print "Ratio: " + str(scale)
+            print("Ratio: " + str(scale))
 
-        print "Final error: " + str(error(newdelta))
+        print("Final error: " + str(error(newdelta)))
 
         if not self.capable() and j > 1:
-            print "Optimization could not be finished successfully."
-            print "The remaining error is: " + str(error(newdelta))
+            print("Optimization could not be finished successfully.")
+            print("The remaining error is: " + str(error(newdelta)))
 
 
         with open(self.name + ' - UpdateResults'+ appendix +'.txt', 'a') as outfile:
@@ -1359,7 +1359,7 @@ class Truss(object):
         if errorlimit > 0.0:
             self.errorlimit = errorlimit
         else:
-            print "The error limit must be a positive number"
+            print("The error limit must be a positive number")
             raise Exception
 
     def setmodificationlimit(self, modificationlimit):
@@ -1369,7 +1369,7 @@ class Truss(object):
         if modificationlimit > 0.0 and modificationlimit < 1.0:
             self.modificationlimit = modificationlimit
         else:
-            print "The modification limit must be higher than 0.0 and lower than 1.0"
+            print("The modification limit must be higher than 0.0 and lower than 1.0")
             raise Exception
 
     def setunitmodification(self, unitmodification):
@@ -1379,7 +1379,7 @@ class Truss(object):
         if abs(unitmodification) >= 0.01 and abs(unitmodification) < 0.5:
             self.unitmodification = unitmodification
         else:
-            print "The absolut value of the unit modification must be minimum 0.01 and maximum 0.5"
+            print("The absolut value of the unit modification must be minimum 0.01 and maximum 0.5")
             raise Exception
 
     def setiterationlimit(self, iterationlimit):
@@ -1389,7 +1389,7 @@ class Truss(object):
         if int(iterationlimit) > 1 and int(iterationlimit) <= math.pow(10, 4):
             self.iterationlimit = int(iterationlimit)
         else:
-            print "The iterationlimit must be between 2 and 10.000"
+            print("The iterationlimit must be between 2 and 10.000")
             raise Exception
 
     def readarduino(self, base, saveinput):
@@ -1415,7 +1415,7 @@ class Truss(object):
                     else:
                         del arduinovalues[len(arduinovalues)-1]
                 except IndexError:
-                    print "Index Error... continuing"
+                    print("Index Error... continuing")
                 if len(arduinovalues) == len(self.arduino_mapping):
                     try:
                         for i in range(len(self.arduino_mapping)):
@@ -1430,18 +1430,18 @@ class Truss(object):
                         newdata = True
 
                     except ValueError:
-                        print "Value error... continuing"
+                        print("Value error... continuing")
                         SER.flushInput()
                         time.sleep(0.5)
                     except Exception:
-                        print "Type error: " + str(arduinovalues) + "... continuing"
+                        print("Type error: " + str(arduinovalues) + "... continuing")
                         SER.flushInput()
                         time.sleep(0.5)
 
             SER.flushInput()
 
         except serial.SerialTimeoutException:
-            print "Data could not be read... continuing"
+            print("Data could not be read... continuing")
             SER.flushInput()
             time.sleep(0.5)
 
@@ -1453,7 +1453,7 @@ class Truss(object):
             # Calculate differences
             delta = self.difference(self.displacement, self.measurement)
 
-            print "Delta: " + str(delta)
+            print("Delta: " + str(delta))
 
             newdata = False
             bigdifference = False
@@ -1496,21 +1496,21 @@ class Truss(object):
                         data[i] = float(arduinovalues[i])
                     self.processeddata = data
                 except Exception:
-                    print "Type error: " + str(arduinovalues) + "... continuing"
+                    print("Type error: " + str(arduinovalues) + "... continuing")
 
                 self.measurement = zip(self.arduino_mapping, data)
 
                 # Calculate differences
                 delta = self.difference(self.displacement, self.measurement)
                 time.sleep(sleeptime)
-                print delta
+                print(delta)
                 return delta
 
         except IndexError:
-            print "IndexError"
+            print("IndexError")
             #pass
         except Exception:
-            print "Exception in simulation data"
+            print("Exception in simulation data")
             #pass
 
     def updatemodel(self):
@@ -1553,11 +1553,11 @@ class Truss(object):
                         pass
                     if not delta is None:
                         self.optimize(delta)
-        print "Update statistics:"
-        print "Totally updated models: " + str(TRUSS.numofupdates[0] + TRUSS.numofupdates[1]++ TRUSS.numofupdates[2])
-        print "  Successfully updated models: " + str(TRUSS.numofupdates[0])
-        print "  Updates with running out of possibilities: " + str(TRUSS.numofupdates[2])
-        print "  Updates did not finshed: " + str(TRUSS.numofupdates[1])
+        print("Update statistics:")
+        print("Totally updated models: " + str(TRUSS.numofupdates[0] + TRUSS.numofupdates[1]++ TRUSS.numofupdates[2]))
+        print("  Successfully updated models: " + str(TRUSS.numofupdates[0]))
+        print("  Updates with running out of possibilities: " + str(TRUSS.numofupdates[2]))
+        print("  Updates did not finshed: " + str(TRUSS.numofupdates[1]))
 
     def calibrate(self):
         """
@@ -1567,10 +1567,10 @@ class Truss(object):
         restart = '0'
         accept = '0'
         arduinovalues = []
-        print "Before starting the model updating, the measuring tools must be calibrated."
-        print "The calibration should be done in load-free state."
+        print("Before starting the model updating, the measuring tools must be calibrated.")
+        print("The calibration should be done in load-free state.")
         while (answer_1 not in ['Y', 'N']):
-            answer_1 = raw_input('Can we start the calibration? (y/n) ').upper()
+            answer_1 = input('Can we start the calibration? (y/n) ').upper()
         if answer_1 == 'N':
             SER.close()
             raise Exception('Calibration is terminated')
@@ -1588,27 +1588,27 @@ class Truss(object):
                     del arduinovalues[len(arduinovalues)-1]               # if needed!!!
                     if len(arduinovalues) == len(self.arduino_mapping):
                         measurement = zip(self.arduino_mapping, arduinovalues)
-                        print "Calibration result:"
-                        print measurement
+                        print("Calibration result:")
+                        print(measurement)
                         while (accept not in ['Y', 'N']):
-                            accept = raw_input('Ok? Can we start the main part? Put on the loads! (y/n) ').upper()
+                            accept = input('Ok? Can we start the main part? Put on the loads! (y/n) ').upper()
                             if accept == 'N':
                                 restart = 'Y'
                     else:
-                        print "Data error. Calibartion is restarting."
-                        print "Arduino values:" + str(arduinovalues)
+                        print("Data error. Calibartion is restarting.")
+                        print("Arduino values:" + str(arduinovalues))
                         restart = 'Y'
                 else:
-                    print 'The calibration cannot be done: no data'
+                    print('The calibration cannot be done: no data')
                     while (restart not in ['Y', 'N']):
-                        restart = raw_input('Do you want to restart calibration? (y/n) ').upper()
+                        restart = input('Do you want to restart calibration? (y/n) ').upper()
             except Exception:
-                print 'The calibration cannot be done: exception was raised'
+                print('The calibration cannot be done: exception was raised')
                 while (restart not in ['Y', 'N']):
-                    restart = raw_input('Do you want to restart calibration? (y/n) ').upper()
+                    restart = input('Do you want to restart calibration? (y/n) ').upper()
 
         if restart == 'Y':
-            print "Restarting calibration"
+            print("Restarting calibration")
             SER.flushInput()
             return self.calibrate()
         elif restart == 'N':
@@ -1771,10 +1771,10 @@ PARTTIME = logtime(TIC, "Initialization")
 #  Define new truss
 TRUSS = Truss('bridge')
 if not _DEBUG:
-    TRUSS.name = raw_input('Test name: ')
+    TRUSS.name = input('Test name: ')
 else:
-    print "*** Debug mode ***"
-    print "*** The following file will be opened: " + TRUSS.name + ".str"
+    print("*** Debug mode ***")
+    print("*** The following file will be opened: " + TRUSS.name + ".str")
 
 # Read input file
 #TRUSS.read('lab_01.txt')
@@ -1782,8 +1782,8 @@ else:
 try:
     TRUSS.read(TRUSS.name + ".str")
 except IOError:
-    print "The following file could not be opened: " + TRUSS.name + ".str"
-    print "Please make sure that the structural data is available for the program in the running directory."
+    print("The following file could not be opened: " + TRUSS.name + ".str")
+    print("Please make sure that the structural data is available for the program in the running directory.")
     raise IOError
 
 #if _ARDUINO or _SIMULATION:                # deprecated
@@ -1840,9 +1840,9 @@ if _LOG:
     TAC = time.time()
     TOTALTIME = TAC-TIC
     if _UPDATING:
-        print "Update statistics:"
-        print "Totally updated models: " + str(TRUSS.numofupdates[0] + TRUSS.numofupdates[1]++ TRUSS.numofupdates[2])
-        print "  Successfully updated models: " + str(TRUSS.numofupdates[0])
-        print "  Updates with running out of possibilities: " + str(TRUSS.numofupdates[2])
-        print "  Updates did not finshed: " + str(TRUSS.numofupdates[1])
-    print 'Total time: ' + str("{:10.3f}".format(TOTALTIME))
+        print("Update statistics:")
+        print("Totally updated models: " + str(TRUSS.numofupdates[0] + TRUSS.numofupdates[1]++ TRUSS.numofupdates[2]))
+        print("  Successfully updated models: " + str(TRUSS.numofupdates[0]))
+        print("  Updates with running out of possibilities: " + str(TRUSS.numofupdates[2]))
+        print("  Updates did not finshed: " + str(TRUSS.numofupdates[1]))
+    print('Total time: ' + str("{:10.3f}".format(TOTALTIME)))
