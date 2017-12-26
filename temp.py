@@ -23,7 +23,7 @@ from copy import deepcopy
 
 _COMPATIBLE_MODE = 0
 
-_SIMULATION = 1                     # Simulating measurements based on input file
+_SIMULATION = 0                     # Simulating measurements based on input file
 
 PORTS = ['COM1', 'COM2', 'COM3']      # List of possible communication ports
 PORTNUMBER = 0                      # Applied communication port
@@ -34,11 +34,11 @@ if _COMPATIBLE_MODE == 0:
     _MODE_NAME = "User defined"
     _LOG = 1                 # Logging time
     _GRAPHICS = 1            # Graphical features
-    _SOLVER = 1              # 0: Basic solver, 1: NumPy solver
+    _SOLVER = 0              # 0: Basic solver, 1: NumPy solver
     _OSLIBRARYAVAILABLE = 1  # Basic OS file features (e.g. file size)
-    _UPDATING = 1            # Model Updating: On/ Off
+    _UPDATING = 0            # Model Updating: On/ Off
     _ARDUINO = 0             # Arduino input: On/Off
-    _DEBUG = 0               # Debugging mode
+    _DEBUG = 1               # Debugging mode
     _REALISTICSIMULATION = 0 # Wait as long as it was originally. Only valid with _SIMULATION = 1
 
 ##############################################
