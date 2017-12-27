@@ -232,7 +232,7 @@ class Arrow3D(FancyArrowPatch):
                         color=col, linewidth=4.0)
         plt.show()
         if saveplot:
-            fig.savefig("./Results/" + plotname + '.png')
+            fig.savefig("./Structures/" + plotname + '.png')
             print("'" + plotname + ".png' is saved.")
             print('------------------------------------')
         return
