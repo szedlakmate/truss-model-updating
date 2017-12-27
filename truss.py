@@ -18,7 +18,6 @@ from extra_math import invert as invert
 #from extra_math import swap_row as swap_row
 from extra_math import swap_col as swap_col
 #from extra_math import make_identity as make_identity
-from graphics import Arrow3D
 from config import Configuration
 
 
@@ -39,7 +38,7 @@ Conf = Configuration(_COMPATIBLE_MODE, _SIMULATION)
 PORTS = ['COM1', 'COM2', 'COM3']      # List of possible communication ports
 PORTNUMBER = 0                      # Applied communication port
 
-if _COMPATIBLE_MODE == 0:
+if _COMPATIBLE_MODE == 0*0:
     ### User defined ###
     # Modify as needed #
     Conf.mode_name = "User defined"
@@ -52,46 +51,46 @@ if _COMPATIBLE_MODE == 0:
     Conf.debug = 0               # Debugging mode
     Conf.realistic_simulation = 0 # Wait as long as it was originally. Only valid with _SIMULATION = 1
 
-if _OSLIBRARYAVAILABLE:
+if Conf.OSlib:
     import os
     try:
         if not os.path.exists("./Results/"):
             os.makedirs("./Results")
-    except Exception:
+    except FileNotFoundError:
         print("Error: Please manually create the 'Results' folder" 
               "in the root of the project")
         
 
-if _SIMULATION or not _UPDATING:
+if Conf.simulation or not Conf.updating:
     _ARDUINO = 0
 
 if _COMPATIBLE_MODE == 2:
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-if _LOG:
+if Conf.log:
     import time
     import datetime
     TIC = time.time()
     print('------------------------------------')
     print('Truss calculational program')
     print('Created by Máté Szedlák (23/11/2016)')
-    print('Compatibility mode: ' + _MODE_NAME)
-    if _SOLVER == 0:
+    print('Compatibility mode: ' + Conf.mode_name)
+    if Conf.solver == 0:
         print('- Solver is set to default')
-    elif _SOLVER == 1:
+    elif Conf.solver == 1:
         print('- Solver is set to NumPy')
     else:
         raise Exception("Solver settings are invalid!")
-    if _UPDATING:
+    if Conf.updating:
         print('+ Model updating is turned ON')
-        if _SIMULATION:
+        if Conf.simulation:
             print('Input data is SIMULATED!')
     else:
         print('- Model updating is turned OFF')
     print('------------------------------------')
 
 
-if _ARDUINO:
+if Conf.arduino:
     SER = 0
     try:
         import serial
@@ -139,16 +138,13 @@ if _ARDUINO:
 #        raise Exception('File not found: ' + mappingfile)
 
 
-if _SOLVER:
+if Conf.solver:
     # NumPy library for solving linear equations in another way
     import numpy as np
 
-if _GRAPHICS:
-    # libraries for drawing
-    import matplotlib.pyplot as plt
-    from matplotlib.patches import FancyArrowPatch
-    from mpl_toolkits.mplot3d import proj3d
-   
+if Conf.graphics:
+    # library for drawing
+    from graphics import Arrow3D
 
 
 # XXX DEPRECATED !
@@ -156,7 +152,7 @@ def endoffile(givenfile, line):
     """
     Check if end of file is reached. Implemented due to compatibility reasons.
     """
-    if _OSLIBRARYAVAILABLE:
+    if Conf.OSlib:
         return givenfile.tell() < os.fstat(givenfile.fileno()).st_size
     else:
         return not line == "EOF"
@@ -169,7 +165,7 @@ def logtime(prev_time, title):
     At the first call, should be called with TIC value. The input argument
     should be overwritten by this funvtion's return value.
     """
-    if _LOG:
+    if Conf.log:
         new_time = time.time()
         print(title)
         print('Time: ' + str("{:10.3f}".format(new_time - prev_time)))
@@ -185,7 +181,6 @@ def error(delta):
     sumerr = 0
     for deltaelement in delta:
         sumerr += deltaelement**2
-
     sumerr = math.sqrt(sumerr)
 
     return sumerr
@@ -381,7 +376,7 @@ class Truss(object):
 
         terminate = False
         for i, value in enumerate(self.readelements):
-            if i > 0 and (i < 8 or _UPDATING):
+            if i > 0 and (i < 8 or Conf.updating):
             #if i > 0:
                 if value == 0:
                     print("The following was not found: " + readelementnames[i])
@@ -584,7 +579,7 @@ class Truss(object):
                     raise Exception
 
         self.keypnum = len(self.analysis)
-        if self.keypnum == 0 and _UPDATING:
+        if self.keypnum == 0 and Conf.updating:
             print("There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file.")
             raise Exception
 
@@ -688,7 +683,7 @@ class Truss(object):
         Main solver of the code
         """
         if self._stiffisfresh == 0:
-            if _LOG:
+            if Conf.log:
                 print('Stiffness matrix is recalculated')
             self.calcstiffness()
 
@@ -707,12 +702,12 @@ class Truss(object):
             self.stiff_new[i] = [x + y for x, y in zip(self.stiff_new[i], stiffincrement)]
 
         # SOLVING THE STRUCTURE
-        if _SOLVER == 0:
-            if _LOG:
+        if Conf.solver == 0:
+            if Conf.log:
                 print('Built-in solver')
             self.dis_new = mat_vec_mult(invert(self.stiff_new), self.force_new)
         else:
-            if _LOG:
+            if Conf.log:
                 print('NumPy solver')
             self.dis_new = np.linalg.solve(np.array(self.stiff_new), np.array(self.force_new))
 
@@ -750,7 +745,7 @@ class Truss(object):
             stiff_new[i] = [x + y for x, y in zip(stiff_new[i], stiffincrement)]
 
         # SOLVING THE MODIFIED STRUCTURE
-        if _SOLVER == 0:
+        if Conf.solver == 0:
             dis_new = mat_vec_mult(invert(stiff_new), self.force_new)
         else:
             dis_new = np.linalg.solve(np.array(stiff_new), np.array(self.force_new))
@@ -1083,7 +1078,7 @@ class Truss(object):
                 prevreadtime = float(str(prevline.split(']')[1]).split(',')[1])
                 nowreadtime = float(str(arduinoline.split(']')[1]).split(',')[1])
                 try:
-                    if _REALISTICSIMULATION:
+                    if Conf.realistic_simulation:
                         sleeptime = nowreadtime - prevreadtime
                 except Exception:
                     pass
@@ -1293,79 +1288,83 @@ class Truss(object):
                 out_supports += str(i[0] - i[0]//3 + self._io_origin) + ', ' + str(i[1]) + ' | '
         # Not elegant solution
         out_specdofs = self.specdof_inputstring
-
-        with open(fname, 'w') as outfile:
-            # Writing data
-            outfile.write('Calculation of \'' + self.name + '\':\n\n')
-
-            outfile.write('Reactions\n')
-            #for i in range(len(self.force)//3):
-            prev = -1
-            for i in self.known_dis_a:
-                if self.dof == 3 or i%3 != 2:
-                    if i//3 != prev:
-                        if i < 100:
-                            outfile.write(' ')
-                            if i < 9:
+        try:
+            with open(fname, 'w') as outfile:
+                # Writing data
+                outfile.write('Calculation of \'' + self.name + '\':\n\n')
+    
+                outfile.write('Reactions\n')
+                #for i in range(len(self.force)//3):
+                prev = -1
+                for i in self.known_dis_a:
+                    if self.dof == 3 or i%3 != 2:
+                        if i//3 != prev:
+                            if i < 100:
                                 outfile.write(' ')
-                        nodalforce = ''
-                        if (i//3)*3+0 in self.known_dis_a:
-                            nodalforce += "{:10.2f}".format(self.force[(i//3)*3+0]) + ', '
-                        else:
-                            nodalforce += '            '
-                        if (i//3)*3+1 in self.known_dis_a:
-                            nodalforce += "{:10.2f}".format(self.force[(i//3)*3+1]) + ', '
-                        else:
-                            nodalforce += '            '
-                        if self.dof != 2 and (i//3)*3+2 in self.known_dis_a:
-                            nodalforce += "{:10.2f}".format(self.force[(i//3)*3+2]) + '\n'
-                        else:
-                            nodalforce += '          \n'
-                        if nodalforce != '                                  \n':
-                            outfile.write(str(i//3 + self._io_origin) + ', ' +  nodalforce)
-                    prev = i//3
-            outfile.write('\n')
-
-            outfile.write('Displacements\n')
-            for i in range(len(self.displacement)//3):
-                if i < 100:
-                    outfile.write(' ')
-                    if i < 9:
+                                if i < 9:
+                                    outfile.write(' ')
+                            nodalforce = ''
+                            if (i//3)*3+0 in self.known_dis_a:
+                                nodalforce += "{:10.2f}".format(self.force[(i//3)*3+0]) + ', '
+                            else:
+                                nodalforce += '            '
+                            if (i//3)*3+1 in self.known_dis_a:
+                                nodalforce += "{:10.2f}".format(self.force[(i//3)*3+1]) + ', '
+                            else:
+                                nodalforce += '            '
+                            if self.dof != 2 and (i//3)*3+2 in self.known_dis_a:
+                                nodalforce += "{:10.2f}".format(self.force[(i//3)*3+2]) + '\n'
+                            else:
+                                nodalforce += '          \n'
+                            if nodalforce != '                                  \n':
+                                outfile.write(str(i//3 + self._io_origin) + ', ' +  nodalforce)
+                        prev = i//3
+                outfile.write('\n')
+    
+                outfile.write('Displacements\n')
+                for i in range(len(self.displacement)//3):
+                    if i < 100:
                         outfile.write(' ')
-                outfile.write(str(i + self._io_origin) + ', ' +  "{:10.3f}".format(self.displacement[i*3 +0]) + ', ' \
-                      + "{:10.3f}".format(self.displacement[i*3 +1]) + ', ' + "{:10.3f}".format(self.displacement[i*3 +2]) + ', ' + '\n')
-            outfile.write('\n')
-
-            outfile.write('Stresses\n')
-            for i, stress in enumerate(self.stress):
-                if i < 100:
-                    outfile.write(' ')
-                    if i < 9:
+                        if i < 9:
+                            outfile.write(' ')
+                    outfile.write(str(i + self._io_origin) + ', ' +  "{:10.3f}".format(self.displacement[i*3 +0]) + ', ' \
+                          + "{:10.3f}".format(self.displacement[i*3 +1]) + ', ' + "{:10.3f}".format(self.displacement[i*3 +2]) + ', ' + '\n')
+                outfile.write('\n')
+    
+                outfile.write('Stresses\n')
+                for i, stress in enumerate(self.stress):
+                    if i < 100:
                         outfile.write(' ')
-                outfile.write(str(i + self._io_origin) + ', ' +  "{:10.3f}".format(stress) + '\n')
-            outfile.write('\n')
-
-            # Saving original input
-            outfile.write('----- Original input: -----\n\n')
-            outfile.write('_ORIGIN\n')
-            outfile.write(str(self._io_origin) + '\n\n')
-            outfile.write('DOF\n')
-            outfile.write(str(self.dof) + '\n\n')
-            outfile.write('ELEMENTS\n')
-            outfile.write(out_element + '\n\n')
-            outfile.write('COORDINATES\n')
-            outfile.write(out_coords + '\n\n')
-            outfile.write('CROSS-SECTIONS\n')
-            outfile.write(out_crsect + '\n\n')
-            outfile.write('MATERIALS\n')
-            outfile.write(out_materials + '\n\n')
-            outfile.write('FORCES\n')
-            outfile.write(out_forces + '\n\n')
-            outfile.write('SUPPORTS\n')
-            outfile.write(out_supports + '\n\n')
-            outfile.write('SPECDOF\n')
-            outfile.write(out_specdofs + '\n\n')
-            outfile.write('EOF\n')
+                        if i < 9:
+                            outfile.write(' ')
+                    outfile.write(str(i + self._io_origin) + ', ' +  "{:10.3f}".format(stress) + '\n')
+                outfile.write('\n')
+    
+                # Saving original input
+                outfile.write('----- Original input: -----\n\n')
+                outfile.write('_ORIGIN\n')
+                outfile.write(str(self._io_origin) + '\n\n')
+                outfile.write('DOF\n')
+                outfile.write(str(self.dof) + '\n\n')
+                outfile.write('ELEMENTS\n')
+                outfile.write(out_element + '\n\n')
+                outfile.write('COORDINATES\n')
+                outfile.write(out_coords + '\n\n')
+                outfile.write('CROSS-SECTIONS\n')
+                outfile.write(out_crsect + '\n\n')
+                outfile.write('MATERIALS\n')
+                outfile.write(out_materials + '\n\n')
+                outfile.write('FORCES\n')
+                outfile.write(out_forces + '\n\n')
+                outfile.write('SUPPORTS\n')
+                outfile.write(out_supports + '\n\n')
+                outfile.write('SPECDOF\n')
+                outfile.write(out_specdofs + '\n\n')
+                outfile.write('EOF\n')
+        except FileNotFoundError:
+            print("Error: Please manually create the 'Results' folder" 
+              "in the root of the project")
+            
 
 ##################################
 #   BEGINNING OF THE MAIN PART   #
@@ -1375,7 +1374,7 @@ PARTTIME = logtime(TIC, "Initialization")
 
 #  Define new truss
 TRUSS = Truss('bridge')
-if not _DEBUG:
+if not Conf.debug:
     TRUSS.name = input('Test name: ')
 else:
     print("*** Debug mode ***")
@@ -1408,7 +1407,7 @@ TRUSS.solve()
 
 PARTTIME = logtime(PARTTIME, "Solving")
 
-if _UPDATING:
+if Conf.updating:
     TRUSS.setunitmodification(0.05)
     TRUSS.seterrorlimit(1.2)
     TRUSS.setmodificationlimit(0.7)
@@ -1417,7 +1416,7 @@ if _UPDATING:
 
 PARTTIME = logtime(PARTTIME, "Updating numerical model")
 
-if _GRAPHICS:
+if Conf.graphics:
     # Plot settings:
     # O: Original D: Deformed S: Supports F: Forces R: Reactions
     # ScD: Scale displacments (Z-axis) (def:1.0) ScF: Scale forces (def:1.0)
@@ -1441,10 +1440,10 @@ if _ARDUINO:
     # Closing Arduino port
     SER.close()
 
-if _LOG:
+if Conf.log:
     TAC = time.time()
     TOTALTIME = TAC-TIC
-    if _UPDATING:
+    if Conf.updating:
         print("Update statistics:")
         print("Totally updated models: " + str(TRUSS.numofupdates[0] + TRUSS.numofupdates[1]++ TRUSS.numofupdates[2]))
         print("  Successfully updated models: " + str(TRUSS.numofupdates[0]))
