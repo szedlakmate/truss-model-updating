@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Dec 27 10:02:39 2017
-
-@author: Pragm
 """
 from copy import deepcopy
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
+
 
 class Arrow3D(FancyArrowPatch):
     """
@@ -25,8 +24,8 @@ class Arrow3D(FancyArrowPatch):
         self.set_positions((_xs[0], _ys[0]), (_xs[1], _ys[1]))
         FancyArrowPatch.draw(self, renderer)
 
-    def plotstructure(struct, showorig, showresult, showsupports, \
-            showforces, showreactions, scaledisp, scale_f, z_corr, showvalues, saveplot, _LOG):
+    def plotstructure(struct, showorig, showresult, showsupports,
+            showforces, showreactions, scaledisp, scale_f, z_corr, showvalues, saveplot, log=0):
         """
         General plotting method for structures
 
@@ -47,7 +46,7 @@ class Arrow3D(FancyArrowPatch):
         # 2: [1, 1-x, 0-x]          Red to White
         # 3: [1, (1-x)/2, (1-x)/2]  Red to MildRed - Distincts pressure and tension
         # 4: [x, 1-x, 0]            Red to Green
-        _coloring = 3 # € [0, 1, 2, 3, 4]
+        _coloring = 3  # € [0, 1, 2, 3, 4]
 
         fig = plt.figure()
         _ax = fig.add_subplot(111, projection='3d')
@@ -71,7 +70,7 @@ class Arrow3D(FancyArrowPatch):
         yframe = max(deltay * 1.5, 2)
 
         if struct.dof == 3:
-            plot_height = plot_width * ((deltay + yframe*2)/(deltax + xframe*2)) *0.3
+            plot_height = plot_width * ((deltay + yframe*2)/(deltax + xframe*2)) * 0.3
         else:
             plot_height = plot_width * 0.5
         fig.set_size_inches(plot_width, plot_height)
@@ -103,18 +102,18 @@ class Arrow3D(FancyArrowPatch):
         if showresult:
             dipslaydisplacement = deepcopy(struct.nodalcoord_def)
             if scaledisp != 1.0:
-                if _LOG:
+                if log:
                     print('Displacements are scaled with factor: ' + str(scaledisp))
                 for i in range(struct.nodenum):
                     for j in range(3):
-                        dipslaydisplacement[i][j] = (struct.nodalcoord_def[i][j] -\
+                        dipslaydisplacement[i][j] = (struct.nodalcoord_def[i][j] -
                         struct.nodalcoord[i][j]) * scaledisp + struct.nodalcoord[i][j]
 
         for i in range(struct.elenum):
             # Plot undeformed structure
             if showorig:
-                _ax.plot([struct.nodalcoord[struct.node[i][1]][0], struct.nodalcoord[struct.node[i][0]][0]], \
-                    [struct.nodalcoord[struct.node[i][1]][1], struct.nodalcoord[struct.node[i][0]][1]], \
+                _ax.plot([struct.nodalcoord[struct.node[i][1]][0], struct.nodalcoord[struct.node[i][0]][0]],
+                    [struct.nodalcoord[struct.node[i][1]][1], struct.nodalcoord[struct.node[i][0]][1]],
                     zs=[struct.nodalcoord[struct.node[i][1]][2], struct.nodalcoord[struct.node[i][0]][2]], color='b')
             # Plot deformed structure
             if showresult:
@@ -123,13 +122,13 @@ class Arrow3D(FancyArrowPatch):
                         if _coloring == 1:
                             rgb_col = [0, 0, abs(struct.stresscolor[i])]
                         elif _coloring == 2:
-                            rgb_col = [1-abs(struct.stresscolor[i]), \
+                            rgb_col = [1-abs(struct.stresscolor[i]),
                                        1-abs(struct.stresscolor[i]), 1]
                         elif _coloring == 3:
-                            rgb_col = [(1-abs(struct.stresscolor[i]))/2, \
+                            rgb_col = [(1-abs(struct.stresscolor[i]))/2,
                                        (1-abs(struct.stresscolor[i]))/2, 1]
                         elif _coloring == 4:
-                            rgb_col = [0, 1-abs(struct.stresscolor[i]), \
+                            rgb_col = [0, 1-abs(struct.stresscolor[i]),
                                        abs(struct.stresscolor[i])]
                         else:
                             rgb_col = [1, 0, 0]
@@ -137,22 +136,23 @@ class Arrow3D(FancyArrowPatch):
                         if _coloring == 1:
                             rgb_col = [abs(struct.stresscolor[i]), 0, 0]
                         elif _coloring == 2:
-                            rgb_col = [1, 1-abs(struct.stresscolor[i]), \
+                            rgb_col = [1, 1-abs(struct.stresscolor[i]),
                                        1-abs(struct.stresscolor[i])]
                         elif _coloring == 3:
-                            rgb_col = [1, (1-abs(struct.stresscolor[i]))/2, \
+                            rgb_col = [1, (1-abs(struct.stresscolor[i]))/2,
                                        (1-abs(struct.stresscolor[i]))/2]
                         elif _coloring == 4:
-                            rgb_col = [abs(struct.stresscolor[i]), \
+                            rgb_col = [abs(struct.stresscolor[i]),
                                        1-abs(struct.stresscolor[i]), 0]
                         else:
                             rgb_col = [1, 0, 0]
                 else:
                     print('Stresses are not calculated')
                     rgb_col = [1, 0, 0]
-                _ax.plot([dipslaydisplacement[struct.node[i][1]][0], dipslaydisplacement[struct.node[i][0]][0]], \
-                        [dipslaydisplacement[struct.node[i][1]][1], dipslaydisplacement[struct.node[i][0]][1]], \
-                        zs=[dipslaydisplacement[struct.node[i][1]][2], dipslaydisplacement[struct.node[i][0]][2]], color=rgb_col)
+                _ax.plot([dipslaydisplacement[struct.node[i][1]][0], dipslaydisplacement[struct.node[i][0]][0]],
+                        [dipslaydisplacement[struct.node[i][1]][1], dipslaydisplacement[struct.node[i][0]][1]],
+                        zs=[dipslaydisplacement[struct.node[i][1]][2], dipslaydisplacement[struct.node[i][0]][2]],
+                        color=rgb_col)
 
         if showforces:
             for i in struct.known_f_notzero:
@@ -166,9 +166,9 @@ class Arrow3D(FancyArrowPatch):
                     f_dir = [0., value*scale_f, 0.]
                 else:
                     f_dir = [0., 0., value*scale_f*z_corr]
-                f_arrow = Arrow3D([struct.nodalcoord[i//3][0], struct.nodalcoord[i//3][0] + f_dir[0]], \
-                                  [struct.nodalcoord[i//3][1], struct.nodalcoord[i//3][1] + f_dir[1]], \
-                                  [struct.nodalcoord[i//3][2], struct.nodalcoord[i//3][2] + f_dir[2]], \
+                f_arrow = Arrow3D([struct.nodalcoord[i//3][0], struct.nodalcoord[i//3][0] + f_dir[0]],
+                                  [struct.nodalcoord[i//3][1], struct.nodalcoord[i//3][1] + f_dir[1]],
+                                  [struct.nodalcoord[i//3][2], struct.nodalcoord[i//3][2] + f_dir[2]],
                                   mutation_scale=20, lw=1, arrowstyle="-|>", color="k")
                 _ax.add_artist(f_arrow)
 
@@ -187,9 +187,9 @@ class Arrow3D(FancyArrowPatch):
                 else:
                     f_dir = [0., 0., value*scale_f*z_corr]
                 if abs(struct.force[i]) > 0:
-                    f_arrow = Arrow3D([struct.nodalcoord[i//3][0], struct.nodalcoord[i//3][0] + f_dir[0]], \
-                                      [struct.nodalcoord[i//3][1], struct.nodalcoord[i//3][1] + f_dir[1]], \
-                                      [struct.nodalcoord[i//3][2], struct.nodalcoord[i//3][2] + f_dir[2]], \
+                    f_arrow = Arrow3D([struct.nodalcoord[i//3][0], struct.nodalcoord[i//3][0] + f_dir[0]],
+                                      [struct.nodalcoord[i//3][1], struct.nodalcoord[i//3][1] + f_dir[1]],
+                                      [struct.nodalcoord[i//3][2], struct.nodalcoord[i//3][2] + f_dir[2]],
                                       mutation_scale=20, lw=1, arrowstyle="-|>", color="darkolivegreen")
                     _ax.add_artist(f_arrow)
                     if showvalues:
@@ -198,19 +198,19 @@ class Arrow3D(FancyArrowPatch):
                         _ax.set_zticklabels([])
                         if not i//3 == e_previous//3:
                             if struct.dof == 3:
-                                _ax.text(struct.nodalcoord[i//3][0], \
-                                    struct.nodalcoord[i//3][1], \
-                                    struct.nodalcoord[i//3][2], \
-                                    "{:10.2f}".format(struct.force[(i//3)*3+0])+'\n'+\
-                                    "{:10.2f}".format(struct.force[(i//3)*3+1])+'\n'+\
-                                    "{:10.2f}".format(struct.force[(i//3)*3+2]),\
+                                _ax.text(struct.nodalcoord[i//3][0],
+                                    struct.nodalcoord[i//3][1],
+                                    struct.nodalcoord[i//3][2],
+                                    "{:10.2f}".format(struct.force[(i//3)*3+0])+'\n' +
+                                    "{:10.2f}".format(struct.force[(i//3)*3+1])+'\n' +
+                                    "{:10.2f}".format(struct.force[(i//3)*3+2]),
                                     fontsize=12, horizontalalignment='right')
                             elif struct.dof == 2:
-                                _ax.text(struct.nodalcoord[i//3][0], \
-                                    struct.nodalcoord[i//3][1], \
-                                    struct.nodalcoord[i//3][2], \
-                                    "{:10.2f}".format(struct.force[(i//3)*3+0])+'\n'+\
-                                    "{:10.2f}".format(struct.force[(i//3)*3+1]),\
+                                _ax.text(struct.nodalcoord[i//3][0],
+                                    struct.nodalcoord[i//3][1],
+                                    struct.nodalcoord[i//3][2],
+                                    "{:10.2f}".format(struct.force[(i//3)*3+0])+'\n' +
+                                    "{:10.2f}".format(struct.force[(i//3)*3+1]),
                                     fontsize=12, horizontalalignment='right')
                 e_previous = i
 
@@ -226,13 +226,13 @@ class Arrow3D(FancyArrowPatch):
                     f_dir = [0., 0., -1.0 * scale_sup * z_corr]
                     col = 'brown'
                 if i % 3 != 2 or struct.dof == 3:
-                    _ax.plot([struct.nodalcoord[i//3][0], struct.nodalcoord[i//3][0]+f_dir[0]], \
-                        [struct.nodalcoord[i//3][1], struct.nodalcoord[i//3][1]+f_dir[1]], \
-                        zs=[struct.nodalcoord[i//3][2], struct.nodalcoord[i//3][2]+f_dir[2]], \
+                    _ax.plot([struct.nodalcoord[i//3][0], struct.nodalcoord[i//3][0]+f_dir[0]],
+                        [struct.nodalcoord[i//3][1], struct.nodalcoord[i//3][1]+f_dir[1]],
+                        zs=[struct.nodalcoord[i//3][2], struct.nodalcoord[i//3][2]+f_dir[2]],
                         color=col, linewidth=4.0)
         plt.show()
         if saveplot:
-            fig.savefig("./Results/"+ plotname + '.png')
-            print("'" + plotname +".png' is saved.")
+            fig.savefig("./Results/" + plotname + '.png')
+            print("'" + plotname + ".png' is saved.")
             print('------------------------------------')
         return

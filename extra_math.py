@@ -13,11 +13,12 @@ def mat_vec_mult(mat_a, vec_b):
     Source:
     https://stackoverflow.com/questions/10508021/matrix-multiplication-in-python
     """
-    vec_c = [0.]*len(mat_a)
+    vec_c = [0.] * len(mat_a)
     for i, row in enumerate(mat_a):
         for j, elem in enumerate(vec_b):
-            vec_c[i] += row[j]*elem
+            vec_c[i] += row[j] * elem
     return vec_c
+
 
 def invert(mat_x):
     """
@@ -31,49 +32,50 @@ def invert(mat_x):
     Source:
     http://www.vikparuchuri.com/blog/inverting-your-very-own-matrix/
     """
-    #copy X to avoid altering input
+    # copy X to avoid altering input
     mat_x = deepcopy(mat_x)
 
-    #Get dimensions of X
+    # Get dimensions of X
     rows = len(mat_x)
     cols = len(mat_x[0])
 
-    #Get the identity matrix and append it to the right of mat_x
-    #This is done because our row operations will make the identity into the inverse
+    # Get the identity matrix and append it to the right of mat_x
+    # This is done because our row operations will make the identity into the inverse
     identity = make_identity(rows, cols)
     for i in range(0, rows):
         mat_x[i] += identity[i]
 
     i = 0
     for j in range(0, cols):
-        #print("On col {0} and row {1}".format(j, i))
-        #Check to see if there are any nonzero values below the current row in the current column
+        # print("On col {0} and row {1}".format(j, i))
+        # Check to see if there are any nonzero values below the current row in the current column
         zero_sum, first_non_zero = check_for_all_zeros(mat_x, i, j)
-        #If everything is zero, increment the columns
+        # If everything is zero, increment the columns
         if zero_sum == 0:
             if j == cols:
                 return mat_x
             raise Exception("Matrix is singular")
-        #If mat_x[i][j] is 0, and there is a nonzero value below it, swap the two rows
+        # If mat_x[i][j] is 0, and there is a nonzero value below it, swap the two rows
         if first_non_zero != i:
             mat_x = swap_row(mat_x, i, first_non_zero)
-        #Divide mat_x[i] by mat_x[i][j] to make mat_x[i][j] equal 1
-        mat_x[i] = [m/mat_x[i][j] for m in mat_x[i]]
+        # Divide mat_x[i] by mat_x[i][j] to make mat_x[i][j] equal 1
+        mat_x[i] = [m / mat_x[i][j] for m in mat_x[i]]
 
-        #Rescale all other rows to make their values 0 below mat_x[i][j]
+        # Rescale all other rows to make their values 0 below mat_x[i][j]
         for k in range(0, rows):
             if k != i:
                 scaled_row = [mat_x[k][j] * m for m in mat_x[i]]
                 mat_x[k] = [mat_x[k][m] - scaled_row[m] for m in range(0, len(scaled_row))]
-        #If either of these is true, we have iterated through the matrix, and are done
+        # If either of these is true, we have iterated through the matrix, and are done
         if i == rows or j == cols:
             break
         i += 1
 
-    #Get just the right hand matrix, which is now our inverse
+    # Get just the right hand matrix, which is now our inverse
     for i in range(0, rows):
         mat_x[i] = mat_x[i][cols:len(mat_x[i])]
     return mat_x
+
 
 def check_for_all_zeros(mat_x, i, j):
     """
@@ -95,6 +97,7 @@ def check_for_all_zeros(mat_x, i, j):
     zero_sum = sum(non_zeros)
     return zero_sum, first_non_zero
 
+
 def swap_row(mat_x, i, j):
     """
     Swap row i and row j in a list of lists
@@ -106,9 +109,10 @@ def swap_row(mat_x, i, j):
     mat_x[j], mat_x[i] = mat_x[i], mat_x[j]
     return mat_x
 
+
 def swap_col(mat_x, i, j):
     """
-    Swap colum i and column j in a list of lists
+    Swap column i and column j in a list of lists
     mat_x - list of lists
     i - column index
     j - column index
@@ -117,6 +121,7 @@ def swap_col(mat_x, i, j):
     for item in mat_x:
         item[i], item[j] = item[j], item[i]
     return mat_x
+
 
 def make_identity(row_num, col_num):
     """
