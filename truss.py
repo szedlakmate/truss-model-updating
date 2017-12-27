@@ -108,6 +108,13 @@ else:                                        #
 
 if _OSLIBRARYAVAILABLE:
     import os
+    try:
+        if not os.path.exists("./Results/"):
+            os.makedirs("./Results")
+    except Exception:
+        print("Error: Please manually create the 'Results' folder" 
+              "in the root of the project")
+        
 
 if _SIMULATION or not _UPDATING:
     _ARDUINO = 0
@@ -418,11 +425,13 @@ if _GRAPHICS:
                         color=col, linewidth=4.0)
         plt.show()
         if saveplot:
-            fig.savefig(plotname + '.png')
-            print('\'' + plotname +'.png\' is saved.')
+            fig.savefig("./Results/"+ plotname + '.png')
+            print("'" + plotname +".png' is saved.")
             print('------------------------------------')
         return
 
+
+# XXX DEPRECATED !
 def endoffile(givenfile, line):
     """
     Check if end of file is reached. Implemented due to compatibility reasons.
@@ -1704,7 +1713,7 @@ if _GRAPHICS:
 PARTTIME = logtime(PARTTIME, "Plotting")
 
 # Write results to file
-TRUSS.writeresults(TRUSS.name + ' - Results.txt')
+TRUSS.writeresults("./Results/" + TRUSS.name + ' - Results.txt')
 
 PARTTIME = logtime(PARTTIME, "Writing results to the output file")
 
