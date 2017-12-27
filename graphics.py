@@ -34,7 +34,7 @@ class Arrow3D(FancyArrowPatch):
         z_corr:    Scale z-axis
         """
         plotname = struct.name
-        plot_width = 18.0              # Plot width in inches
+        plot_width = 10.0              # Plot width in inches
         xframe = 0                     # Frame width at X direction
         yframe = 0                     # Frame width at Y direction
         zframe = 0                     # Frame width at Z direction
@@ -72,7 +72,7 @@ class Arrow3D(FancyArrowPatch):
         if struct.dof == 3:
             plot_height = plot_width * ((deltay + yframe*2)/(deltax + xframe*2)) * 0.3
         else:
-            plot_height = plot_width * 0.5
+            plot_height = plot_width * 0.5 * 0.5
         fig.set_size_inches(plot_width, plot_height)
 
         _ax.set_xlim3d(xmin - xframe, xmax + xframe)
