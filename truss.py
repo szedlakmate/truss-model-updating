@@ -5,28 +5,22 @@ Created on Sat Dec 30 18:49:40 2018
 3D truss model updater program created by Máté Szedlák (2016-2018).
 Copyright MIT, Máté Szedlák 2016-2018.
 """
-### Code for "Processing" only
-#size(640, 360)
-#background(126)
-
-import math
 import itertools
+import math
 from copy import deepcopy
-from extra_math import mat_vec_mult as mat_vec_mult
-from extra_math import invert as invert
-#from extra_math import check_for_all_zeros as check_for_all_zeros
-#from extra_math import swap_row as swap_row
-from extra_math import swap_col as swap_col
-#from extra_math import make_identity as make_identity
 from config import Configuration
+from extra_math import invert as invert
+from extra_math import mat_vec_mult as mat_vec_mult
+from extra_math import swap_col as swap_col
 
-
-# COMPATIBILITY MODES:
-    # 0: User defined
-    # 1: Processing3
-    # 2: Android
-    # 3: Most information (with numpy)
-    # 4: Maximum compatibility
+"""
+ COMPATIBILITY MODES:
+     0: User defined
+     1: DEPRECATED
+     2: Android
+     3: Most information (with numpy)
+     4: Maximum compatibility
+"""
 
 _COMPATIBLE_MODE = 0
 _SIMULATION = 1                     # Simulating measurements based on input file
@@ -38,7 +32,7 @@ PORTS = ['COM1', 'COM2', 'COM3']      # List of possible communication ports
 PORTNUMBER = 0                      # Applied communication port
 
 if _COMPATIBLE_MODE == 0*0:
-    ### User defined ###
+    #** User defined ***
     # Modify as needed #
     Conf.mode_name = "User defined"
     Conf.log = 1                 # Logging time
@@ -48,7 +42,7 @@ if _COMPATIBLE_MODE == 0*0:
     Conf.updating = 0            # Model Updating: On/ Off
     Conf.arduino = 0             # Arduino input: On/Off
     Conf.debug = 0               # Debugging mode
-    Conf.realistic_simulation = 0 # Wait as long as it was originally. Only valid with _SIMULATION = 1
+    Conf.realistic_simulation = 0  # Wait as long as it was originally. Only valid with _SIMULATION = 1
 
 if Conf.OSlib:
     import os
@@ -71,7 +65,7 @@ if Conf.log:
     import datetime
     TIC = time.time()
     print('------------------------------------')
-    print('Truss calculational program')
+    print('Truss calculation program')
     print('Created by Máté Szedlák (23/11/2016)')
     print('Compatibility mode: ' + Conf.mode_name)
     if Conf.solver == 0:
@@ -112,7 +106,8 @@ if Conf.arduino:
         try:
             SER = serial.Serial(PORTS[PORTNUMBER], 9600, timeout=0)
         except serial.SerialException:
-            Exception(PORTS[PORTNUMBER] + ' port is busy. It might be occupied by this program or another one :/ Be careful or try resetting this program')
+            Exception(PORTS[PORTNUMBER] + ' port is busy. It might be occupied by this program or another one :'
+                                          '/ Be careful or try resetting this program')
             SER = 0
             try:
                 SER.close()
@@ -125,17 +120,17 @@ if Conf.arduino:
             except Exception:
                 pass
 
+"""
+if _ARDUINO or _SIMULATION:
+    try:
+        mappingfile = 'arduino_mapping.txt'
+        with open(mappingfile, "r") as textfile:
+            line = textfile.readline().strip()
+            arduino_mapping = line.upper().split(',')
 
-#if _ARDUINO or _SIMULATION:
-#    try:
-#        mappingfile = 'arduino_mapping.txt'
-#        with open(mappingfile, "r") as textfile:
-#            line = textfile.readline().strip()
-#            arduino_mapping = line.upper().split(',')
-#
-#    except IOError:
-#        raise Exception('File not found: ' + mappingfile)
-
+    except IOError:
+        raise Exception('File not found: ' + mappingfile)
+"""
 
 if Conf.solver:
     # NumPy library for solving linear equations in another way
@@ -156,6 +151,7 @@ def endoffile(givenfile, line):
     else:
         return not line == "EOF"
 
+
 def logtime(prev_time, title):
     """
     Calculating and printing the time consumption of tasks
@@ -173,6 +169,7 @@ def logtime(prev_time, title):
     else:
         return 0
 
+
 def error(delta):
     """
     Error function using least-square method
@@ -183,6 +180,7 @@ def error(delta):
     sumerr = math.sqrt(sumerr)
 
     return sumerr
+
 
 class Truss(object):
     """
@@ -242,7 +240,8 @@ class Truss(object):
         self.modificationlimit = 0.6
         self.unitmodification = 0.05
         self.measurement = [0.]
-        self.numofupdates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit, #Updates where there were no more modification option]
+        self.numofupdates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit,
+                                             # #Updates where there were no more modification option]
         self.iterationlimit = 20
 
     def read(self, filename):
@@ -267,7 +266,8 @@ class Truss(object):
             EOF - For compatibility reasons EOF should be placed after the commands
         """
         self._io_origin = 0
-        readelementnames = ["Origin", "DOF", "Elements", "Coordinates", "Cross-sections", "Materials", "Forces", "Supports", "Measured DOFs"]
+        readelementnames = ["Origin", "DOF", "Elements", "Coordinates",
+                            "Cross-sections", "Materials", "Forces", "Supports", "Measured DOFs"]
 
         with open(filename, "r") as sourcefile:
             sourceline = ""
@@ -375,15 +375,14 @@ class Truss(object):
 
         terminate = False
         for i, value in enumerate(self.readelements):
-            if i > 0 and (i < 8 or Conf.updating):
-            #if i > 0:
+            if i > 0 and (i < 8 or Conf.updating):  # if i > 0:
                 if value == 0:
                     print("The following was not found: " + readelementnames[i])
                     terminate = True
         if terminate:
             raise Exception
 
-    def plot(self, showorig, showresult, showsupports, showforces, \
+    def plot(self, showorig, showresult, showsupports, showforces,
              showreactions, scaledisplacement, scaleforce, scalez, saveplot):
         """
         Plot function of the Truss class
@@ -409,8 +408,8 @@ class Truss(object):
             if scalez == 0:
                 scalez = 0.3                      # Scale z-axis
 
-            Arrow3D.plotstructure(self, showorig, showresult, showsupports, showforces, showreactions, \
-                 scaledisplacement, scaleforce, scalez, _showvalues, saveplot, Conf.log)
+            Arrow3D.plotstructure(self, showorig, showresult, showsupports, showforces, showreactions,
+                                  scaledisplacement, scaleforce, scalez, _showvalues, saveplot, Conf.log)
 
     def __checkcoordinates(self, ignorable):
         """
@@ -455,7 +454,7 @@ class Truss(object):
 
         # Creating mapping tool for elements
         for node in self.node:
-            self.eledof.append([node[0]*3, node[0]*3+1, node[0]*3+2, \
+            self.eledof.append([node[0]*3, node[0]*3+1, node[0]*3+2,
                                 node[1]*3, node[1]*3+1, node[1]*3+2])
 
         # Initialazing matrix for all matrices
@@ -474,7 +473,7 @@ class Truss(object):
         self._mod_stiffisfresh = 0
         if self.nodenum > len(self.nodalcoord):
             raise Exception('More coordinates are needed')
-        elif self.node == []:
+        elif not self.node:
             raise Exception('Nodes must be set before defining elements')
         self.__checkcoordinates(False)
 
@@ -574,14 +573,14 @@ class Truss(object):
                     self.analysis[dofname] = node*3+2
                     self.keypoint.append(node*3+2)
                 else:
-                    print("Z-direction is not allowed in 2D structures. Please check the \'MEASUREMENTS\' section in the input file.")
+                    print("Z-direction is not allowed in 2D structures. "
+                          "Please check the 'MEASUREMENTS' section in the input file.")
                     raise Exception
 
         self.keypnum = len(self.analysis)
         if self.keypnum == 0 and Conf.updating:
             print("There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file.")
             raise Exception
-
 
     def calcstiffness(self):
         """
@@ -594,7 +593,7 @@ class Truss(object):
                 self.constraint.append([int(zdof*3+2), 0.])
         self.constraint = list(k for k, _ in itertools.groupby(sorted(self.constraint)))
 
-        #Setting known forces
+        # Setting known forces
         for dofloc in range(3*self.nodenum):
             self.known_f_a.append(dofloc)
             if self.force[dofloc] != 0:
@@ -622,21 +621,21 @@ class Truss(object):
         self.stiffness = [[0.]*(len(self.nodalcoord)*3)]*(len(self.nodalcoord)*3)
 
         for i in range(self.elenum):
-            ele_length[i] = math.sqrt((self.nodalcoord[self.node[i][1]][0]-self.nodalcoord[self.node[i][0]][0])**2+ \
-                (self.nodalcoord[self.node[i][1]][1]-self.nodalcoord[self.node[i][0]][1])**2 + \
+            ele_length[i] = math.sqrt((self.nodalcoord[self.node[i][1]][0]-self.nodalcoord[self.node[i][0]][0])**2 +
+                (self.nodalcoord[self.node[i][1]][1]-self.nodalcoord[self.node[i][0]][1])**2 +
                 (self.nodalcoord[self.node[i][1]][2]-self.nodalcoord[self.node[i][0]][2])**2)
 
             self._cx[i] = (self.nodalcoord[self.node[i][1]][0]-self.nodalcoord[self.node[i][0]][0])/ele_length[i]
             self._cy[i] = (self.nodalcoord[self.node[i][1]][1]-self.nodalcoord[self.node[i][0]][1])/ele_length[i]
             self._cz[i] = (self.nodalcoord[self.node[i][1]][2]-self.nodalcoord[self.node[i][0]][2])/ele_length[i]
             self._norm_stiff[i] = self.el_mod[i]/ele_length[i]
-            self._s_loc[i] = [[self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i], -self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i]], \
-                [self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i], -self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i]], \
-                [self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2, -self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2], \
-                [-self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i], self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i]], \
-                [-self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i], self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i]], \
+            self._s_loc[i] = [[self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i], -self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i]],
+                [self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i], -self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i]],
+                [self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2, -self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2],
+                [-self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i], self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i]],
+                [-self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i], self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i]],
                 [-self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2, self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2]]
-            self._loc_stiff[i] = [[y* self.area[i]* self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
+            self._loc_stiff[i] = [[y * self.area[i] * self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
             ele_dof_vec = self.eledof[i]
 
             stiffincrement = [0.]*(len(self.nodalcoord)*3)
@@ -651,17 +650,17 @@ class Truss(object):
         """
         Convergency step in stiffness matrix modification
         """
-        if self.mod_stiffnesses == []:
+        if not self.mod_stiffnesses:
             self.mod_stiffnesses = [0.]*(self.elenum+1)
 
-        #for loopindex in range(self.elenum):
+        # for loopindex in range(self.elenum):
         _mod_stiffnesses_temp = [[0.]*(len(self.nodalcoord)*3)]*(len(self.nodalcoord)*3)
 
         for i in range(self.elenum):
             if i == index:
-                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i] + magnitude) #self.el_mod[i]/ele_length[i]
+                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i] + magnitude)  # self.el_mod[i]/ele_length[i]
             else:
-                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i]) #self.el_mod[i]/ele_length[i]
+                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i])  # self.el_mod[i]/ele_length[i]
 
             _mod_loc_stiff = [[y*self.area[i]*_mod_norm_stiff for y in x] for x in self._s_loc[i]]
 
@@ -672,10 +671,10 @@ class Truss(object):
             for j in range(3*2):
                 for k in range(3*2):
                     stiffincrement[ele_dof_vec[k]] = _mod_loc_stiff[j][k]
-                _mod_stiffnesses_temp[ele_dof_vec[j]] = [x + y for x, y in zip(_mod_stiffnesses_temp[ele_dof_vec[j]], stiffincrement)]
+                _mod_stiffnesses_temp[ele_dof_vec[j]] = [x + y for x, y in
+                                                         zip(_mod_stiffnesses_temp[ele_dof_vec[j]], stiffincrement)]
 
         self.mod_stiffnesses[index] = _mod_stiffnesses_temp
-
 
     def solve(self):
         """
@@ -718,14 +717,13 @@ class Truss(object):
         # Deformed shape
         self.nodalcoord_def = []
         for i in range(self.nodenum):
-            self.nodalcoord_def.append([self.nodalcoord[i][0]+ self.displacement[i*3+0], \
-                self.nodalcoord[i][1]+ self.displacement[i*3+1], self.nodalcoord[i][2]+ self.displacement[i*3+2]])
+            self.nodalcoord_def.append([self.nodalcoord[i][0] + self.displacement[i*3+0],
+                self.nodalcoord[i][1] + self.displacement[i*3+1], self.nodalcoord[i][2] + self.displacement[i*3+2]])
 
         # Postrpocesses
         self.postprocess()
 
         self.mod_displacements = [0.]*(self.elenum+1)
-
 
     def solvemodstruct(self, index):
         """
@@ -755,8 +753,6 @@ class Truss(object):
             mod_displacement_temp[kfa] = dis_new[i] - self.dis_new[i]
 
         self.mod_displacements[index] = [x + y for x, y in zip(self.mod_displacements[index], mod_displacement_temp)]
-
-
 
     def evaluate(self):
         """
@@ -794,7 +790,7 @@ class Truss(object):
                 else:
                     self.effectratio[i][j] = 0
 
-        #print("   \'effectratio\' is not used yet")
+        # print("   \'effectratio\' is not used yet")
 
         # Sort by effectiveness
         for i in range(self.keypnum):
@@ -805,9 +801,9 @@ class Truss(object):
                 if self.sortedeff[i][ktemp][i] < 0:
                     for jtemp in range(self.keypnum):
                         self.sortedeff[i][ktemp][jtemp] = abs(self.sortedeff[i][ktemp][jtemp])
-                        self.sortedeff[i][ktemp][self.keypnum +1] = -1
+                        self.sortedeff[i][ktemp][self.keypnum + 1] = -1
                 else:
-                    self.sortedeff[i][ktemp][self.keypnum +1] = +1
+                    self.sortedeff[i][ktemp][self.keypnum + 1] = +1
 
             for j in range(self.keypnum):
                 if i != j and j != 0:
@@ -824,7 +820,7 @@ class Truss(object):
 
             MEASUREMENT: [[13X, -2.154], [16Y, 5.256], ...]
         """
-        #print(nodenumber option should be added! <XXX>)
+        # print(nodenumber option should be added! <XXX>)
 
         delta = []
 
@@ -846,11 +842,9 @@ class Truss(object):
         """
         Modell updating - core function
         """
-        #modnum = min(10, self.elenum)
+        # modnum = min(10, self.elenum)
         modnum = self.elenum
         self.modifications = [0.0]*self.elenum
-
-
 
         if not _SIMULATION:
             appendix = ""
@@ -861,14 +855,15 @@ class Truss(object):
         j = 0
 
         print("-----")
-        print("Step: 0/"+ str(self.iterationlimit))
+        print("Step: 0/" + str(self.iterationlimit))
 
-        while (error(newdelta) > self.errorlimit and j <= self.iterationlimit and (self.capable() or j <= 1)):     # Optimization loop
+        # Optimization loop
+        while error(newdelta) > self.errorlimit and j <= self.iterationlimit and (self.capable() or j <= 1):
             j += 1
 
             print("Error: " + str(error(newdelta)))
             print("-----")
-            print("Step: " + str(j) + "/"+ str(self.iterationlimit))
+            print("Step: " + str(j) + "/" + str(self.iterationlimit))
 
             ratio = [0.]*modnum
             unit = 0
@@ -876,7 +871,9 @@ class Truss(object):
             prevmodifications = self.modifications
 
             for index in range(self.elenum):
-                self.modifications[index] = min(abs(self.modifications[index] - self.unitmodification), self.modificationlimit) *math.copysign(1, self.modifications[index]- self.unitmodification)
+                self.modifications[index] = min(abs(self.modifications[index] - self.unitmodification),
+                                                self.modificationlimit) * \
+                                            math.copysign(1, self.modifications[index] - self.unitmodification)
                 self.calcmodstiffness(index, self.modifications[index])
                 self.solvemodstruct(index)
             self.evaluate()
@@ -894,14 +891,18 @@ class Truss(object):
 
             for i in range(self.elenum):
                 modificationnumber = self.sortedeff[0][i][1]
-                ratio[modificationnumber] = abs(self.sortedeff[0][i][0] / self.toteffect[0])*math.copysign(1, self.sortedeff[0][i][2])
+                ratio[modificationnumber] = abs(self.sortedeff[0][i][0] / self.toteffect[0]) * \
+                                            math.copysign(1, self.sortedeff[0][i][2])
                 unit += abs(ratio[modificationnumber]*self.sortedeff[0][i][0])
 
             scale = newdelta[0]/unit
             for i in range(self.elenum):
                 modificationnumber = self.sortedeff[0][i][1]
-                self.modifications[modificationnumber] = min(abs(prevmodifications[modificationnumber] - self.unitmodification*ratio[modificationnumber]), self.modificationlimit)\
-                    *math.copysign(1, prevmodifications[modificationnumber] - self.unitmodification*ratio[modificationnumber])
+                self.modifications[modificationnumber] = min(abs(prevmodifications[modificationnumber] -
+                                                                 self.unitmodification*ratio[modificationnumber]),
+                                                             self.modificationlimit)\
+                    * math.copysign(1, prevmodifications[modificationnumber] -
+                                    self.unitmodification*ratio[modificationnumber])
                     # the last part is already the sign itself without the sign function
 
             print("Ratio: " + str(scale))
@@ -912,8 +913,7 @@ class Truss(object):
             print("Optimization could not be finished successfully.")
             print("The remaining error is: " + str(error(newdelta)))
 
-
-        with open(self.name + ' - UpdateResults'+ appendix +'.txt', 'a') as outfile:
+        with open(self.name + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
             if j > 1:
                 if j <= self.iterationlimit and self.capable():
                     self.numofupdates[0] += 1
@@ -929,7 +929,7 @@ class Truss(object):
             outfile.write("Requiered iterations: " + str(j) + "\n")
             outfile.write("Measurement: " + str(self.measurement) + "\n")
             outfile.write("Original delta: " + str(delta) + "\n")
-            outfile.write("New delta: " + str(newdelta) + " (limit: " + str(self.errorlimit) +")\n")
+            outfile.write("New delta: " + str(newdelta) + " (limit: " + str(self.errorlimit) + ")\n")
             outfile.write("Final error: " + str(error(newdelta)) + "\n")
             outfile.write("Modifications [%]: \n")
             outfile.write(str(self.modifications) + "\n")
@@ -940,14 +940,12 @@ class Truss(object):
                 outfile.write(str(self.mod_displacements[self.elenum]) + "\n")
             outfile.write("----------------------\n")
 
-
     def capable(self):
         """
         Function telling whether there are more options to modify
         """
-        capable = False
         for variable in self.modifications:
-            if abs(variable) <= 0.95*self.modificationlimit and abs(variable) > 0.01:
+            if 0.01 < abs(variable) <= 0.95*self.modificationlimit:
                 capable = True
         return capable
 
@@ -965,7 +963,7 @@ class Truss(object):
         """
         Setting modification limit for members (model updating)
         """
-        if modificationlimit > 0.0 and modificationlimit < 1.0:
+        if 0.0 < modificationlimit < 1.0:
             self.modificationlimit = modificationlimit
         else:
             print("The modification limit must be higher than 0.0 and lower than 1.0")
@@ -975,7 +973,7 @@ class Truss(object):
         """
         Setting modification step (model updating)
         """
-        if abs(unitmodification) >= 0.01 and abs(unitmodification) < 0.5:
+        if 0.01 <= abs(unitmodification) < 0.5:
             self.unitmodification = unitmodification
         else:
             print("The absolut value of the unit modification must be minimum 0.01 and maximum 0.5")
@@ -985,7 +983,7 @@ class Truss(object):
         """
         Setting maximum number of iterations (model updating)
         """
-        if int(iterationlimit) > 1 and int(iterationlimit) <= math.pow(10, 4):
+        if 1 < int(iterationlimit) <= math.pow(10, 4):
             self.iterationlimit = int(iterationlimit)
         else:
             print("The iterationlimit must be between 2 and 10.000")
@@ -1044,11 +1042,10 @@ class Truss(object):
             SER.flushInput()
             time.sleep(0.5)
 
-
         if newdata and not bigdifference and not readerror:
             self.measurement = zip(self.arduino_mapping, data)
 
-            saveinput.write(str(data) +', '+ str(time.time()) + "\n")
+            saveinput.write(str(data) + ', ' + str(time.time()) + "\n")
             # Calculate differences
             delta = self.difference(self.displacement, self.measurement)
 
@@ -1107,10 +1104,10 @@ class Truss(object):
 
         except IndexError:
             print("IndexError")
-            #pass
+            # pass
         except Exception:
             print("Exception in simulation data")
-            #pass
+            # pass
 
     def updatemodel(self):
         """
@@ -1133,7 +1130,8 @@ class Truss(object):
             # Saving input data
             if not _SIMULATION:
                 inputfile.write('Input data of \'' + self.name + '\':\n\n')
-                inputfile.write('Start Time: ' + str(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')) + "\n")
+                inputfile.write('Start Time: ' +
+                                str(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')) + "\n")
                 inputfile.write('Base: ' + str(base) + '\n')
 
             inputline = "[],0.0"
@@ -1150,7 +1148,7 @@ class Truss(object):
                             delta = self.simulatearduino(inputline, previnputline)
                     except Exception:
                         pass
-                    if not delta is None:
+                    if delta:
                         self.optimize(delta)
         print("Update statistics:")
         print("Totally updated models: " + str(TRUSS.numofupdates[0] + TRUSS.numofupdates[1]++ TRUSS.numofupdates[2]))
@@ -1160,7 +1158,8 @@ class Truss(object):
 
     def calibrate(self):
         """
-        Calibration for Arduino measurement. All the measurements will describe the dispalecements from the claibration-state.
+        Calibration for Arduino measurement.
+        All the measurements will describe the dispalecements from the claibration-state.
         """
         answer_1 = '0'
         restart = '0'
@@ -1168,7 +1167,7 @@ class Truss(object):
         arduinovalues = []
         print("Before starting the model updating, the measuring tools must be calibrated.")
         print("The calibration should be done in load-free state.")
-        while (answer_1 not in ['Y', 'N']):
+        while answer_1 not in ['Y', 'N']:
             answer_1 = input('Can we start the calibration? (y/n) ').upper()
         if answer_1 == 'N':
             SER.close()
@@ -1176,8 +1175,8 @@ class Truss(object):
         else:
             try:
                 SER.flushInput()
-                #time.sleep(0.2)
-                arduinoline = '' #SER.readline()
+                # time.sleep(0.2)
+                arduinoline = ''  # SER.readline()
                 while len(arduinoline) == 0:
                     time.sleep(0.2)
                     arduinoline = SER.readline()
@@ -1189,7 +1188,7 @@ class Truss(object):
                         measurement = zip(self.arduino_mapping, arduinovalues)
                         print("Calibration result:")
                         print(measurement)
-                        while (accept not in ['Y', 'N']):
+                        while accept not in ['Y', 'N']:
                             accept = input('Ok? Can we start the main part? Put on the loads! (y/n) ').upper()
                             if accept == 'N':
                                 restart = 'Y'
@@ -1199,11 +1198,11 @@ class Truss(object):
                         restart = 'Y'
                 else:
                     print('The calibration cannot be done: no data')
-                    while (restart not in ['Y', 'N']):
+                    while restart not in ['Y', 'N']:
                         restart = input('Do you want to restart calibration? (y/n) ').upper()
             except Exception:
                 print('The calibration cannot be done: exception was raised')
-                while (restart not in ['Y', 'N']):
+                while restart not in ['Y', 'N']:
                     restart = input('Do you want to restart calibration? (y/n) ').upper()
 
         if restart == 'Y':
@@ -1215,7 +1214,6 @@ class Truss(object):
             raise Exception('Calibration is terminated')
         if accept == 'Y':
             return measurement
-
 
     def postprocess(self):
         """
@@ -1242,7 +1240,7 @@ class Truss(object):
         """
         self.stress = [0.]*self.elenum
         for element in range(self.elenum):
-            locstiff = [-self._cx[element], -self._cy[element], -self._cz[element], \
+            locstiff = [-self._cx[element], -self._cy[element], -self._cz[element],
                          self._cx[element], self._cy[element], self._cz[element]]
             for i in range(3*2):
                 self.stress[element] += locstiff[i]*self.displacement[self.eledof[element][i]]
@@ -1293,10 +1291,10 @@ class Truss(object):
                 outfile.write('Calculation of \'' + self.name + '\':\n\n')
     
                 outfile.write('Reactions\n')
-                #for i in range(len(self.force)//3):
+                # for i in range(len(self.force)//3):
                 prev = -1
                 for i in self.known_dis_a:
-                    if self.dof == 3 or i%3 != 2:
+                    if self.dof == 3 or i % 3 != 2:
                         if i//3 != prev:
                             if i < 100:
                                 outfile.write(' ')
@@ -1316,7 +1314,7 @@ class Truss(object):
                             else:
                                 nodalforce += '          \n'
                             if nodalforce != '                                  \n':
-                                outfile.write(str(i//3 + self._io_origin) + ', ' +  nodalforce)
+                                outfile.write(str(i//3 + self._io_origin) + ', ' + nodalforce)
                         prev = i//3
                 outfile.write('\n')
     
@@ -1326,8 +1324,9 @@ class Truss(object):
                         outfile.write(' ')
                         if i < 9:
                             outfile.write(' ')
-                    outfile.write(str(i + self._io_origin) + ', ' +  "{:10.3f}".format(self.displacement[i*3 +0]) + ', ' \
-                          + "{:10.3f}".format(self.displacement[i*3 +1]) + ', ' + "{:10.3f}".format(self.displacement[i*3 +2]) + ', ' + '\n')
+                    outfile.write(str(i + self._io_origin) + ', ' + "{:10.3f}".format(self.displacement[i*3 + 0]) +
+                          ', ' + "{:10.3f}".format(self.displacement[i*3 + 1]) +
+                          ', ' + "{:10.3f}".format(self.displacement[i*3 + 2]) + ', ' + '\n')
                 outfile.write('\n')
     
                 outfile.write('Stresses\n')
@@ -1336,7 +1335,7 @@ class Truss(object):
                         outfile.write(' ')
                         if i < 9:
                             outfile.write(' ')
-                    outfile.write(str(i + self._io_origin) + ', ' +  "{:10.3f}".format(stress) + '\n')
+                    outfile.write(str(i + self._io_origin) + ', ' + "{:10.3f}".format(stress) + '\n')
                 outfile.write('\n')
     
                 # Saving original input
@@ -1380,7 +1379,7 @@ else:
     print("*** The following file will be opened: " + TRUSS.name + ".str")
 
 # Read input file
-#TRUSS.read('lab_01.txt')
+# TRUSS.read('lab_01.txt')
 
 try:
     TRUSS.read(TRUSS.name + ".str")
@@ -1389,20 +1388,20 @@ except IOError:
     print("Please make sure that the structural data is available for the program in the running directory.")
     raise IOError
 
-#if _ARDUINO or _SIMULATION:                # deprecated
+# if _ARDUINO or _SIMULATION:                # deprecated
 #    TRUSS.setspecdofs(arduino_mapping)
 
 PARTTIME = logtime(PARTTIME, "Setting up structure")
 
 # Calculate stiffness-matrix
 TRUSS.calcstiffness()
-#TRUSS.calcstiffness_plate()
+# TRUSS.calcstiffness_plate()
 
 PARTTIME = logtime(PARTTIME, "Calculating Stiffness Matrix")
 
-#Solve structure
+# Solve structure
 TRUSS.solve()
-#TRUSS.solve_plate()
+# TRUSS.solve_plate()
 
 PARTTIME = logtime(PARTTIME, "Solving")
 
@@ -1426,7 +1425,7 @@ if Conf.graphics:
     TRUSS.plot(1, 0, 1, 1, 0, 1.0, 0.0, 0.0, True)
     TRUSS.plot(1, 1, 1, 0, 0, 1.0, 0.0, 0.0, True)
     TRUSS.plot(0, 1, 1, 1, 1, 2.0, 0.0, 0.0, True)
-    #pass
+    # pass
 
 PARTTIME = logtime(PARTTIME, "Plotting")
 
@@ -1435,7 +1434,7 @@ TRUSS.writeresults("./Results/" + TRUSS.name + ' - Results.txt')
 
 PARTTIME = logtime(PARTTIME, "Writing results to the output file")
 
-if _ARDUINO:
+if Conf.arduino:
     # Closing Arduino port
     SER.close()
 
