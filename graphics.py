@@ -11,7 +11,9 @@ from mpl_toolkits.mplot3d import proj3d
 
 class Arrow3D(FancyArrowPatch):
     """
-    Vector drawer module from the internet
+    Vector drawer module based on the matplotlib library using external sources, like:
+        https://stackoverflow.com/questions/29188612/arrows-in-matplotlib-using-mplot3d
+        https://gist.github.com/jpwspicer/ea6d20e4d8c54e9daabbc1daabbdc027
     """
     def __init__(self, xs, ys, zs, *args, **kwargs):
         FancyArrowPatch.__init__(self, (0, 0), (0, 0), *args, **kwargs)

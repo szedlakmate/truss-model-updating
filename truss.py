@@ -21,7 +21,6 @@ from extra_math import swap_col as swap_col
 from config import Configuration
 
 
-
 # COMPATIBILITY MODES:
     # 0: User defined
     # 1: Processing3
