@@ -47,10 +47,10 @@ if _COMPATIBLE_MODE == 0*0:
 if Conf.OSlib:
     import os
     try:
-        if not os.path.exists("./Results/"):
-            os.makedirs("./Results")
+        if not os.path.exists("./Structures/"):
+            os.makedirs("./Structures")
     except FileNotFoundError:
-        print("Error: Please manually create the 'Results' folder" 
+        print("Error: Please manually create the 'Structures' folder" 
               "in the root of the project")
         
 
@@ -269,7 +269,7 @@ class Truss(object):
         readelementnames = ["Origin", "DOF", "Elements", "Coordinates",
                             "Cross-sections", "Materials", "Forces", "Supports", "Measured DOFs"]
 
-        with open(filename, "r") as sourcefile:
+        with open("./Structures/" + filename, "r") as sourcefile:
             sourceline = ""
             while sourceline != "EOF":
                 sourceline = sourcefile.readline().strip()
@@ -913,7 +913,7 @@ class Truss(object):
             print("Optimization could not be finished successfully.")
             print("The remaining error is: " + str(error(newdelta)))
 
-        with open(self.name + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
+        with open("./Structures/" + self.name + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
             if j > 1:
                 if j <= self.iterationlimit and self.capable():
                     self.numofupdates[0] += 1
@@ -1126,7 +1126,7 @@ class Truss(object):
                 pass
             filemode = 'r'
 
-        with open(self.name + ' - Input Data.txt', filemode) as inputfile:
+        with open("./Structures/" + self.name + ' - Input Data.txt', filemode) as inputfile:
             # Saving input data
             if not _SIMULATION:
                 inputfile.write('Input data of \'' + self.name + '\':\n\n')
@@ -1286,7 +1286,7 @@ class Truss(object):
         # Not elegant solution
         out_specdofs = self.specdof_inputstring
         try:
-            with open(fname, 'w') as outfile:
+            with open("./Structures/" + fname, 'w') as outfile:
                 # Writing data
                 outfile.write('Calculation of \'' + self.name + '\':\n\n')
     
@@ -1360,7 +1360,7 @@ class Truss(object):
                 outfile.write(out_specdofs + '\n\n')
                 outfile.write('EOF\n')
         except FileNotFoundError:
-            print("Error: Please manually create the 'Results' folder" 
+            print("Error: Please manually create the 'Structures' folder" 
               "in the root of the project")
             
 
@@ -1384,7 +1384,7 @@ else:
 try:
     TRUSS.read(TRUSS.name + ".str")
 except IOError:
-    print("The following file could not be opened: " + TRUSS.name + ".str")
+    print("The following file could not be opened: " + "./Structures/" + TRUSS.name + ".str")
     print("Please make sure that the structural data is available for the program in the running directory.")
     raise IOError
 
@@ -1430,7 +1430,7 @@ if Conf.graphics:
 PARTTIME = logtime(PARTTIME, "Plotting")
 
 # Write results to file
-TRUSS.writeresults("./Results/" + TRUSS.name + ' - Results.txt')
+TRUSS.writeresults("./Structures/" + TRUSS.name + ' - Results.txt')
 
 PARTTIME = logtime(PARTTIME, "Writing results to the output file")
 

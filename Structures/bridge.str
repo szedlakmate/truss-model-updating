@@ -1,0 +1,49 @@
+# Input file for TRUSS.py program
+# All commands must be written with uppercase characters
+# *** The values MUST be written in the exact following line of a command
+# Only lines with the command and nothing more counts. Everything else will be neglected. Even hastags are useless :)
+# The order of the commands is indifferent.
+#
+# Commands and their format (example):
+# DOF - Degree of freedom: 3
+# ELEMENTS - Elements given by end-nodes: 0, 1 | 0, 2 ...
+# COORDINATES - Nodal coordinates: 0., 0., 0., | 0., 3., 0. ...
+# CROSS-SECTIONS - This data will be evaluated in Python: 36, 5.0*(10**(-4)) ...
+# MATERIALS - This data will be evaluated in Python: 1800, 100.0*(10**9) ...
+# FORCES - Selected DOF + Force: 11, +1000000.0 | 12, +1000000.0 ...
+# SUPPORTS - Selected DOF + Prescribed displacement: 0, 0.0 | 1, 0.0 ...
+# MEASUREMENTS - Selected node's DOF will be analyzed during Model Updating: 4X, 4Y, 10Z, ...
+# EOF - For compatibility reasons EOF should be placed after the commands
+#
+# Optional:         
+#_ORIGIN - Defines the number of the first element during reading input. The default is 0.
+#  Should be placed at the TOP OF THE FILE!
+
+_ORIGIN
+1
+
+DOF
+2
+
+ELEMENTS
+1,3|3,5|5,6|6,7|7,8|8,9|4,9|2,4|3,10|6,11|8,12|4,13|3,6|4,8|6,8|1,10|5,10|5,11|7,11|7,12|9,12|2,13|9,13|2,14|14,15|15,16|16,17|14,18|16,19|14,16|2,18|15,18|17,19|15,19|4,14|17,20|20,21|20,22|17,22|21,22|16,20|     
+
+COORDINATES
+1592.,1056.|2792.,1056.|1742., 1106.|2642., 1106.|1892., 1056.|2042., 1106.|2192., 1056.|2342., 1106.|2492.,1056.|1742., 1056.|2042., 1056.|2342., 1056.|2642., 1056.|2942., 1106.|3092., 1056.|3242., 1106.|3392., 1056.|2942., 1056.|3242., 1056.|3542., 1106.|3692., 1056.|3542., 1056.| 
+
+CROSS-SECTIONS
+36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36 , 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36 ,36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
+
+MATERIALS
+1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800,1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800,1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800,1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 1800,
+
+FORCES
+26, -9.80| 
+
+SUPPORTS
+1, 0.0|2, 0.0|42, 0.0|
+
+MEASUREMENTS
+4Y
+
+EOF
