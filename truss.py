@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Oct 30 18:49:40 2016
+Created on Sat Dec 30 18:49:40 2018
 
-3D truss model updater program created by Máté Szedlák (2016, 2017).
-Copyright GNU GPL v3.0, Máté Szedlák 2016, 2017.
+3D truss model updater program created by Máté Szedlák (2016-2018).
+Copyright MIT, Máté Szedlák 2016-2018.
 """
 ### Code for "Processing" only
 #size(640, 360)
@@ -12,6 +12,14 @@ Copyright GNU GPL v3.0, Máté Szedlák 2016, 2017.
 import math
 import itertools
 from copy import deepcopy
+from extra_math import mat_vec_mult as mat_vec_mult
+from extra_math import invert as invert
+#from extra_math import check_for_all_zeros as check_for_all_zeros
+#from extra_math import swap_row as swap_row
+from extra_math import swap_col as swap_col
+#from extra_math import make_identity as make_identity
+from config import Configuration
+
 
 
 # COMPATIBILITY MODES:
@@ -22,116 +30,67 @@ from copy import deepcopy
     # 4: Maximum compatibility
 
 _COMPATIBLE_MODE = 0
+_SIMULATION = 1                     # Simulating measurements based on input file
 
-_SIMULATION = 0                     # Simulating measurements based on input file
+Conf = Configuration(_COMPATIBLE_MODE, _SIMULATION)
+
 
 PORTS = ['COM1', 'COM2', 'COM3']      # List of possible communication ports
 PORTNUMBER = 0                      # Applied communication port
 
-if _COMPATIBLE_MODE == 0:
+if _COMPATIBLE_MODE == 0*0:
     ### User defined ###
     # Modify as needed #
-    _MODE_NAME = "User defined"
-    _LOG = 1                 # Logging time
-    _GRAPHICS = 1            # Graphical features
-    _SOLVER = 0              # 0: Basic solver, 1: NumPy solver
-    _OSLIBRARYAVAILABLE = 1  # Basic OS file features (e.g. file size)
-    _UPDATING = 0            # Model Updating: On/ Off
-    _ARDUINO = 0             # Arduino input: On/Off
-    _DEBUG = 1               # Debugging mode
-    _REALISTICSIMULATION = 0 # Wait as long as it was originally. Only valid with _SIMULATION = 1
+    Conf.mode_name = "User defined"
+    Conf.log = 1                 # Logging time
+    Conf.graphics = 1            # Graphical features
+    Conf.solver = 1              # 0: Basic solver, 1: NumPy solver
+    Conf.OSlib = 1  # Basic OS file features (e.g. file size)
+    Conf.updating = 0            # Model Updating: On/ Off
+    Conf.arduino = 0             # Arduino input: On/Off
+    Conf.debug = 0               # Debugging mode
+    Conf.realistic_simulation = 0 # Wait as long as it was originally. Only valid with _SIMULATION = 1
 
-##############################################
-           ###  DO NOT MODIFY ###            #
-                                             #
-elif _COMPATIBLE_MODE == 1:                 #
-    ### "Processing 3" mode ###              #
-    _MODE_NAME = "Processing 3"              #
-    _LOG = 1*1                               #
-    _GRAPHICS = 0*0                          #
-    _SOLVER = 0*0                            #
-    _OSLIBRARYAVAILABLE = 0*0                #
-    _UPDATING = 1*1                          #
-    _ARDUINO = 1*1                           #
-    _DEBUG = 0*0                             #
-    _REALISTICSIMULATION = 1*1               #
-                                             #
-elif _COMPATIBLE_MODE == 2:                 #
-    ### Android mode ###                     #
-    # DO NOT MODIFY                          #
-    _MODE_NAME = "Android"                   #
-    _LOG = 1*1                               #
-    _GRAPHICS = 0*0                          #
-    _SOLVER = 0*0                            #
-    _OSLIBRARYAVAILABLE = 1*1                #
-    _UPDATING = 0*0                          #
-    _ARDUINO = 0*0                           #
-    _DEBUG = 0*0                             #
-    _REALISTICSIMULATION = 1*1               #
-                                             #
-elif _COMPATIBLE_MODE == 3:                 #
-    ### Informative ###                      #
-    # DO NOT MODIFY                          #
-    _MODE_NAME = "Informative mode"          #
-    _LOG = 1*1                               #
-    _GRAPHICS = 1*1                          #
-    _SOLVER = 1*1                            #
-    _OSLIBRARYAVAILABLE = 1*1                #
-    _UPDATING = 1*1                          #
-    _ARDUINO = 1*1                           #
-    _DEBUG = 0*0                             #
-    _REALISTICSIMULATION = 1*1               #
-                                             #
-else:                                        #
-    ### Maximum compatibility ###            #
-    # DO NOT MODIFY                          #
-    _MODE_NAME = "Maximum compatibility"     #
-    _LOG = 0*0                               #
-    _GRAPHICS = 0*0                          #
-    _SOLVER = 0*0                            #
-    _OSLIBRARYAVAILABLE = 0*0                #
-    _UPDATING = 0*0                          #
-    _ARDUINO = 0*0                           #
-    _DEBUG = 0*0                             #
-    _REALISTICSIMULATION = 1*1               #
-                                             #
-           ###  DO NOT MODIFY ###            #
-##############################################
-
-
-if _OSLIBRARYAVAILABLE:
+if Conf.OSlib:
     import os
+    try:
+        if not os.path.exists("./Results/"):
+            os.makedirs("./Results")
+    except FileNotFoundError:
+        print("Error: Please manually create the 'Results' folder" 
+              "in the root of the project")
+        
 
-if _SIMULATION or not _UPDATING:
+if Conf.simulation or not Conf.updating:
     _ARDUINO = 0
 
 if _COMPATIBLE_MODE == 2:
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-if _LOG:
+if Conf.log:
     import time
     import datetime
     TIC = time.time()
     print('------------------------------------')
     print('Truss calculational program')
     print('Created by Máté Szedlák (23/11/2016)')
-    print('Compatibility mode: ' + _MODE_NAME)
-    if _SOLVER == 0:
+    print('Compatibility mode: ' + Conf.mode_name)
+    if Conf.solver == 0:
         print('- Solver is set to default')
-    elif _SOLVER == 1:
+    elif Conf.solver == 1:
         print('- Solver is set to NumPy')
     else:
         raise Exception("Solver settings are invalid!")
-    if _UPDATING:
+    if Conf.updating:
         print('+ Model updating is turned ON')
-        if _SIMULATION:
+        if Conf.simulation:
             print('Input data is SIMULATED!')
     else:
         print('- Model updating is turned OFF')
     print('------------------------------------')
 
 
-if _ARDUINO:
+if Conf.arduino:
     SER = 0
     try:
         import serial
@@ -179,379 +138,21 @@ if _ARDUINO:
 #        raise Exception('File not found: ' + mappingfile)
 
 
-if _SOLVER:
+if Conf.solver:
     # NumPy library for solving linear equations in another way
     import numpy as np
 
-if _GRAPHICS:
-    # libraries for drawing
-    import matplotlib.pyplot as plt
-    from matplotlib.patches import FancyArrowPatch
-    from mpl_toolkits.mplot3d import proj3d
+if Conf.graphics:
+    # library for drawing
+    from graphics import Arrow3D
 
-# From here:
-def mat_vec_mult(mat_a, vec_b):
-    """
-    Multiplying matrix with a vector, giving the result as a vector
 
-    Source:
-    https://stackoverflow.com/questions/10508021/matrix-multiplication-in-python
-    """
-    vec_c = [0.]*len(mat_a)
-    for i, row in enumerate(mat_a):
-        for j, elem in enumerate(vec_b):
-            vec_c[i] += row[j]*elem
-    return vec_c
-
-def invert(mat_x):
-    """
-    Invert a matrix X according to gauss-jordan elimination
-    In gauss-jordan elimination, we perform basic row operations to turn a matrix into
-    row-echelon form.  If we concatenate an identity matrix to our input
-    matrix during this process, we will turn the identity matrix into our inverse.
-    X - input list of lists where each list is a matrix row
-    output - inverse of X
-
-    Source:
-    http://www.vikparuchuri.com/blog/inverting-your-very-own-matrix/
-    """
-    #copy X to avoid altering input
-    mat_x = deepcopy(mat_x)
-
-    #Get dimensions of X
-    rows = len(mat_x)
-    cols = len(mat_x[0])
-
-    #Get the identity matrix and append it to the right of mat_x
-    #This is done because our row operations will make the identity into the inverse
-    identity = make_identity(rows, cols)
-    for i in range(0, rows):
-        mat_x[i] += identity[i]
-
-    i = 0
-    for j in range(0, cols):
-        #print("On col {0} and row {1}".format(j, i))
-        #Check to see if there are any nonzero values below the current row in the current column
-        zero_sum, first_non_zero = check_for_all_zeros(mat_x, i, j)
-        #If everything is zero, increment the columns
-        if zero_sum == 0:
-            if j == cols:
-                return mat_x
-            raise Exception("Matrix is singular")
-        #If mat_x[i][j] is 0, and there is a nonzero value below it, swap the two rows
-        if first_non_zero != i:
-            mat_x = swap_row(mat_x, i, first_non_zero)
-        #Divide mat_x[i] by mat_x[i][j] to make mat_x[i][j] equal 1
-        mat_x[i] = [m/mat_x[i][j] for m in mat_x[i]]
-
-        #Rescale all other rows to make their values 0 below mat_x[i][j]
-        for k in range(0, rows):
-            if k != i:
-                scaled_row = [mat_x[k][j] * m for m in mat_x[i]]
-                mat_x[k] = [mat_x[k][m] - scaled_row[m] for m in range(0, len(scaled_row))]
-        #If either of these is true, we have iterated through the matrix, and are done
-        if i == rows or j == cols:
-            break
-        i += 1
-
-    #Get just the right hand matrix, which is now our inverse
-    for i in range(0, rows):
-        mat_x[i] = mat_x[i][cols:len(mat_x[i])]
-    return mat_x
-
-def check_for_all_zeros(mat_x, i, j):
-    """
-    Check matrix mat_x to see if only zeros exist at or below row i in column j
-    mat_x - a list of lists
-    i - row index
-    j - column index
-    returns -
-        zero_sum - the count of non zero entries
-        first_non_zero - index of the first non value
-    """
-    non_zeros = []
-    first_non_zero = -1
-    for k in range(i, len(mat_x)):
-        non_zero = mat_x[k][j] != 0
-        non_zeros.append(non_zero)
-        if first_non_zero == -1 and non_zero:
-            first_non_zero = k
-    zero_sum = sum(non_zeros)
-    return zero_sum, first_non_zero
-
-def swap_row(mat_x, i, j):
-    """
-    Swap row i and row j in a list of lists
-    mat_x - list of lists
-    i - row index
-    j - row index
-    returns- modified matrix
-    """
-    mat_x[j], mat_x[i] = mat_x[i], mat_x[j]
-    return mat_x
-
-def swap_col(mat_x, i, j):
-    """
-    Swap colum i and column j in a list of lists
-    mat_x - list of lists
-    i - column index
-    j - column index
-    returns- modified matrix
-    """
-    for item in mat_x:
-        item[i], item[j] = item[j], item[i]
-    return mat_x
-
-def make_identity(row_num, col_num):
-    """
-    Make an identity matrix with dimensions rxc
-    row_num - number of rows
-    col_num - number of columns
-    returns - list of lists corresponding to  the identity matrix
-    """
-    identity = []
-    for i in range(0, row_num):
-        row = []
-        for j in range(0, col_num):
-            elem = 0
-            if i == j:
-                elem = 1
-            row.append(elem)
-        identity.append(row)
-    return identity
-
-if _GRAPHICS:
-    class Arrow3D(FancyArrowPatch):
-        """
-        Vector drawer module from the internet
-        """
-        def __init__(self, xs, ys, zs, *args, **kwargs):
-            FancyArrowPatch.__init__(self, (0, 0), (0, 0), *args, **kwargs)
-            self._verts3d = xs, ys, zs
-
-        def draw(self, renderer):
-            _xs3d, _ys3d, _zs3d = self._verts3d
-            _xs, _ys, _zs = proj3d.proj_transform(_xs3d, _ys3d, _zs3d, renderer.M)
-            self.set_positions((_xs[0], _ys[0]), (_xs[1], _ys[1]))
-            FancyArrowPatch.draw(self, renderer)
-
-    def plotstructure(struct, showorig, showresult, showsupports, \
-            showforces, showreactions, scaledisp, scale_f, z_corr, showvalues, saveplot):
-        """
-        General plotting method for structures
-
-            scaledisp: Scale drwaing of displacements
-            scale_f:   Scale force sign
-            z_corr:    Scale z-axis
-        """
-        plotname = struct.name
-        plot_width = 18.0              # Plot width in inches
-        xframe = 0                     # Frame width at X direction
-        yframe = 0                     # Frame width at Y direction
-        zframe = 0                     # Frame width at Z direction
-        scale_sup = scale_f*0.3        # Scale support sign  # All the others are input parameters
-
-        # Stress coloring settings [R G B] - Examples considering pressure:
-        # 0: [1, 0, 0]              Plain red
-        # 1: [x, 0, 0]              Red to Black
-        # 2: [1, 1-x, 0-x]          Red to White
-        # 3: [1, (1-x)/2, (1-x)/2]  Red to MildRed - Distincts pressure and tension
-        # 4: [x, 1-x, 0]            Red to Green
-        _coloring = 3 # € [0, 1, 2, 3, 4]
-
-        fig = plt.figure()
-        _ax = fig.add_subplot(111, projection='3d')
-
-        if struct.dof == 2:
-            _ax.view_init(elev=90., azim=-90.)
-            _ax.w_zaxis.line.set_lw(0.)
-            _ax.set_zticklabels([])
-
-        xmin = min(list(struct.nodalcoord[x][0] for x in range(struct.nodenum)))
-        xmax = max(list(struct.nodalcoord[x][0] for x in range(struct.nodenum)))
-        ymin = min(list(struct.nodalcoord[x][1] for x in range(struct.nodenum)))
-        ymax = max(list(struct.nodalcoord[x][1] for x in range(struct.nodenum)))
-        zmin = min(list(struct.nodalcoord[x][2] for x in range(struct.nodenum)))
-        zmax = max(list(struct.nodalcoord[x][2] for x in range(struct.nodenum)))
-
-        deltax = xmax - xmin
-        deltay = ymax - ymin
-
-        xframe = max(deltax * 0.05, 2)
-        yframe = max(deltay * 1.5, 2)
-
-        if struct.dof == 3:
-            plot_height = plot_width * ((deltay + yframe*2)/(deltax + xframe*2)) *0.3
-        else:
-            plot_height = plot_width * 0.5
-        fig.set_size_inches(plot_width, plot_height)
-
-        _ax.set_xlim3d(xmin - xframe, xmax + xframe)
-        _ax.set_ylim3d(ymin - yframe, ymax + yframe)
-        _ax.set_zlim3d(zmin - zframe, zmax + zframe)
-
-        if showorig == showresult:
-            _coloring = 0
-
-        # Giving plot names
-        if showorig == 1 and showresult == 0 and showsupports == 1 and showreactions == 0:
-            plotname += ' - Initial structure'
-            if showforces:
-                plotname += ' with forces'
-        elif showorig == 1 and showresult == 1:
-            plotname += ' - Deformation'
-            if showreactions == 0:
-                plotname += ' with reactions'
-        elif showorig == 0 and showresult == 1:
-            plotname += ' - Stresses'
-            if showreactions == 0:
-                plotname += ' with reactions'
-        else:
-            plotname += ' - Unnamed'
-
-        print(plotname + ": ")
-        if showresult:
-            dipslaydisplacement = deepcopy(struct.nodalcoord_def)
-            if scaledisp != 1.0:
-                if _LOG:
-                    print('Displacements are scaled with factor: ' + str(scaledisp))
-                for i in range(struct.nodenum):
-                    for j in range(3):
-                        dipslaydisplacement[i][j] = (struct.nodalcoord_def[i][j] -\
-                        struct.nodalcoord[i][j]) * scaledisp + struct.nodalcoord[i][j]
-
-        for i in range(struct.elenum):
-            # Plot undeformed structure
-            if showorig:
-                _ax.plot([struct.nodalcoord[struct.node[i][1]][0], struct.nodalcoord[struct.node[i][0]][0]], \
-                    [struct.nodalcoord[struct.node[i][1]][1], struct.nodalcoord[struct.node[i][0]][1]], \
-                    zs=[struct.nodalcoord[struct.node[i][1]][2], struct.nodalcoord[struct.node[i][0]][2]], color='b')
-            # Plot deformed structure
-            if showresult:
-                if struct.postprocessed():
-                    if struct.stresscolor[i] > 0:
-                        if _coloring == 1:
-                            rgb_col = [0, 0, abs(struct.stresscolor[i])]
-                        elif _coloring == 2:
-                            rgb_col = [1-abs(struct.stresscolor[i]), \
-                                       1-abs(struct.stresscolor[i]), 1]
-                        elif _coloring == 3:
-                            rgb_col = [(1-abs(struct.stresscolor[i]))/2, \
-                                       (1-abs(struct.stresscolor[i]))/2, 1]
-                        elif _coloring == 4:
-                            rgb_col = [0, 1-abs(struct.stresscolor[i]), \
-                                       abs(struct.stresscolor[i])]
-                        else:
-                            rgb_col = [1, 0, 0]
-                    else:
-                        if _coloring == 1:
-                            rgb_col = [abs(struct.stresscolor[i]), 0, 0]
-                        elif _coloring == 2:
-                            rgb_col = [1, 1-abs(struct.stresscolor[i]), \
-                                       1-abs(struct.stresscolor[i])]
-                        elif _coloring == 3:
-                            rgb_col = [1, (1-abs(struct.stresscolor[i]))/2, \
-                                       (1-abs(struct.stresscolor[i]))/2]
-                        elif _coloring == 4:
-                            rgb_col = [abs(struct.stresscolor[i]), \
-                                       1-abs(struct.stresscolor[i]), 0]
-                        else:
-                            rgb_col = [1, 0, 0]
-                else:
-                    print('Stresses are not calculated')
-                    rgb_col = [1, 0, 0]
-                _ax.plot([dipslaydisplacement[struct.node[i][1]][0], dipslaydisplacement[struct.node[i][0]][0]], \
-                        [dipslaydisplacement[struct.node[i][1]][1], dipslaydisplacement[struct.node[i][0]][1]], \
-                        zs=[dipslaydisplacement[struct.node[i][1]][2], dipslaydisplacement[struct.node[i][0]][2]], color=rgb_col)
-
-        if showforces:
-            for i in struct.known_f_notzero:
-                if struct.force[i] < 0:
-                    value = -1.0
-                else:
-                    value = 1.0
-                if i % 3 == 0:
-                    f_dir = [value*scale_f, 0., 0.]
-                elif i % 3 == 1:
-                    f_dir = [0., value*scale_f, 0.]
-                else:
-                    f_dir = [0., 0., value*scale_f*z_corr]
-                f_arrow = Arrow3D([struct.nodalcoord[i//3][0], struct.nodalcoord[i//3][0] + f_dir[0]], \
-                                  [struct.nodalcoord[i//3][1], struct.nodalcoord[i//3][1] + f_dir[1]], \
-                                  [struct.nodalcoord[i//3][2], struct.nodalcoord[i//3][2] + f_dir[2]], \
-                                  mutation_scale=20, lw=1, arrowstyle="-|>", color="k")
-                _ax.add_artist(f_arrow)
-
-        if showreactions:
-            e_previous = -100
-            for i in struct.known_dis_a:
-                value = 0.0             # Maybe this is useless <XXX>
-                if struct.force[i] < 0:
-                    value = -1.0
-                elif struct.force[i] > 0:
-                    value = 1.0
-                if i % 3 == 0:
-                    f_dir = [value*scale_f, 0., 0.]
-                elif i % 3 == 1:
-                    f_dir = [0., value*scale_f, 0.]
-                else:
-                    f_dir = [0., 0., value*scale_f*z_corr]
-                if abs(struct.force[i]) > 0:
-                    f_arrow = Arrow3D([struct.nodalcoord[i//3][0], struct.nodalcoord[i//3][0] + f_dir[0]], \
-                                      [struct.nodalcoord[i//3][1], struct.nodalcoord[i//3][1] + f_dir[1]], \
-                                      [struct.nodalcoord[i//3][2], struct.nodalcoord[i//3][2] + f_dir[2]], \
-                                      mutation_scale=20, lw=1, arrowstyle="-|>", color="darkolivegreen")
-                    _ax.add_artist(f_arrow)
-                    if showvalues:
-                        _ax.set_xticklabels([])
-                        _ax.set_yticklabels([])
-                        _ax.set_zticklabels([])
-                        if not i//3 == e_previous//3:
-                            if struct.dof == 3:
-                                _ax.text(struct.nodalcoord[i//3][0], \
-                                    struct.nodalcoord[i//3][1], \
-                                    struct.nodalcoord[i//3][2], \
-                                    "{:10.2f}".format(struct.force[(i//3)*3+0])+'\n'+\
-                                    "{:10.2f}".format(struct.force[(i//3)*3+1])+'\n'+\
-                                    "{:10.2f}".format(struct.force[(i//3)*3+2]),\
-                                    fontsize=12, horizontalalignment='right')
-                            elif struct.dof == 2:
-                                _ax.text(struct.nodalcoord[i//3][0], \
-                                    struct.nodalcoord[i//3][1], \
-                                    struct.nodalcoord[i//3][2], \
-                                    "{:10.2f}".format(struct.force[(i//3)*3+0])+'\n'+\
-                                    "{:10.2f}".format(struct.force[(i//3)*3+1]),\
-                                    fontsize=12, horizontalalignment='right')
-                e_previous = i
-
-        if showsupports:
-            for i in struct.known_dis_a:
-                if i % 3 == 0:
-                    f_dir = [-1.0 * scale_sup, 0., 0.]
-                    col = 'g'
-                elif i % 3 == 1:
-                    f_dir = [0., -1.0 * scale_sup, 0.]
-                    col = 'y'
-                else:
-                    f_dir = [0., 0., -1.0 * scale_sup * z_corr]
-                    col = 'brown'
-                if i % 3 != 2 or struct.dof == 3:
-                    _ax.plot([struct.nodalcoord[i//3][0], struct.nodalcoord[i//3][0]+f_dir[0]], \
-                        [struct.nodalcoord[i//3][1], struct.nodalcoord[i//3][1]+f_dir[1]], \
-                        zs=[struct.nodalcoord[i//3][2], struct.nodalcoord[i//3][2]+f_dir[2]], \
-                        color=col, linewidth=4.0)
-        plt.show()
-        if saveplot:
-            fig.savefig(plotname + '.png')
-            print('\'' + plotname +'.png\' is saved.')
-            print('------------------------------------')
-        return
-
+# XXX DEPRECATED !
 def endoffile(givenfile, line):
     """
     Check if end of file is reached. Implemented due to compatibility reasons.
     """
-    if _OSLIBRARYAVAILABLE:
+    if Conf.OSlib:
         return givenfile.tell() < os.fstat(givenfile.fileno()).st_size
     else:
         return not line == "EOF"
@@ -564,7 +165,7 @@ def logtime(prev_time, title):
     At the first call, should be called with TIC value. The input argument
     should be overwritten by this funvtion's return value.
     """
-    if _LOG:
+    if Conf.log:
         new_time = time.time()
         print(title)
         print('Time: ' + str("{:10.3f}".format(new_time - prev_time)))
@@ -580,7 +181,6 @@ def error(delta):
     sumerr = 0
     for deltaelement in delta:
         sumerr += deltaelement**2
-
     sumerr = math.sqrt(sumerr)
 
     return sumerr
@@ -776,7 +376,7 @@ class Truss(object):
 
         terminate = False
         for i, value in enumerate(self.readelements):
-            if i > 0 and (i < 8 or _UPDATING):
+            if i > 0 and (i < 8 or Conf.updating):
             #if i > 0:
                 if value == 0:
                     print("The following was not found: " + readelementnames[i])
@@ -810,8 +410,8 @@ class Truss(object):
             if scalez == 0:
                 scalez = 0.3                      # Scale z-axis
 
-            plotstructure(self, showorig, showresult, showsupports, showforces, showreactions, \
-                 scaledisplacement, scaleforce, scalez, _showvalues, saveplot)
+            Arrow3D.plotstructure(self, showorig, showresult, showsupports, showforces, showreactions, \
+                 scaledisplacement, scaleforce, scalez, _showvalues, saveplot, Conf.log)
 
     def __checkcoordinates(self, ignorable):
         """
@@ -979,7 +579,7 @@ class Truss(object):
                     raise Exception
 
         self.keypnum = len(self.analysis)
-        if self.keypnum == 0 and _UPDATING:
+        if self.keypnum == 0 and Conf.updating:
             print("There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file.")
             raise Exception
 
@@ -1083,7 +683,7 @@ class Truss(object):
         Main solver of the code
         """
         if self._stiffisfresh == 0:
-            if _LOG:
+            if Conf.log:
                 print('Stiffness matrix is recalculated')
             self.calcstiffness()
 
@@ -1102,12 +702,12 @@ class Truss(object):
             self.stiff_new[i] = [x + y for x, y in zip(self.stiff_new[i], stiffincrement)]
 
         # SOLVING THE STRUCTURE
-        if _SOLVER == 0:
-            if _LOG:
+        if Conf.solver == 0:
+            if Conf.log:
                 print('Built-in solver')
             self.dis_new = mat_vec_mult(invert(self.stiff_new), self.force_new)
         else:
-            if _LOG:
+            if Conf.log:
                 print('NumPy solver')
             self.dis_new = np.linalg.solve(np.array(self.stiff_new), np.array(self.force_new))
 
@@ -1145,7 +745,7 @@ class Truss(object):
             stiff_new[i] = [x + y for x, y in zip(stiff_new[i], stiffincrement)]
 
         # SOLVING THE MODIFIED STRUCTURE
-        if _SOLVER == 0:
+        if Conf.solver == 0:
             dis_new = mat_vec_mult(invert(stiff_new), self.force_new)
         else:
             dis_new = np.linalg.solve(np.array(stiff_new), np.array(self.force_new))
@@ -1478,7 +1078,7 @@ class Truss(object):
                 prevreadtime = float(str(prevline.split(']')[1]).split(',')[1])
                 nowreadtime = float(str(arduinoline.split(']')[1]).split(',')[1])
                 try:
-                    if _REALISTICSIMULATION:
+                    if Conf.realistic_simulation:
                         sleeptime = nowreadtime - prevreadtime
                 except Exception:
                     pass
@@ -1688,79 +1288,83 @@ class Truss(object):
                 out_supports += str(i[0] - i[0]//3 + self._io_origin) + ', ' + str(i[1]) + ' | '
         # Not elegant solution
         out_specdofs = self.specdof_inputstring
-
-        with open(fname, 'w') as outfile:
-            # Writing data
-            outfile.write('Calculation of \'' + self.name + '\':\n\n')
-
-            outfile.write('Reactions\n')
-            #for i in range(len(self.force)//3):
-            prev = -1
-            for i in self.known_dis_a:
-                if self.dof == 3 or i%3 != 2:
-                    if i//3 != prev:
-                        if i < 100:
-                            outfile.write(' ')
-                            if i < 9:
+        try:
+            with open(fname, 'w') as outfile:
+                # Writing data
+                outfile.write('Calculation of \'' + self.name + '\':\n\n')
+    
+                outfile.write('Reactions\n')
+                #for i in range(len(self.force)//3):
+                prev = -1
+                for i in self.known_dis_a:
+                    if self.dof == 3 or i%3 != 2:
+                        if i//3 != prev:
+                            if i < 100:
                                 outfile.write(' ')
-                        nodalforce = ''
-                        if (i//3)*3+0 in self.known_dis_a:
-                            nodalforce += "{:10.2f}".format(self.force[(i//3)*3+0]) + ', '
-                        else:
-                            nodalforce += '            '
-                        if (i//3)*3+1 in self.known_dis_a:
-                            nodalforce += "{:10.2f}".format(self.force[(i//3)*3+1]) + ', '
-                        else:
-                            nodalforce += '            '
-                        if self.dof != 2 and (i//3)*3+2 in self.known_dis_a:
-                            nodalforce += "{:10.2f}".format(self.force[(i//3)*3+2]) + '\n'
-                        else:
-                            nodalforce += '          \n'
-                        if nodalforce != '                                  \n':
-                            outfile.write(str(i//3 + self._io_origin) + ', ' +  nodalforce)
-                    prev = i//3
-            outfile.write('\n')
-
-            outfile.write('Displacements\n')
-            for i in range(len(self.displacement)//3):
-                if i < 100:
-                    outfile.write(' ')
-                    if i < 9:
+                                if i < 9:
+                                    outfile.write(' ')
+                            nodalforce = ''
+                            if (i//3)*3+0 in self.known_dis_a:
+                                nodalforce += "{:10.2f}".format(self.force[(i//3)*3+0]) + ', '
+                            else:
+                                nodalforce += '            '
+                            if (i//3)*3+1 in self.known_dis_a:
+                                nodalforce += "{:10.2f}".format(self.force[(i//3)*3+1]) + ', '
+                            else:
+                                nodalforce += '            '
+                            if self.dof != 2 and (i//3)*3+2 in self.known_dis_a:
+                                nodalforce += "{:10.2f}".format(self.force[(i//3)*3+2]) + '\n'
+                            else:
+                                nodalforce += '          \n'
+                            if nodalforce != '                                  \n':
+                                outfile.write(str(i//3 + self._io_origin) + ', ' +  nodalforce)
+                        prev = i//3
+                outfile.write('\n')
+    
+                outfile.write('Displacements\n')
+                for i in range(len(self.displacement)//3):
+                    if i < 100:
                         outfile.write(' ')
-                outfile.write(str(i + self._io_origin) + ', ' +  "{:10.3f}".format(self.displacement[i*3 +0]) + ', ' \
-                      + "{:10.3f}".format(self.displacement[i*3 +1]) + ', ' + "{:10.3f}".format(self.displacement[i*3 +2]) + ', ' + '\n')
-            outfile.write('\n')
-
-            outfile.write('Stresses\n')
-            for i, stress in enumerate(self.stress):
-                if i < 100:
-                    outfile.write(' ')
-                    if i < 9:
+                        if i < 9:
+                            outfile.write(' ')
+                    outfile.write(str(i + self._io_origin) + ', ' +  "{:10.3f}".format(self.displacement[i*3 +0]) + ', ' \
+                          + "{:10.3f}".format(self.displacement[i*3 +1]) + ', ' + "{:10.3f}".format(self.displacement[i*3 +2]) + ', ' + '\n')
+                outfile.write('\n')
+    
+                outfile.write('Stresses\n')
+                for i, stress in enumerate(self.stress):
+                    if i < 100:
                         outfile.write(' ')
-                outfile.write(str(i + self._io_origin) + ', ' +  "{:10.3f}".format(stress) + '\n')
-            outfile.write('\n')
-
-            # Saving original input
-            outfile.write('----- Original input: -----\n\n')
-            outfile.write('_ORIGIN\n')
-            outfile.write(str(self._io_origin) + '\n\n')
-            outfile.write('DOF\n')
-            outfile.write(str(self.dof) + '\n\n')
-            outfile.write('ELEMENTS\n')
-            outfile.write(out_element + '\n\n')
-            outfile.write('COORDINATES\n')
-            outfile.write(out_coords + '\n\n')
-            outfile.write('CROSS-SECTIONS\n')
-            outfile.write(out_crsect + '\n\n')
-            outfile.write('MATERIALS\n')
-            outfile.write(out_materials + '\n\n')
-            outfile.write('FORCES\n')
-            outfile.write(out_forces + '\n\n')
-            outfile.write('SUPPORTS\n')
-            outfile.write(out_supports + '\n\n')
-            outfile.write('SPECDOF\n')
-            outfile.write(out_specdofs + '\n\n')
-            outfile.write('EOF\n')
+                        if i < 9:
+                            outfile.write(' ')
+                    outfile.write(str(i + self._io_origin) + ', ' +  "{:10.3f}".format(stress) + '\n')
+                outfile.write('\n')
+    
+                # Saving original input
+                outfile.write('----- Original input: -----\n\n')
+                outfile.write('_ORIGIN\n')
+                outfile.write(str(self._io_origin) + '\n\n')
+                outfile.write('DOF\n')
+                outfile.write(str(self.dof) + '\n\n')
+                outfile.write('ELEMENTS\n')
+                outfile.write(out_element + '\n\n')
+                outfile.write('COORDINATES\n')
+                outfile.write(out_coords + '\n\n')
+                outfile.write('CROSS-SECTIONS\n')
+                outfile.write(out_crsect + '\n\n')
+                outfile.write('MATERIALS\n')
+                outfile.write(out_materials + '\n\n')
+                outfile.write('FORCES\n')
+                outfile.write(out_forces + '\n\n')
+                outfile.write('SUPPORTS\n')
+                outfile.write(out_supports + '\n\n')
+                outfile.write('SPECDOF\n')
+                outfile.write(out_specdofs + '\n\n')
+                outfile.write('EOF\n')
+        except FileNotFoundError:
+            print("Error: Please manually create the 'Results' folder" 
+              "in the root of the project")
+            
 
 ##################################
 #   BEGINNING OF THE MAIN PART   #
@@ -1770,7 +1374,7 @@ PARTTIME = logtime(TIC, "Initialization")
 
 #  Define new truss
 TRUSS = Truss('bridge')
-if not _DEBUG:
+if not Conf.debug:
     TRUSS.name = input('Test name: ')
 else:
     print("*** Debug mode ***")
@@ -1803,7 +1407,7 @@ TRUSS.solve()
 
 PARTTIME = logtime(PARTTIME, "Solving")
 
-if _UPDATING:
+if Conf.updating:
     TRUSS.setunitmodification(0.05)
     TRUSS.seterrorlimit(1.2)
     TRUSS.setmodificationlimit(0.7)
@@ -1812,7 +1416,7 @@ if _UPDATING:
 
 PARTTIME = logtime(PARTTIME, "Updating numerical model")
 
-if _GRAPHICS:
+if Conf.graphics:
     # Plot settings:
     # O: Original D: Deformed S: Supports F: Forces R: Reactions
     # ScD: Scale displacments (Z-axis) (def:1.0) ScF: Scale forces (def:1.0)
@@ -1828,7 +1432,7 @@ if _GRAPHICS:
 PARTTIME = logtime(PARTTIME, "Plotting")
 
 # Write results to file
-TRUSS.writeresults(TRUSS.name + ' - Results.txt')
+TRUSS.writeresults("./Results/" + TRUSS.name + ' - Results.txt')
 
 PARTTIME = logtime(PARTTIME, "Writing results to the output file")
 
@@ -1836,10 +1440,10 @@ if _ARDUINO:
     # Closing Arduino port
     SER.close()
 
-if _LOG:
+if Conf.log:
     TAC = time.time()
     TOTALTIME = TAC-TIC
-    if _UPDATING:
+    if Conf.updating:
         print("Update statistics:")
         print("Totally updated models: " + str(TRUSS.numofupdates[0] + TRUSS.numofupdates[1]++ TRUSS.numofupdates[2]))
         print("  Successfully updated models: " + str(TRUSS.numofupdates[0]))
