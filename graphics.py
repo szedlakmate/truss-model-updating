@@ -34,7 +34,7 @@ class Arrow3D(FancyArrowPatch):
         z_corr:    Scale z-axis
         """
         plotname = struct.name
-        plot_width = 18.0              # Plot width in inches
+        plot_width = 10.0              # Plot width in inches
         xframe = 0                     # Frame width at X direction
         yframe = 0                     # Frame width at Y direction
         zframe = 0                     # Frame width at Z direction
