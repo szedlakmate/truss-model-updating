@@ -1,8 +1,9 @@
 # Custom routes
+JG_*
 temp.py
 /Results/
 /.idea/
-/Structures/*.png
+Structures/*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
