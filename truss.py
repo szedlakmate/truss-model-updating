@@ -29,7 +29,7 @@ Conf = Configuration(_COMPATIBLE_MODE, _SIMULATION)
 
 
 PORTS = ['COM1', 'COM2', 'COM3']      # List of possible communication ports
-PORTNUMBER = 0                      # Applied communication port
+PORT_NUMBER = 0                      # Applied communication port
 
 if _COMPATIBLE_MODE == 0*0:
     #** User defined ***
@@ -92,21 +92,21 @@ if Conf.arduino:
         print("Please first install pySerial: http://playground.arduino.cc/Interfacing/Python")
         raise Exception('Android mode denied: pyserial not found')
 
-    PORTNUMBER -= 1
+    PORT_NUMBER -= 1
     while SER == 0:
-        PORTNUMBER += 1
-        if PORTNUMBER >= len(PORTS):
-            PORTNUMBER = 0
+        PORT_NUMBER += 1
+        if PORT_NUMBER >= len(PORTS):
+            PORT_NUMBER = 0
         time.sleep(0.6)
-        print('Opening serial at port ' + str(PORTS[PORTNUMBER]))
+        print('Opening serial at port ' + str(PORTS[PORT_NUMBER]))
         try:
             SER.close()
         except Exception:
             pass
         try:
-            SER = serial.Serial(PORTS[PORTNUMBER], 9600, timeout=0)
+            SER = serial.Serial(PORTS[PORT_NUMBER], 9600, timeout=0)
         except serial.SerialException:
-            Exception(PORTS[PORTNUMBER] + ' port is busy. It might be occupied by this program or another one :'
+            Exception(PORTS[PORT_NUMBER] + ' port is busy. It might be occupied by this program or another one :'
                                           '/ Be careful or try resetting this program')
             SER = 0
             try:
@@ -123,13 +123,13 @@ if Conf.arduino:
 """
 if _ARDUINO or _SIMULATION:
     try:
-        mappingfile = 'arduino_mapping.txt'
-        with open(mappingfile, "r") as textfile:
+        mapping_file = 'arduino_mapping.txt'
+        with open(mapping_file, "r") as textfile:
             line = textfile.readline().strip()
             arduino_mapping = line.upper().split(',')
 
     except IOError:
-        raise Exception('File not found: ' + mappingfile)
+        raise Exception('File not found: ' + mapping_file)
 """
 
 if Conf.solver:
@@ -139,17 +139,6 @@ if Conf.solver:
 if Conf.graphics:
     # library for drawing
     from graphics import Arrow3D
-
-
-# XXX DEPRECATED !
-def endoffile(givenfile, line):
-    """
-    Check if end of file is reached. Implemented due to compatibility reasons.
-    """
-    if Conf.OSlib:
-        return givenfile.tell() < os.fstat(givenfile.fileno()).st_size
-    else:
-        return not line == "EOF"
 
 
 def logtime(prev_time, title):
