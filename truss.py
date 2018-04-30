@@ -1,95 +1,143 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Dec 30 18:49:40 2018
+Created on Sun Oct 30 18:49:40 2016
 
-3D truss model updater program created by Máté Szedlák (2016-2018).
-Copyright MIT, Máté Szedlák 2016-2018.
+3D truss model updater program created by Máté Szedlák (2016, 2017).
+Copyright GNU GPL v3.0, Máté Szedlák 2016, 2017.
 """
-import itertools
+### Code for "Processing" only
+#size(640, 360)
+#background(126)
+
 import math
+import itertools
 from copy import deepcopy
-from config import Configuration
-from extra_math import invert as invert
-from extra_math import mat_vec_mult as mat_vec_mult
-from extra_math import swap_col as swap_col
 
-"""
- COMPATIBILITY MODES:
-     0: User defined
-     1: DEPRECATED
-     2: Android
-     3: Most information (with numpy)
-     4: Maximum compatibility
-"""
+
+# COMPATIBILITY MODES:
+    # 0: User defined
+    # 1: Processing3
+    # 2: Android
+    # 3: Most information (with numpy)
+    # 4: Maximum compatibility
 
 _COMPATIBLE_MODE = 0
+
 _SIMULATION = 1                     # Simulating measurements based on input file
-
-Conf = Configuration(_COMPATIBLE_MODE, _SIMULATION)
-
 
 PORTS = ['COM1', 'COM2', 'COM3']      # List of possible communication ports
 PORTNUMBER = 0                      # Applied communication port
 
-if _COMPATIBLE_MODE == 0*0:
-    #** User defined ***
+if _COMPATIBLE_MODE == 00:
+    ### User defined ###
     # Modify as needed #
-    Conf.mode_name = "User defined"
-    Conf.log = 1                 # Logging time
-    Conf.graphics = 1            # Graphical features
-    Conf.solver = 1              # 0: Basic solver, 1: NumPy solver
-    Conf.OSlib = 1  # Basic OS file features (e.g. file size)
-    Conf.updating = 0            # Model Updating: On/ Off
-    Conf.arduino = 0             # Arduino input: On/Off
-    Conf.debug = 0               # Debugging mode
-    Conf.realistic_simulation = 0  # Wait as long as it was originally. Only valid with _SIMULATION = 1
+    _MODE_NAME = "User defined"
+    _LOG = 1                 # Logging time
+    _GRAPHICS = 1            # Graphical features
+    _SOLVER = 1              # 0: Basic solver, 1: NumPy solver
+    _OSLIBRARYAVAILABLE = 1  # Basic OS file features (e.g. file size)
+    _UPDATING = 1            # Model Updating: On/ Off
+    _ARDUINO = 0             # Arduino input: On/Off
+    _DEBUG = 0               # Debugging mode
+    _REALISTICSIMULATION = 0 # Wait as long as it was originally. Only valid with _SIMULATION = 1
 
-if Conf.OSlib:
+##############################################
+           ###  DO NOT MODIFY ###            #
+                                             #
+elif _COMPATIBLE_MODE == 01:                 #
+    ### "Processing 3" mode ###              #
+    _MODE_NAME = "Processing 3"              #
+    _LOG = 1*1                               #
+    _GRAPHICS = 0*0                          #
+    _SOLVER = 0*0                            #
+    _OSLIBRARYAVAILABLE = 0*0                #
+    _UPDATING = 1*1                          #
+    _ARDUINO = 1*1                           #
+    _DEBUG = 0*0                             #
+    _REALISTICSIMULATION = 1*1               #
+                                             #
+elif _COMPATIBLE_MODE == 02:                 #
+    ### Android mode ###                     #
+    # DO NOT MODIFY                          #
+    _MODE_NAME = "Android"                   #
+    _LOG = 1*1                               #
+    _GRAPHICS = 0*0                          #
+    _SOLVER = 0*0                            #
+    _OSLIBRARYAVAILABLE = 1*1                #
+    _UPDATING = 0*0                          #
+    _ARDUINO = 0*0                           #
+    _DEBUG = 0*0                             #
+    _REALISTICSIMULATION = 1*1               #
+                                             #
+elif _COMPATIBLE_MODE == 03:                 #
+    ### Informative ###                      #
+    # DO NOT MODIFY                          #
+    _MODE_NAME = "Informative mode"          #
+    _LOG = 1*1                               #
+    _GRAPHICS = 1*1                          #
+    _SOLVER = 1*1                            #
+    _OSLIBRARYAVAILABLE = 1*1                #
+    _UPDATING = 1*1                          #
+    _ARDUINO = 1*1                           #
+    _DEBUG = 0*0                             #
+    _REALISTICSIMULATION = 1*1               #
+                                             #
+else:                                        #
+    ### Maximum compatibility ###            #
+    # DO NOT MODIFY                          #
+    _MODE_NAME = "Maximum compatibility"     #
+    _LOG = 0*0                               #
+    _GRAPHICS = 0*0                          #
+    _SOLVER = 0*0                            #
+    _OSLIBRARYAVAILABLE = 0*0                #
+    _UPDATING = 0*0                          #
+    _ARDUINO = 0*0                           #
+    _DEBUG = 0*0                             #
+    _REALISTICSIMULATION = 1*1               #
+                                             #
+           ###  DO NOT MODIFY ###            #
+##############################################
+
+
+if _OSLIBRARYAVAILABLE:
     import os
-    try:
-        if not os.path.exists("./Structures/"):
-            os.makedirs("./Structures")
-    except FileNotFoundError:
-        print("Error: Please manually create the 'Structures' folder" 
-              "in the root of the project")
-        
 
-if Conf.simulation or not Conf.updating:
+if _SIMULATION or not _UPDATING:
     _ARDUINO = 0
 
 if _COMPATIBLE_MODE == 2:
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-if Conf.log:
+if _LOG:
     import time
     import datetime
     TIC = time.time()
-    print('------------------------------------')
-    print('Truss calculation program')
-    print('Created by Máté Szedlák (23/11/2016)')
-    print('Compatibility mode: ' + Conf.mode_name)
-    if Conf.solver == 0:
-        print('- Solver is set to default')
-    elif Conf.solver == 1:
-        print('- Solver is set to NumPy')
+    print '------------------------------------'
+    print 'Truss calculational program'
+    print 'Created by Máté Szedlák (23/11/2016)'
+    print 'Compatibility mode: ' + _MODE_NAME
+    if _SOLVER == 0:
+        print '- Solver is set to default'
+    elif _SOLVER == 1:
+        print '- Solver is set to NumPy'
     else:
         raise Exception("Solver settings are invalid!")
-    if Conf.updating:
-        print('+ Model updating is turned ON')
-        if Conf.simulation:
-            print('Input data is SIMULATED!')
+    if _UPDATING:
+        print '+ Model updating is turned ON'
+        if _SIMULATION:
+            print 'Input data is SIMULATED!'
     else:
-        print('- Model updating is turned OFF')
-    print('------------------------------------')
+        print '- Model updating is turned OFF'
+    print '------------------------------------'
 
 
-if Conf.arduino:
+if _ARDUINO:
     SER = 0
     try:
         import serial
     except ImportError:
-        print("You tried to import \'serial\' in Windows mode without installing \'pySerial\'.")
-        print("Please first install pySerial: http://playground.arduino.cc/Interfacing/Python")
+        print "You tried to import \'serial\' in Windows mode without installing \'pySerial\'."
+        print "Please first install pySerial: http://playground.arduino.cc/Interfacing/Python"
         raise Exception('Android mode denied: pyserial not found')
 
     PORTNUMBER -= 1
@@ -98,7 +146,7 @@ if Conf.arduino:
         if PORTNUMBER >= len(PORTS):
             PORTNUMBER = 0
         time.sleep(0.6)
-        print('Opening serial at port ' + str(PORTS[PORTNUMBER]))
+        print 'Opening serial at port ' + str(PORTS[PORTNUMBER])
         try:
             SER.close()
         except Exception:
@@ -106,8 +154,7 @@ if Conf.arduino:
         try:
             SER = serial.Serial(PORTS[PORTNUMBER], 9600, timeout=0)
         except serial.SerialException:
-            Exception(PORTS[PORTNUMBER] + ' port is busy. It might be occupied by this program or another one :'
-                                          '/ Be careful or try resetting this program')
+            Exception(PORTS[PORTNUMBER] + ' port is busy. It might be occupied by this program or another one :/ Be careful or try resetting this program')
             SER = 0
             try:
                 SER.close()
@@ -120,37 +167,394 @@ if Conf.arduino:
             except Exception:
                 pass
 
-"""
-if _ARDUINO or _SIMULATION:
-    try:
-        mappingfile = 'arduino_mapping.txt'
-        with open(mappingfile, "r") as textfile:
-            line = textfile.readline().strip()
-            arduino_mapping = line.upper().split(',')
 
-    except IOError:
-        raise Exception('File not found: ' + mappingfile)
-"""
+#if _ARDUINO or _SIMULATION:
+#    try:
+#        mappingfile = 'arduino_mapping.txt'
+#        with open(mappingfile, "r") as textfile:
+#            line = textfile.readline().strip()
+#            arduino_mapping = line.upper().split(',')
+#
+#    except IOError:
+#        raise Exception('File not found: ' + mappingfile)
 
-if Conf.solver:
+
+if _SOLVER:
     # NumPy library for solving linear equations in another way
     import numpy as np
 
-if Conf.graphics:
-    # library for drawing
-    from graphics import Arrow3D
+if _GRAPHICS:
+    # libraries for drawing
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import FancyArrowPatch
+    from mpl_toolkits.mplot3d import proj3d
 
+# From here:
+def mat_vec_mult(mat_a, vec_b):
+    """
+    Multiplying matrix with a vector, giving the result as a vector
 
-# XXX DEPRECATED !
+    Source:
+    https://stackoverflow.com/questions/10508021/matrix-multiplication-in-python
+    """
+    vec_c = [0.]*len(mat_a)
+    for i, row in enumerate(mat_a):
+        for j, elem in enumerate(vec_b):
+            vec_c[i] += row[j]*elem
+    return vec_c
+
+def invert(mat_x):
+    """
+    Invert a matrix X according to gauss-jordan elimination
+    In gauss-jordan elimination, we perform basic row operations to turn a matrix into
+    row-echelon form.  If we concatenate an identity matrix to our input
+    matrix during this process, we will turn the identity matrix into our inverse.
+    X - input list of lists where each list is a matrix row
+    output - inverse of X
+
+    Source:
+    http://www.vikparuchuri.com/blog/inverting-your-very-own-matrix/
+    """
+    #copy X to avoid altering input
+    mat_x = deepcopy(mat_x)
+
+    #Get dimensions of X
+    rows = len(mat_x)
+    cols = len(mat_x[0])
+
+    #Get the identity matrix and append it to the right of mat_x
+    #This is done because our row operations will make the identity into the inverse
+    identity = make_identity(rows, cols)
+    for i in xrange(0, rows):
+        mat_x[i] += identity[i]
+
+    i = 0
+    for j in xrange(0, cols):
+        #print("On col {0} and row {1}".format(j, i))
+        #Check to see if there are any nonzero values below the current row in the current column
+        zero_sum, first_non_zero = check_for_all_zeros(mat_x, i, j)
+        #If everything is zero, increment the columns
+        if zero_sum == 0:
+            if j == cols:
+                return mat_x
+            raise Exception("Matrix is singular")
+        #If mat_x[i][j] is 0, and there is a nonzero value below it, swap the two rows
+        if first_non_zero != i:
+            mat_x = swap_row(mat_x, i, first_non_zero)
+        #Divide mat_x[i] by mat_x[i][j] to make mat_x[i][j] equal 1
+        mat_x[i] = [m/mat_x[i][j] for m in mat_x[i]]
+
+        #Rescale all other rows to make their values 0 below mat_x[i][j]
+        for k in xrange(0, rows):
+            if k != i:
+                scaled_row = [mat_x[k][j] * m for m in mat_x[i]]
+                mat_x[k] = [mat_x[k][m] - scaled_row[m] for m in xrange(0, len(scaled_row))]
+        #If either of these is true, we have iterated through the matrix, and are done
+        if i == rows or j == cols:
+            break
+        i += 1
+
+    #Get just the right hand matrix, which is now our inverse
+    for i in xrange(0, rows):
+        mat_x[i] = mat_x[i][cols:len(mat_x[i])]
+    return mat_x
+
+def check_for_all_zeros(mat_x, i, j):
+    """
+    Check matrix mat_x to see if only zeros exist at or below row i in column j
+    mat_x - a list of lists
+    i - row index
+    j - column index
+    returns -
+        zero_sum - the count of non zero entries
+        first_non_zero - index of the first non value
+    """
+    non_zeros = []
+    first_non_zero = -1
+    for k in xrange(i, len(mat_x)):
+        non_zero = mat_x[k][j] != 0
+        non_zeros.append(non_zero)
+        if first_non_zero == -1 and non_zero:
+            first_non_zero = k
+    zero_sum = sum(non_zeros)
+    return zero_sum, first_non_zero
+
+def swap_row(mat_x, i, j):
+    """
+    Swap row i and row j in a list of lists
+    mat_x - list of lists
+    i - row index
+    j - row index
+    returns- modified matrix
+    """
+    mat_x[j], mat_x[i] = mat_x[i], mat_x[j]
+    return mat_x
+
+def swap_col(mat_x, i, j):
+    """
+    Swap colum i and column j in a list of lists
+    mat_x - list of lists
+    i - column index
+    j - column index
+    returns- modified matrix
+    """
+    for item in mat_x:
+        item[i], item[j] = item[j], item[i]
+    return mat_x
+
+def make_identity(row_num, col_num):
+    """
+    Make an identity matrix with dimensions rxc
+    row_num - number of rows
+    col_num - number of columns
+    returns - list of lists corresponding to  the identity matrix
+    """
+    identity = []
+    for i in xrange(0, row_num):
+        row = []
+        for j in xrange(0, col_num):
+            elem = 0
+            if i == j:
+                elem = 1
+            row.append(elem)
+        identity.append(row)
+    return identity
+
+if _GRAPHICS:
+    class Arrow3D(FancyArrowPatch):
+        """
+        Vector drawer module from the internet
+        """
+        def __init__(self, xs, ys, zs, *args, **kwargs):
+            FancyArrowPatch.__init__(self, (0, 0), (0, 0), *args, **kwargs)
+            self._verts3d = xs, ys, zs
+
+        def draw(self, renderer):
+            _xs3d, _ys3d, _zs3d = self._verts3d
+            _xs, _ys, _zs = proj3d.proj_transform(_xs3d, _ys3d, _zs3d, renderer.M)
+            self.set_positions((_xs[0], _ys[0]), (_xs[1], _ys[1]))
+            FancyArrowPatch.draw(self, renderer)
+
+    def plotstructure(struct, showorig, showresult, showsupports, \
+            showforces, showreactions, scaledisp, scale_f, z_corr, showvalues, saveplot):
+        """
+        General plotting method for structures
+
+            scaledisp: Scale drwaing of displacements
+            scale_f:   Scale force sign
+            z_corr:    Scale z-axis
+        """
+        plotname = struct.name
+        plot_width = 18.0              # Plot width in inches
+        xframe = 0                     # Frame width at X direction
+        yframe = 0                     # Frame width at Y direction
+        zframe = 0                     # Frame width at Z direction
+        scale_sup = scale_f*0.3        # Scale support sign  # All the others are input parameters
+
+        # Stress coloring settings [R G B] - Examples considering pressure:
+        # 0: [1, 0, 0]              Plain red
+        # 1: [x, 0, 0]              Red to Black
+        # 2: [1, 1-x, 0-x]          Red to White
+        # 3: [1, (1-x)/2, (1-x)/2]  Red to MildRed - Distincts pressure and tension
+        # 4: [x, 1-x, 0]            Red to Green
+        _coloring = 3 # € [0, 1, 2, 3, 4]
+
+        fig = plt.figure()
+        _ax = fig.add_subplot(111, projection='3d')
+
+        if struct.dof == 2:
+            _ax.view_init(elev=90., azim=-90.)
+            _ax.w_zaxis.line.set_lw(0.)
+            _ax.set_zticklabels([])
+
+        xmin = min(list(struct.nodalcoord[x][0] for x in range(struct.nodenum)))
+        xmax = max(list(struct.nodalcoord[x][0] for x in range(struct.nodenum)))
+        ymin = min(list(struct.nodalcoord[x][1] for x in range(struct.nodenum)))
+        ymax = max(list(struct.nodalcoord[x][1] for x in range(struct.nodenum)))
+        zmin = min(list(struct.nodalcoord[x][2] for x in range(struct.nodenum)))
+        zmax = max(list(struct.nodalcoord[x][2] for x in range(struct.nodenum)))
+
+        deltax = xmax - xmin
+        deltay = ymax - ymin
+
+        xframe = max(deltax * 0.05, 2)
+        yframe = max(deltay * 1.5, 2)
+
+        if struct.dof == 3:
+            plot_height = plot_width * ((deltay + yframe*2)/(deltax + xframe*2)) *0.3
+        else:
+            plot_height = plot_width * 0.5
+        fig.set_size_inches(plot_width, plot_height)
+
+        _ax.set_xlim3d(xmin - xframe, xmax + xframe)
+        _ax.set_ylim3d(ymin - yframe, ymax + yframe)
+        _ax.set_zlim3d(zmin - zframe, zmax + zframe)
+
+        if showorig == showresult:
+            _coloring = 0
+
+        # Giving plot names
+        if showorig == 1 and showresult == 0 and showsupports == 1 and showreactions == 0:
+            plotname += ' - Initial structure'
+            if showforces:
+                plotname += ' with forces'
+        elif showorig == 1 and showresult == 1:
+            plotname += ' - Deformation'
+            if showreactions == 0:
+                plotname += ' with reactions'
+        elif showorig == 0 and showresult == 1:
+            plotname += ' - Stresses'
+            if showreactions == 0:
+                plotname += ' with reactions'
+        else:
+            plotname += ' - Unnamed'
+
+        print plotname + ": "
+        if showresult:
+            dipslaydisplacement = deepcopy(struct.nodalcoord_def)
+            if scaledisp != 1.0:
+                if _LOG:
+                    print('Displacements are scaled with factor: ') + str(scaledisp)
+                for i in range(struct.nodenum):
+                    for j in range(3):
+                        dipslaydisplacement[i][j] = (struct.nodalcoord_def[i][j] -\
+                        struct.nodalcoord[i][j]) * scaledisp + struct.nodalcoord[i][j]
+
+        for i in range(struct.elenum):
+            # Plot undeformed structure
+            if showorig:
+                _ax.plot([struct.nodalcoord[struct.node[i][1]][0], struct.nodalcoord[struct.node[i][0]][0]], \
+                    [struct.nodalcoord[struct.node[i][1]][1], struct.nodalcoord[struct.node[i][0]][1]], \
+                    zs=[struct.nodalcoord[struct.node[i][1]][2], struct.nodalcoord[struct.node[i][0]][2]], color='b')
+            # Plot deformed structure
+            if showresult:
+                if struct.postprocessed():
+                    if struct.stresscolor[i] > 0:
+                        if _coloring == 1:
+                            rgb_col = [0, 0, abs(struct.stresscolor[i])]
+                        elif _coloring == 2:
+                            rgb_col = [1-abs(struct.stresscolor[i]), \
+                                       1-abs(struct.stresscolor[i]), 1]
+                        elif _coloring == 3:
+                            rgb_col = [(1-abs(struct.stresscolor[i]))/2, \
+                                       (1-abs(struct.stresscolor[i]))/2, 1]
+                        elif _coloring == 4:
+                            rgb_col = [0, 1-abs(struct.stresscolor[i]), \
+                                       abs(struct.stresscolor[i])]
+                        else:
+                            rgb_col = [1, 0, 0]
+                    else:
+                        if _coloring == 1:
+                            rgb_col = [abs(struct.stresscolor[i]), 0, 0]
+                        elif _coloring == 2:
+                            rgb_col = [1, 1-abs(struct.stresscolor[i]), \
+                                       1-abs(struct.stresscolor[i])]
+                        elif _coloring == 3:
+                            rgb_col = [1, (1-abs(struct.stresscolor[i]))/2, \
+                                       (1-abs(struct.stresscolor[i]))/2]
+                        elif _coloring == 4:
+                            rgb_col = [abs(struct.stresscolor[i]), \
+                                       1-abs(struct.stresscolor[i]), 0]
+                        else:
+                            rgb_col = [1, 0, 0]
+                else:
+                    print 'Stresses are not calculated'
+                    rgb_col = [1, 0, 0]
+                _ax.plot([dipslaydisplacement[struct.node[i][1]][0], dipslaydisplacement[struct.node[i][0]][0]], \
+                        [dipslaydisplacement[struct.node[i][1]][1], dipslaydisplacement[struct.node[i][0]][1]], \
+                        zs=[dipslaydisplacement[struct.node[i][1]][2], dipslaydisplacement[struct.node[i][0]][2]], color=rgb_col)
+
+        if showforces:
+            for i in struct.known_f_notzero:
+                if struct.force[i] < 0:
+                    value = -1.0
+                else:
+                    value = 1.0
+                if i % 3 == 0:
+                    f_dir = [value*scale_f, 0., 0.]
+                elif i % 3 == 1:
+                    f_dir = [0., value*scale_f, 0.]
+                else:
+                    f_dir = [0., 0., value*scale_f*z_corr]
+                f_arrow = Arrow3D([struct.nodalcoord[i//3][0], struct.nodalcoord[i//3][0] + f_dir[0]], \
+                                  [struct.nodalcoord[i//3][1], struct.nodalcoord[i//3][1] + f_dir[1]], \
+                                  [struct.nodalcoord[i//3][2], struct.nodalcoord[i//3][2] + f_dir[2]], \
+                                  mutation_scale=20, lw=1, arrowstyle="-|>", color="k")
+                _ax.add_artist(f_arrow)
+
+        if showreactions:
+            e_previous = -100
+            for i in struct.known_dis_a:
+                value = 0.0             # Maybe this is useless <XXX>
+                if struct.force[i] < 0:
+                    value = -1.0
+                elif struct.force[i] > 0:
+                    value = 1.0
+                if i % 3 == 0:
+                    f_dir = [value*scale_f, 0., 0.]
+                elif i % 3 == 1:
+                    f_dir = [0., value*scale_f, 0.]
+                else:
+                    f_dir = [0., 0., value*scale_f*z_corr]
+                if abs(struct.force[i]) > 0:
+                    f_arrow = Arrow3D([struct.nodalcoord[i//3][0], struct.nodalcoord[i//3][0] + f_dir[0]], \
+                                      [struct.nodalcoord[i//3][1], struct.nodalcoord[i//3][1] + f_dir[1]], \
+                                      [struct.nodalcoord[i//3][2], struct.nodalcoord[i//3][2] + f_dir[2]], \
+                                      mutation_scale=20, lw=1, arrowstyle="-|>", color="darkolivegreen")
+                    _ax.add_artist(f_arrow)
+                    if showvalues:
+                        _ax.set_xticklabels([])
+                        _ax.set_yticklabels([])
+                        _ax.set_zticklabels([])
+                        if not i//3 == e_previous//3:
+                            if struct.dof == 3:
+                                _ax.text(struct.nodalcoord[i//3][0], \
+                                    struct.nodalcoord[i//3][1], \
+                                    struct.nodalcoord[i//3][2], \
+                                    "{:10.2f}".format(struct.force[(i//3)*3+0])+'\n'+\
+                                    "{:10.2f}".format(struct.force[(i//3)*3+1])+'\n'+\
+                                    "{:10.2f}".format(struct.force[(i//3)*3+2]),\
+                                    fontsize=12, horizontalalignment='right')
+                            elif struct.dof == 2:
+                                _ax.text(struct.nodalcoord[i//3][0], \
+                                    struct.nodalcoord[i//3][1], \
+                                    struct.nodalcoord[i//3][2], \
+                                    "{:10.2f}".format(struct.force[(i//3)*3+0])+'\n'+\
+                                    "{:10.2f}".format(struct.force[(i//3)*3+1]),\
+                                    fontsize=12, horizontalalignment='right')
+                e_previous = i
+
+        if showsupports:
+            for i in struct.known_dis_a:
+                if i % 3 == 0:
+                    f_dir = [-1.0 * scale_sup, 0., 0.]
+                    col = 'g'
+                elif i % 3 == 1:
+                    f_dir = [0., -1.0 * scale_sup, 0.]
+                    col = 'y'
+                else:
+                    f_dir = [0., 0., -1.0 * scale_sup * z_corr]
+                    col = 'brown'
+                if i % 3 != 2 or struct.dof == 3:
+                    _ax.plot([struct.nodalcoord[i//3][0], struct.nodalcoord[i//3][0]+f_dir[0]], \
+                        [struct.nodalcoord[i//3][1], struct.nodalcoord[i//3][1]+f_dir[1]], \
+                        zs=[struct.nodalcoord[i//3][2], struct.nodalcoord[i//3][2]+f_dir[2]], \
+                        color=col, linewidth=4.0)
+        plt.show()
+        if saveplot:
+            fig.savefig(plotname + '.png')
+            print '\'' + plotname +'.png\' is saved.'
+            print '------------------------------------'
+        return
+
 def endoffile(givenfile, line):
     """
     Check if end of file is reached. Implemented due to compatibility reasons.
     """
-    if Conf.OSlib:
+    if _OSLIBRARYAVAILABLE:
         return givenfile.tell() < os.fstat(givenfile.fileno()).st_size
     else:
         return not line == "EOF"
-
 
 def logtime(prev_time, title):
     """
@@ -160,15 +564,14 @@ def logtime(prev_time, title):
     At the first call, should be called with TIC value. The input argument
     should be overwritten by this funvtion's return value.
     """
-    if Conf.log:
+    if _LOG:
         new_time = time.time()
-        print(title)
-        print('Time: ' + str("{:10.3f}".format(new_time - prev_time)))
-        print('------------------------------------')
+        print title
+        print 'Time: ' + str("{:10.3f}".format(new_time - prev_time))
+        print '------------------------------------'
         return new_time
     else:
         return 0
-
 
 def error(delta):
     """
@@ -177,10 +580,10 @@ def error(delta):
     sumerr = 0
     for deltaelement in delta:
         sumerr += deltaelement**2
+
     sumerr = math.sqrt(sumerr)
 
     return sumerr
-
 
 class Truss(object):
     """
@@ -240,8 +643,7 @@ class Truss(object):
         self.modificationlimit = 0.6
         self.unitmodification = 0.05
         self.measurement = [0.]
-        self.numofupdates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit,
-                                             # #Updates where there were no more modification option]
+        self.numofupdates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit, #Updates where there were no more modification option]
         self.iterationlimit = 20
 
     def read(self, filename):
@@ -266,12 +668,11 @@ class Truss(object):
             EOF - For compatibility reasons EOF should be placed after the commands
         """
         self._io_origin = 0
-        readelementnames = ["Origin", "DOF", "Elements", "Coordinates",
-                            "Cross-sections", "Materials", "Forces", "Supports", "Measured DOFs"]
+        readelementnames = ["Origin", "DOF", "Elements", "Coordinates", "Cross-sections", "Materials", "Forces", "Supports", "Measured DOFs"]
 
-        with open("./Structures/" + filename, "r") as sourcefile:
+        with open(filename, "r") as sourcefile:
             sourceline = ""
-            while sourceline != "EOF":
+            while endoffile(sourcefile, sourceline):
                 sourceline = sourcefile.readline().strip()
 
                 if sourceline.upper() == "_ORIGIN":
@@ -375,14 +776,15 @@ class Truss(object):
 
         terminate = False
         for i, value in enumerate(self.readelements):
-            if i > 0 and (i < 8 or Conf.updating):  # if i > 0:
+            if i > 0 and (i < 8 or _UPDATING):
+            #if i > 0:
                 if value == 0:
-                    print("The following was not found: " + readelementnames[i])
+                    print "The following was not found: " + readelementnames[i]
                     terminate = True
         if terminate:
             raise Exception
 
-    def plot(self, showorig, showresult, showsupports, showforces,
+    def plot(self, showorig, showresult, showsupports, showforces, \
              showreactions, scaledisplacement, scaleforce, scalez, saveplot):
         """
         Plot function of the Truss class
@@ -399,7 +801,7 @@ class Truss(object):
         _showvalues = 1     # Show values of forces
 
         if self._postprocessed == 0:
-            print('Postprocess is needed before plotting structure!')
+            print 'Postprocess is needed before plotting structure!'
         else:
             if scaledisplacement == 0:
                 scaledisplacement = 1.0           # Scale drwaing of displacements
@@ -408,8 +810,8 @@ class Truss(object):
             if scalez == 0:
                 scalez = 0.3                      # Scale z-axis
 
-            Arrow3D.plotstructure(self, showorig, showresult, showsupports, showforces, showreactions,
-                                  scaledisplacement, scaleforce, scalez, _showvalues, saveplot, Conf.log)
+            plotstructure(self, showorig, showresult, showsupports, showforces, showreactions, \
+                 scaledisplacement, scaleforce, scalez, _showvalues, saveplot)
 
     def __checkcoordinates(self, ignorable):
         """
@@ -423,7 +825,7 @@ class Truss(object):
             if ignorable == 0:
                 raise Exception('Coordinate list has repeating items. Calculation is terminated')
             else:
-                print("This node already exists. Input is ignored.")
+                print "This node already exists. Input is ignored."
             return 0
         else:
             return 1
@@ -454,7 +856,7 @@ class Truss(object):
 
         # Creating mapping tool for elements
         for node in self.node:
-            self.eledof.append([node[0]*3, node[0]*3+1, node[0]*3+2,
+            self.eledof.append([node[0]*3, node[0]*3+1, node[0]*3+2, \
                                 node[1]*3, node[1]*3+1, node[1]*3+2])
 
         # Initialazing matrix for all matrices
@@ -473,7 +875,7 @@ class Truss(object):
         self._mod_stiffisfresh = 0
         if self.nodenum > len(self.nodalcoord):
             raise Exception('More coordinates are needed')
-        elif not self.node:
+        elif self.node == []:
             raise Exception('Nodes must be set before defining elements')
         self.__checkcoordinates(False)
 
@@ -573,14 +975,14 @@ class Truss(object):
                     self.analysis[dofname] = node*3+2
                     self.keypoint.append(node*3+2)
                 else:
-                    print("Z-direction is not allowed in 2D structures. "
-                          "Please check the 'MEASUREMENTS' section in the input file.")
+                    print "Z-direction is not allowed in 2D structures. Please check the \'MEASUREMENTS\' section in the input file."
                     raise Exception
 
         self.keypnum = len(self.analysis)
-        if self.keypnum == 0 and Conf.updating:
-            print("There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file.")
+        if self.keypnum == 0 and _UPDATING:
+            print "There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file."
             raise Exception
+
 
     def calcstiffness(self):
         """
@@ -593,7 +995,7 @@ class Truss(object):
                 self.constraint.append([int(zdof*3+2), 0.])
         self.constraint = list(k for k, _ in itertools.groupby(sorted(self.constraint)))
 
-        # Setting known forces
+        #Setting known forces
         for dofloc in range(3*self.nodenum):
             self.known_f_a.append(dofloc)
             if self.force[dofloc] != 0:
@@ -621,21 +1023,21 @@ class Truss(object):
         self.stiffness = [[0.]*(len(self.nodalcoord)*3)]*(len(self.nodalcoord)*3)
 
         for i in range(self.elenum):
-            ele_length[i] = math.sqrt((self.nodalcoord[self.node[i][1]][0]-self.nodalcoord[self.node[i][0]][0])**2 +
-                (self.nodalcoord[self.node[i][1]][1]-self.nodalcoord[self.node[i][0]][1])**2 +
+            ele_length[i] = math.sqrt((self.nodalcoord[self.node[i][1]][0]-self.nodalcoord[self.node[i][0]][0])**2+ \
+                (self.nodalcoord[self.node[i][1]][1]-self.nodalcoord[self.node[i][0]][1])**2 + \
                 (self.nodalcoord[self.node[i][1]][2]-self.nodalcoord[self.node[i][0]][2])**2)
 
             self._cx[i] = (self.nodalcoord[self.node[i][1]][0]-self.nodalcoord[self.node[i][0]][0])/ele_length[i]
             self._cy[i] = (self.nodalcoord[self.node[i][1]][1]-self.nodalcoord[self.node[i][0]][1])/ele_length[i]
             self._cz[i] = (self.nodalcoord[self.node[i][1]][2]-self.nodalcoord[self.node[i][0]][2])/ele_length[i]
             self._norm_stiff[i] = self.el_mod[i]/ele_length[i]
-            self._s_loc[i] = [[self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i], -self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i]],
-                [self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i], -self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i]],
-                [self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2, -self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2],
-                [-self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i], self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i]],
-                [-self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i], self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i]],
+            self._s_loc[i] = [[self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i], -self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i]], \
+                [self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i], -self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i]], \
+                [self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2, -self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2], \
+                [-self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i], self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i]], \
+                [-self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i], self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i]], \
                 [-self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2, self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2]]
-            self._loc_stiff[i] = [[y * self.area[i] * self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
+            self._loc_stiff[i] = [[y* self.area[i]* self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
             ele_dof_vec = self.eledof[i]
 
             stiffincrement = [0.]*(len(self.nodalcoord)*3)
@@ -650,17 +1052,17 @@ class Truss(object):
         """
         Convergency step in stiffness matrix modification
         """
-        if not self.mod_stiffnesses:
+        if self.mod_stiffnesses == []:
             self.mod_stiffnesses = [0.]*(self.elenum+1)
 
-        # for loopindex in range(self.elenum):
+        #for loopindex in range(self.elenum):
         _mod_stiffnesses_temp = [[0.]*(len(self.nodalcoord)*3)]*(len(self.nodalcoord)*3)
 
         for i in range(self.elenum):
             if i == index:
-                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i] + magnitude)  # self.el_mod[i]/ele_length[i]
+                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i] + magnitude) #self.el_mod[i]/ele_length[i]
             else:
-                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i])  # self.el_mod[i]/ele_length[i]
+                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i]) #self.el_mod[i]/ele_length[i]
 
             _mod_loc_stiff = [[y*self.area[i]*_mod_norm_stiff for y in x] for x in self._s_loc[i]]
 
@@ -671,18 +1073,18 @@ class Truss(object):
             for j in range(3*2):
                 for k in range(3*2):
                     stiffincrement[ele_dof_vec[k]] = _mod_loc_stiff[j][k]
-                _mod_stiffnesses_temp[ele_dof_vec[j]] = [x + y for x, y in
-                                                         zip(_mod_stiffnesses_temp[ele_dof_vec[j]], stiffincrement)]
+                _mod_stiffnesses_temp[ele_dof_vec[j]] = [x + y for x, y in zip(_mod_stiffnesses_temp[ele_dof_vec[j]], stiffincrement)]
 
         self.mod_stiffnesses[index] = _mod_stiffnesses_temp
+
 
     def solve(self):
         """
         Main solver of the code
         """
         if self._stiffisfresh == 0:
-            if Conf.log:
-                print('Stiffness matrix is recalculated')
+            if _LOG:
+                print 'Stiffness matrix is recalculated'
             self.calcstiffness()
 
         self.dis_new = [0.]*(self.nodenum*3-len(self.constraint))
@@ -700,13 +1102,13 @@ class Truss(object):
             self.stiff_new[i] = [x + y for x, y in zip(self.stiff_new[i], stiffincrement)]
 
         # SOLVING THE STRUCTURE
-        if Conf.solver == 0:
-            if Conf.log:
-                print('Built-in solver')
+        if _SOLVER == 0:
+            if _LOG:
+                print 'Built-in solver'
             self.dis_new = mat_vec_mult(invert(self.stiff_new), self.force_new)
         else:
-            if Conf.log:
-                print('NumPy solver')
+            if _LOG:
+                print 'NumPy solver'
             self.dis_new = np.linalg.solve(np.array(self.stiff_new), np.array(self.force_new))
 
         self.displacement = deepcopy(self.init_disp)
@@ -717,13 +1119,14 @@ class Truss(object):
         # Deformed shape
         self.nodalcoord_def = []
         for i in range(self.nodenum):
-            self.nodalcoord_def.append([self.nodalcoord[i][0] + self.displacement[i*3+0],
-                self.nodalcoord[i][1] + self.displacement[i*3+1], self.nodalcoord[i][2] + self.displacement[i*3+2]])
+            self.nodalcoord_def.append([self.nodalcoord[i][0]+ self.displacement[i*3+0], \
+                self.nodalcoord[i][1]+ self.displacement[i*3+1], self.nodalcoord[i][2]+ self.displacement[i*3+2]])
 
         # Postrpocesses
         self.postprocess()
 
         self.mod_displacements = [0.]*(self.elenum+1)
+
 
     def solvemodstruct(self, index):
         """
@@ -742,7 +1145,7 @@ class Truss(object):
             stiff_new[i] = [x + y for x, y in zip(stiff_new[i], stiffincrement)]
 
         # SOLVING THE MODIFIED STRUCTURE
-        if Conf.solver == 0:
+        if _SOLVER == 0:
             dis_new = mat_vec_mult(invert(stiff_new), self.force_new)
         else:
             dis_new = np.linalg.solve(np.array(stiff_new), np.array(self.force_new))
@@ -753,6 +1156,8 @@ class Truss(object):
             mod_displacement_temp[kfa] = dis_new[i] - self.dis_new[i]
 
         self.mod_displacements[index] = [x + y for x, y in zip(self.mod_displacements[index], mod_displacement_temp)]
+
+
 
     def evaluate(self):
         """
@@ -778,8 +1183,8 @@ class Truss(object):
                     self.effect[modnum] = [x for x in effect_temp]
                     self.toteffect[j] += abs(self.effect[modnum][j])
                 except IndexError:
-                    print("Maybe the mapping data is invalid.")
-                    print("Please check the \'arduino_mapping.txt\' input whether the given DOFs are correct or not.")
+                    print "Maybe the mapping data is invalid."
+                    print "Please check the \'arduino_mapping.txt\' input whether the given DOFs are correct or not."
                     raise IndexError
 
         self.effectratio = deepcopy(self.effect)
@@ -790,7 +1195,7 @@ class Truss(object):
                 else:
                     self.effectratio[i][j] = 0
 
-        # print("   \'effectratio\' is not used yet")
+        #print "   \'effectratio\' is not used yet"
 
         # Sort by effectiveness
         for i in range(self.keypnum):
@@ -801,9 +1206,9 @@ class Truss(object):
                 if self.sortedeff[i][ktemp][i] < 0:
                     for jtemp in range(self.keypnum):
                         self.sortedeff[i][ktemp][jtemp] = abs(self.sortedeff[i][ktemp][jtemp])
-                        self.sortedeff[i][ktemp][self.keypnum + 1] = -1
+                        self.sortedeff[i][ktemp][self.keypnum +1] = -1
                 else:
-                    self.sortedeff[i][ktemp][self.keypnum + 1] = +1
+                    self.sortedeff[i][ktemp][self.keypnum +1] = +1
 
             for j in range(self.keypnum):
                 if i != j and j != 0:
@@ -820,7 +1225,7 @@ class Truss(object):
 
             MEASUREMENT: [[13X, -2.154], [16Y, 5.256], ...]
         """
-        # print(nodenumber option should be added! <XXX>)
+        #Print nodenumber option should be added! <XXX>
 
         delta = []
 
@@ -828,9 +1233,9 @@ class Truss(object):
             try:
                 dof = self.analysis[loc.upper()]
             except KeyError:
-                print('The given measurement location cannot be matched with the input data.')
-                print('The available nodes are: {\'NAMES\': mapping addresses}')
-                print(self.analysis)
+                print 'The given measurement location cannot be matched with the input data.'
+                print 'The available nodes are: {\'NAMES\': mapping addresses}'
+                print self.analysis
                 SER.close()
                 raise Exception('Watchpoint name error')
 
@@ -842,9 +1247,11 @@ class Truss(object):
         """
         Modell updating - core function
         """
-        # modnum = min(10, self.elenum)
+        #modnum = min(10, self.elenum)
         modnum = self.elenum
         self.modifications = [0.0]*self.elenum
+
+
 
         if not _SIMULATION:
             appendix = ""
@@ -854,16 +1261,15 @@ class Truss(object):
         newdelta = delta
         j = 0
 
-        print("-----")
-        print("Step: 0/" + str(self.iterationlimit))
+        print "-----"
+        print "Step: 0/"+ str(self.iterationlimit)
 
-        # Optimization loop
-        while error(newdelta) > self.errorlimit and j <= self.iterationlimit and (self.capable() or j <= 1):
+        while (error(newdelta) > self.errorlimit and j <= self.iterationlimit and (self.capable() or j <= 1)):     # Optimization loop
             j += 1
 
-            print("Error: " + str(error(newdelta)))
-            print("-----")
-            print("Step: " + str(j) + "/" + str(self.iterationlimit))
+            print "Error: " + str(error(newdelta))
+            print "-----"
+            print "Step: " + str(j) + "/"+ str(self.iterationlimit)
 
             ratio = [0.]*modnum
             unit = 0
@@ -871,9 +1277,7 @@ class Truss(object):
             prevmodifications = self.modifications
 
             for index in range(self.elenum):
-                self.modifications[index] = min(abs(self.modifications[index] - self.unitmodification),
-                                                self.modificationlimit) * \
-                                            math.copysign(1, self.modifications[index] - self.unitmodification)
+                self.modifications[index] = min(abs(self.modifications[index] - self.unitmodification), self.modificationlimit) *math.copysign(1, self.modifications[index]- self.unitmodification)
                 self.calcmodstiffness(index, self.modifications[index])
                 self.solvemodstruct(index)
             self.evaluate()
@@ -885,35 +1289,32 @@ class Truss(object):
 
             for i, effect in enumerate(self.toteffect):
                 if effect == 0.0:
-                    print("None of the variables has effect on " + str(self.arduino_mapping[i]))
-                    print("Model updating has no solution.")
+                    print "None of the variables has effect on " + str(self.arduino_mapping[i])
+                    print "Model updating has no solution."
                     raise Exception
 
             for i in range(self.elenum):
                 modificationnumber = self.sortedeff[0][i][1]
-                ratio[modificationnumber] = abs(self.sortedeff[0][i][0] / self.toteffect[0]) * \
-                                            math.copysign(1, self.sortedeff[0][i][2])
+                ratio[modificationnumber] = abs(self.sortedeff[0][i][0] / self.toteffect[0])*math.copysign(1, self.sortedeff[0][i][2])
                 unit += abs(ratio[modificationnumber]*self.sortedeff[0][i][0])
 
             scale = newdelta[0]/unit
             for i in range(self.elenum):
                 modificationnumber = self.sortedeff[0][i][1]
-                self.modifications[modificationnumber] = min(abs(prevmodifications[modificationnumber] -
-                                                                 self.unitmodification*ratio[modificationnumber]),
-                                                             self.modificationlimit)\
-                    * math.copysign(1, prevmodifications[modificationnumber] -
-                                    self.unitmodification*ratio[modificationnumber])
+                self.modifications[modificationnumber] = min(abs(prevmodifications[modificationnumber] - self.unitmodification*ratio[modificationnumber]), self.modificationlimit)\
+                    *math.copysign(1, prevmodifications[modificationnumber] - self.unitmodification*ratio[modificationnumber])
                     # the last part is already the sign itself without the sign function
 
-            print("Ratio: " + str(scale))
+            print "Ratio: " + str(scale)
 
-        print("Final error: " + str(error(newdelta)))
+        print "Final error: " + str(error(newdelta))
 
         if not self.capable() and j > 1:
-            print("Optimization could not be finished successfully.")
-            print("The remaining error is: " + str(error(newdelta)))
+            print "Optimization could not be finished successfully."
+            print "The remaining error is: " + str(error(newdelta))
 
-        with open("./Structures/" + self.name + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
+
+        with open(self.name + ' - UpdateResults'+ appendix +'.txt', 'a') as outfile:
             if j > 1:
                 if j <= self.iterationlimit and self.capable():
                     self.numofupdates[0] += 1
@@ -929,7 +1330,7 @@ class Truss(object):
             outfile.write("Requiered iterations: " + str(j) + "\n")
             outfile.write("Measurement: " + str(self.measurement) + "\n")
             outfile.write("Original delta: " + str(delta) + "\n")
-            outfile.write("New delta: " + str(newdelta) + " (limit: " + str(self.errorlimit) + ")\n")
+            outfile.write("New delta: " + str(newdelta) + " (limit: " + str(self.errorlimit) +")\n")
             outfile.write("Final error: " + str(error(newdelta)) + "\n")
             outfile.write("Modifications [%]: \n")
             outfile.write(str(self.modifications) + "\n")
@@ -940,12 +1341,14 @@ class Truss(object):
                 outfile.write(str(self.mod_displacements[self.elenum]) + "\n")
             outfile.write("----------------------\n")
 
+
     def capable(self):
         """
         Function telling whether there are more options to modify
         """
+        capable = False
         for variable in self.modifications:
-            if 0.01 < abs(variable) <= 0.95*self.modificationlimit:
+            if abs(variable) <= 0.95*self.modificationlimit and abs(variable) > 0.01:
                 capable = True
         return capable
 
@@ -956,37 +1359,37 @@ class Truss(object):
         if errorlimit > 0.0:
             self.errorlimit = errorlimit
         else:
-            print("The error limit must be a positive number")
+            print "The error limit must be a positive number"
             raise Exception
 
     def setmodificationlimit(self, modificationlimit):
         """
         Setting modification limit for members (model updating)
         """
-        if 0.0 < modificationlimit < 1.0:
+        if modificationlimit > 0.0 and modificationlimit < 1.0:
             self.modificationlimit = modificationlimit
         else:
-            print("The modification limit must be higher than 0.0 and lower than 1.0")
+            print "The modification limit must be higher than 0.0 and lower than 1.0"
             raise Exception
 
     def setunitmodification(self, unitmodification):
         """
         Setting modification step (model updating)
         """
-        if 0.01 <= abs(unitmodification) < 0.5:
+        if abs(unitmodification) >= 0.01 and abs(unitmodification) < 0.5:
             self.unitmodification = unitmodification
         else:
-            print("The absolut value of the unit modification must be minimum 0.01 and maximum 0.5")
+            print "The absolut value of the unit modification must be minimum 0.01 and maximum 0.5"
             raise Exception
 
     def setiterationlimit(self, iterationlimit):
         """
         Setting maximum number of iterations (model updating)
         """
-        if 1 < int(iterationlimit) <= math.pow(10, 4):
+        if int(iterationlimit) > 1 and int(iterationlimit) <= math.pow(10, 4):
             self.iterationlimit = int(iterationlimit)
         else:
-            print("The iterationlimit must be between 2 and 10.000")
+            print "The iterationlimit must be between 2 and 10.000"
             raise Exception
 
     def readarduino(self, base, saveinput):
@@ -1012,7 +1415,7 @@ class Truss(object):
                     else:
                         del arduinovalues[len(arduinovalues)-1]
                 except IndexError:
-                    print("Index Error... continuing")
+                    print "Index Error... continuing"
                 if len(arduinovalues) == len(self.arduino_mapping):
                     try:
                         for i in range(len(self.arduino_mapping)):
@@ -1027,29 +1430,30 @@ class Truss(object):
                         newdata = True
 
                     except ValueError:
-                        print("Value error... continuing")
+                        print "Value error... continuing"
                         SER.flushInput()
                         time.sleep(0.5)
                     except Exception:
-                        print("Type error: " + str(arduinovalues) + "... continuing")
+                        print "Type error: " + str(arduinovalues) + "... continuing"
                         SER.flushInput()
                         time.sleep(0.5)
 
             SER.flushInput()
 
         except serial.SerialTimeoutException:
-            print("Data could not be read... continuing")
+            print "Data could not be read... continuing"
             SER.flushInput()
             time.sleep(0.5)
+
 
         if newdata and not bigdifference and not readerror:
             self.measurement = zip(self.arduino_mapping, data)
 
-            saveinput.write(str(data) + ', ' + str(time.time()) + "\n")
+            saveinput.write(str(data) +', '+ str(time.time()) + "\n")
             # Calculate differences
             delta = self.difference(self.displacement, self.measurement)
 
-            print("Delta: " + str(delta))
+            print "Delta: " + str(delta)
 
             newdata = False
             bigdifference = False
@@ -1074,7 +1478,7 @@ class Truss(object):
                 prevreadtime = float(str(prevline.split(']')[1]).split(',')[1])
                 nowreadtime = float(str(arduinoline.split(']')[1]).split(',')[1])
                 try:
-                    if Conf.realistic_simulation:
+                    if _REALISTICSIMULATION:
                         sleeptime = nowreadtime - prevreadtime
                 except Exception:
                     pass
@@ -1092,22 +1496,22 @@ class Truss(object):
                         data[i] = float(arduinovalues[i])
                     self.processeddata = data
                 except Exception:
-                    print("Type error: " + str(arduinovalues) + "... continuing")
+                    print "Type error: " + str(arduinovalues) + "... continuing"
 
                 self.measurement = zip(self.arduino_mapping, data)
 
                 # Calculate differences
                 delta = self.difference(self.displacement, self.measurement)
                 time.sleep(sleeptime)
-                print(delta)
+                print delta
                 return delta
 
         except IndexError:
-            print("IndexError")
-            # pass
+            print "IndexError"
+            #pass
         except Exception:
-            print("Exception in simulation data")
-            # pass
+            print "Exception in simulation data"
+            #pass
 
     def updatemodel(self):
         """
@@ -1126,12 +1530,11 @@ class Truss(object):
                 pass
             filemode = 'r'
 
-        with open("./Structures/" + self.name + ' - Input Data.txt', filemode) as inputfile:
+        with open(self.name + ' - Input Data.txt', filemode) as inputfile:
             # Saving input data
             if not _SIMULATION:
                 inputfile.write('Input data of \'' + self.name + '\':\n\n')
-                inputfile.write('Start Time: ' +
-                                str(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')) + "\n")
+                inputfile.write('Start Time: ' + str(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')) + "\n")
                 inputfile.write('Base: ' + str(base) + '\n')
 
             inputline = "[],0.0"
@@ -1148,35 +1551,34 @@ class Truss(object):
                             delta = self.simulatearduino(inputline, previnputline)
                     except Exception:
                         pass
-                    if delta:
+                    if not delta is None:
                         self.optimize(delta)
-        print("Update statistics:")
-        print("Totally updated models: " + str(TRUSS.numofupdates[0] + TRUSS.numofupdates[1]++ TRUSS.numofupdates[2]))
-        print("  Successfully updated models: " + str(TRUSS.numofupdates[0]))
-        print("  Updates with running out of possibilities: " + str(TRUSS.numofupdates[2]))
-        print("  Updates did not finshed: " + str(TRUSS.numofupdates[1]))
+        print "Update statistics:"
+        print "Totally updated models: " + str(TRUSS.numofupdates[0] + TRUSS.numofupdates[1]++ TRUSS.numofupdates[2])
+        print "  Successfully updated models: " + str(TRUSS.numofupdates[0])
+        print "  Updates with running out of possibilities: " + str(TRUSS.numofupdates[2])
+        print "  Updates did not finshed: " + str(TRUSS.numofupdates[1])
 
     def calibrate(self):
         """
-        Calibration for Arduino measurement.
-        All the measurements will describe the dispalecements from the claibration-state.
+        Calibration for Arduino measurement. All the measurements will describe the dispalecements from the claibration-state.
         """
         answer_1 = '0'
         restart = '0'
         accept = '0'
         arduinovalues = []
-        print("Before starting the model updating, the measuring tools must be calibrated.")
-        print("The calibration should be done in load-free state.")
-        while answer_1 not in ['Y', 'N']:
-            answer_1 = input('Can we start the calibration? (y/n) ').upper()
+        print "Before starting the model updating, the measuring tools must be calibrated."
+        print "The calibration should be done in load-free state."
+        while (answer_1 not in ['Y', 'N']):
+            answer_1 = raw_input('Can we start the calibration? (y/n) ').upper()
         if answer_1 == 'N':
             SER.close()
             raise Exception('Calibration is terminated')
         else:
             try:
                 SER.flushInput()
-                # time.sleep(0.2)
-                arduinoline = ''  # SER.readline()
+                #time.sleep(0.2)
+                arduinoline = '' #SER.readline()
                 while len(arduinoline) == 0:
                     time.sleep(0.2)
                     arduinoline = SER.readline()
@@ -1186,27 +1588,27 @@ class Truss(object):
                     del arduinovalues[len(arduinovalues)-1]               # if needed!!!
                     if len(arduinovalues) == len(self.arduino_mapping):
                         measurement = zip(self.arduino_mapping, arduinovalues)
-                        print("Calibration result:")
-                        print(measurement)
-                        while accept not in ['Y', 'N']:
-                            accept = input('Ok? Can we start the main part? Put on the loads! (y/n) ').upper()
+                        print "Calibration result:"
+                        print measurement
+                        while (accept not in ['Y', 'N']):
+                            accept = raw_input('Ok? Can we start the main part? Put on the loads! (y/n) ').upper()
                             if accept == 'N':
                                 restart = 'Y'
                     else:
-                        print("Data error. Calibartion is restarting.")
-                        print("Arduino values:" + str(arduinovalues))
+                        print "Data error. Calibartion is restarting."
+                        print "Arduino values:" + str(arduinovalues)
                         restart = 'Y'
                 else:
-                    print('The calibration cannot be done: no data')
-                    while restart not in ['Y', 'N']:
-                        restart = input('Do you want to restart calibration? (y/n) ').upper()
+                    print 'The calibration cannot be done: no data'
+                    while (restart not in ['Y', 'N']):
+                        restart = raw_input('Do you want to restart calibration? (y/n) ').upper()
             except Exception:
-                print('The calibration cannot be done: exception was raised')
-                while restart not in ['Y', 'N']:
-                    restart = input('Do you want to restart calibration? (y/n) ').upper()
+                print 'The calibration cannot be done: exception was raised'
+                while (restart not in ['Y', 'N']):
+                    restart = raw_input('Do you want to restart calibration? (y/n) ').upper()
 
         if restart == 'Y':
-            print("Restarting calibration")
+            print "Restarting calibration"
             SER.flushInput()
             return self.calibrate()
         elif restart == 'N':
@@ -1214,6 +1616,7 @@ class Truss(object):
             raise Exception('Calibration is terminated')
         if accept == 'Y':
             return measurement
+
 
     def postprocess(self):
         """
@@ -1240,7 +1643,7 @@ class Truss(object):
         """
         self.stress = [0.]*self.elenum
         for element in range(self.elenum):
-            locstiff = [-self._cx[element], -self._cy[element], -self._cz[element],
+            locstiff = [-self._cx[element], -self._cy[element], -self._cz[element], \
                          self._cx[element], self._cy[element], self._cz[element]]
             for i in range(3*2):
                 self.stress[element] += locstiff[i]*self.displacement[self.eledof[element][i]]
@@ -1285,84 +1688,79 @@ class Truss(object):
                 out_supports += str(i[0] - i[0]//3 + self._io_origin) + ', ' + str(i[1]) + ' | '
         # Not elegant solution
         out_specdofs = self.specdof_inputstring
-        try:
-            with open("./Structures/" + fname, 'w') as outfile:
-                # Writing data
-                outfile.write('Calculation of \'' + self.name + '\':\n\n')
-    
-                outfile.write('Reactions\n')
-                # for i in range(len(self.force)//3):
-                prev = -1
-                for i in self.known_dis_a:
-                    if self.dof == 3 or i % 3 != 2:
-                        if i//3 != prev:
-                            if i < 100:
+
+        with open(fname, 'w') as outfile:
+            # Writing data
+            outfile.write('Calculation of \'' + self.name + '\':\n\n')
+
+            outfile.write('Reactions\n')
+            #for i in range(len(self.force)//3):
+            prev = -1
+            for i in self.known_dis_a:
+                if self.dof == 3 or i%3 != 2:
+                    if i//3 != prev:
+                        if i < 100:
+                            outfile.write(' ')
+                            if i < 9:
                                 outfile.write(' ')
-                                if i < 9:
-                                    outfile.write(' ')
-                            nodalforce = ''
-                            if (i//3)*3+0 in self.known_dis_a:
-                                nodalforce += "{:10.2f}".format(self.force[(i//3)*3+0]) + ', '
-                            else:
-                                nodalforce += '            '
-                            if (i//3)*3+1 in self.known_dis_a:
-                                nodalforce += "{:10.2f}".format(self.force[(i//3)*3+1]) + ', '
-                            else:
-                                nodalforce += '            '
-                            if self.dof != 2 and (i//3)*3+2 in self.known_dis_a:
-                                nodalforce += "{:10.2f}".format(self.force[(i//3)*3+2]) + '\n'
-                            else:
-                                nodalforce += '          \n'
-                            if nodalforce != '                                  \n':
-                                outfile.write(str(i//3 + self._io_origin) + ', ' + nodalforce)
-                        prev = i//3
-                outfile.write('\n')
-    
-                outfile.write('Displacements\n')
-                for i in range(len(self.displacement)//3):
-                    if i < 100:
+                        nodalforce = ''
+                        if (i//3)*3+0 in self.known_dis_a:
+                            nodalforce += "{:10.2f}".format(self.force[(i//3)*3+0]) + ', '
+                        else:
+                            nodalforce += '            '
+                        if (i//3)*3+1 in self.known_dis_a:
+                            nodalforce += "{:10.2f}".format(self.force[(i//3)*3+1]) + ', '
+                        else:
+                            nodalforce += '            '
+                        if self.dof != 2 and (i//3)*3+2 in self.known_dis_a:
+                            nodalforce += "{:10.2f}".format(self.force[(i//3)*3+2]) + '\n'
+                        else:
+                            nodalforce += '          \n'
+                        if nodalforce != '                                  \n':
+                            outfile.write(str(i//3 + self._io_origin) + ', ' +  nodalforce)
+                    prev = i//3
+            outfile.write('\n')
+
+            outfile.write('Displacements\n')
+            for i in range(len(self.displacement)//3):
+                if i < 100:
+                    outfile.write(' ')
+                    if i < 9:
                         outfile.write(' ')
-                        if i < 9:
-                            outfile.write(' ')
-                    outfile.write(str(i + self._io_origin) + ', ' + "{:10.3f}".format(self.displacement[i*3 + 0]) +
-                          ', ' + "{:10.3f}".format(self.displacement[i*3 + 1]) +
-                          ', ' + "{:10.3f}".format(self.displacement[i*3 + 2]) + ', ' + '\n')
-                outfile.write('\n')
-    
-                outfile.write('Stresses\n')
-                for i, stress in enumerate(self.stress):
-                    if i < 100:
+                outfile.write(str(i + self._io_origin) + ', ' +  "{:10.3f}".format(self.displacement[i*3 +0]) + ', ' \
+                      + "{:10.3f}".format(self.displacement[i*3 +1]) + ', ' + "{:10.3f}".format(self.displacement[i*3 +2]) + ', ' + '\n')
+            outfile.write('\n')
+
+            outfile.write('Stresses\n')
+            for i, stress in enumerate(self.stress):
+                if i < 100:
+                    outfile.write(' ')
+                    if i < 9:
                         outfile.write(' ')
-                        if i < 9:
-                            outfile.write(' ')
-                    outfile.write(str(i + self._io_origin) + ', ' + "{:10.3f}".format(stress) + '\n')
-                outfile.write('\n')
-    
-                # Saving original input
-                outfile.write('----- Original input: -----\n\n')
-                outfile.write('_ORIGIN\n')
-                outfile.write(str(self._io_origin) + '\n\n')
-                outfile.write('DOF\n')
-                outfile.write(str(self.dof) + '\n\n')
-                outfile.write('ELEMENTS\n')
-                outfile.write(out_element + '\n\n')
-                outfile.write('COORDINATES\n')
-                outfile.write(out_coords + '\n\n')
-                outfile.write('CROSS-SECTIONS\n')
-                outfile.write(out_crsect + '\n\n')
-                outfile.write('MATERIALS\n')
-                outfile.write(out_materials + '\n\n')
-                outfile.write('FORCES\n')
-                outfile.write(out_forces + '\n\n')
-                outfile.write('SUPPORTS\n')
-                outfile.write(out_supports + '\n\n')
-                outfile.write('SPECDOF\n')
-                outfile.write(out_specdofs + '\n\n')
-                outfile.write('EOF\n')
-        except FileNotFoundError:
-            print("Error: Please manually create the 'Structures' folder" 
-              "in the root of the project")
-            
+                outfile.write(str(i + self._io_origin) + ', ' +  "{:10.3f}".format(stress) + '\n')
+            outfile.write('\n')
+
+            # Saving original input
+            outfile.write('----- Original input: -----\n\n')
+            outfile.write('_ORIGIN\n')
+            outfile.write(str(self._io_origin) + '\n\n')
+            outfile.write('DOF\n')
+            outfile.write(str(self.dof) + '\n\n')
+            outfile.write('ELEMENTS\n')
+            outfile.write(out_element + '\n\n')
+            outfile.write('COORDINATES\n')
+            outfile.write(out_coords + '\n\n')
+            outfile.write('CROSS-SECTIONS\n')
+            outfile.write(out_crsect + '\n\n')
+            outfile.write('MATERIALS\n')
+            outfile.write(out_materials + '\n\n')
+            outfile.write('FORCES\n')
+            outfile.write(out_forces + '\n\n')
+            outfile.write('SUPPORTS\n')
+            outfile.write(out_supports + '\n\n')
+            outfile.write('SPECDOF\n')
+            outfile.write(out_specdofs + '\n\n')
+            outfile.write('EOF\n')
 
 ##################################
 #   BEGINNING OF THE MAIN PART   #
@@ -1372,40 +1770,40 @@ PARTTIME = logtime(TIC, "Initialization")
 
 #  Define new truss
 TRUSS = Truss('bridge')
-if not Conf.debug:
-    TRUSS.name = input('Test name: ')
+if not _DEBUG:
+    TRUSS.name = raw_input('Test name: ')
 else:
-    print("*** Debug mode ***")
-    print("*** The following file will be opened: " + TRUSS.name + ".str")
+    print "*** Debug mode ***"
+    print "*** The following file will be opened: " + TRUSS.name + ".str"
 
 # Read input file
-# TRUSS.read('lab_01.txt')
+#TRUSS.read('lab_01.txt')
 
 try:
     TRUSS.read(TRUSS.name + ".str")
 except IOError:
-    print("The following file could not be opened: " + "./Structures/" + TRUSS.name + ".str")
-    print("Please make sure that the structural data is available for the program in the running directory.")
+    print "The following file could not be opened: " + TRUSS.name + ".str"
+    print "Please make sure that the structural data is available for the program in the running directory."
     raise IOError
 
-# if _ARDUINO or _SIMULATION:                # deprecated
+#if _ARDUINO or _SIMULATION:                # deprecated
 #    TRUSS.setspecdofs(arduino_mapping)
 
 PARTTIME = logtime(PARTTIME, "Setting up structure")
 
 # Calculate stiffness-matrix
 TRUSS.calcstiffness()
-# TRUSS.calcstiffness_plate()
+#TRUSS.calcstiffness_plate()
 
 PARTTIME = logtime(PARTTIME, "Calculating Stiffness Matrix")
 
-# Solve structure
+#Solve structure
 TRUSS.solve()
-# TRUSS.solve_plate()
+#TRUSS.solve_plate()
 
 PARTTIME = logtime(PARTTIME, "Solving")
 
-if Conf.updating:
+if _UPDATING:
     TRUSS.setunitmodification(0.05)
     TRUSS.seterrorlimit(1.2)
     TRUSS.setmodificationlimit(0.7)
@@ -1414,7 +1812,7 @@ if Conf.updating:
 
 PARTTIME = logtime(PARTTIME, "Updating numerical model")
 
-if Conf.graphics:
+if _GRAPHICS:
     # Plot settings:
     # O: Original D: Deformed S: Supports F: Forces R: Reactions
     # ScD: Scale displacments (Z-axis) (def:1.0) ScF: Scale forces (def:1.0)
@@ -1425,26 +1823,26 @@ if Conf.graphics:
     TRUSS.plot(1, 0, 1, 1, 0, 1.0, 0.0, 0.0, True)
     TRUSS.plot(1, 1, 1, 0, 0, 1.0, 0.0, 0.0, True)
     TRUSS.plot(0, 1, 1, 1, 1, 2.0, 0.0, 0.0, True)
-    # pass
+    #pass
 
 PARTTIME = logtime(PARTTIME, "Plotting")
 
 # Write results to file
-TRUSS.writeresults("./Structures/" + TRUSS.name + ' - Results.txt')
+TRUSS.writeresults(TRUSS.name + ' - Results.txt')
 
 PARTTIME = logtime(PARTTIME, "Writing results to the output file")
 
-if Conf.arduino:
+if _ARDUINO:
     # Closing Arduino port
     SER.close()
 
-if Conf.log:
+if _LOG:
     TAC = time.time()
     TOTALTIME = TAC-TIC
-    if Conf.updating:
-        print("Update statistics:")
-        print("Totally updated models: " + str(TRUSS.numofupdates[0] + TRUSS.numofupdates[1]++ TRUSS.numofupdates[2]))
-        print("  Successfully updated models: " + str(TRUSS.numofupdates[0]))
-        print("  Updates with running out of possibilities: " + str(TRUSS.numofupdates[2]))
-        print("  Updates did not finshed: " + str(TRUSS.numofupdates[1]))
-    print('Total time: ' + str("{:10.3f}".format(TOTALTIME)))
+    if _UPDATING:
+        print "Update statistics:"
+        print "Totally updated models: " + str(TRUSS.numofupdates[0] + TRUSS.numofupdates[1]++ TRUSS.numofupdates[2])
+        print "  Successfully updated models: " + str(TRUSS.numofupdates[0])
+        print "  Updates with running out of possibilities: " + str(TRUSS.numofupdates[2])
+        print "  Updates did not finshed: " + str(TRUSS.numofupdates[1])
+    print 'Total time: ' + str("{:10.3f}".format(TOTALTIME))
