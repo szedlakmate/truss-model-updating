@@ -1,17 +1,34 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Dec 30 18:49:40 2018
+Created on April 30 18:49:40 2018
 
-3D truss model updater program created by Máté Szedlák (2016-2018).
+3D truss model updater program created by Máté Szedlák.
 Copyright MIT, Máté Szedlák 2016-2018.
 """
+import os
 import itertools
 import math
+import time
+import datetime
+import numpy as np
+try:
+    import serial
+except ImportError:
+    print("You tried to import \'serial\' without installing \'pySerial\'.")
+    print("Please first install pySerial: http://playground.arduino.cc/Interfacing/Python")
+    raise Exception('pyserial package not found')
 from copy import deepcopy
-from config import Configuration
-from extra_math import invert as invert
-from extra_math import mat_vec_mult as mat_vec_mult
-from extra_math import swap_col as swap_col
+try:
+    from graphics import Arrow3D
+    from config import Configuration
+    from extra_math import invert as invert
+    from extra_math import mat_vec_mult as mat_vec_mult
+    from extra_math import swap_col as swap_col
+except ImportError:
+    print("Input data is missing")
+    print("Please check the config.py, graphics.py and extra_math.py files.")
+    raise Exception('Requirement is missing')
+
 
 """
  COMPATIBILITY MODES:
@@ -28,9 +45,6 @@ _SIMULATION = 1                     # Simulating measurements based on input fil
 Conf = Configuration(_COMPATIBLE_MODE, _SIMULATION)
 
 
-PORTS = ['COM1', 'COM2', 'COM3']      # List of possible communication ports
-PORT_NUMBER = 0                      # Applied communication port
-
 if _COMPATIBLE_MODE == 0*0:
     #** User defined ***
     # Modify as needed #
@@ -45,14 +59,13 @@ if _COMPATIBLE_MODE == 0*0:
     Conf.realistic_simulation = 0  # Wait as long as it was originally. Only valid with _SIMULATION = 1
 
 if Conf.OSlib:
-    import os
     try:
         if not os.path.exists("./Structures/"):
             os.makedirs("./Structures")
     except FileNotFoundError:
-        print("Error: Please manually create the 'Structures' folder" 
+        print("Error: Please manually create the 'Structures' folder"
               "in the root of the project")
-        
+
 
 if Conf.simulation or not Conf.updating:
     _ARDUINO = 0
@@ -61,8 +74,6 @@ if _COMPATIBLE_MODE == 2:
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 if Conf.log:
-    import time
-    import datetime
     TIC = time.time()
     print('------------------------------------')
     print('Truss calculation program')
@@ -83,43 +94,6 @@ if Conf.log:
     print('------------------------------------')
 
 
-if Conf.arduino:
-    SER = 0
-    try:
-        import serial
-    except ImportError:
-        print("You tried to import \'serial\' in Windows mode without installing \'pySerial\'.")
-        print("Please first install pySerial: http://playground.arduino.cc/Interfacing/Python")
-        raise Exception('Android mode denied: pyserial not found')
-
-    PORT_NUMBER -= 1
-    while SER == 0:
-        PORT_NUMBER += 1
-        if PORT_NUMBER >= len(PORTS):
-            PORT_NUMBER = 0
-        time.sleep(0.6)
-        print('Opening serial at port ' + str(PORTS[PORT_NUMBER]))
-        try:
-            SER.close()
-        except Exception:
-            pass
-        try:
-            SER = serial.Serial(PORTS[PORT_NUMBER], 9600, timeout=0)
-        except serial.SerialException:
-            Exception(PORTS[PORT_NUMBER] + ' port is busy. It might be occupied by this program or another one :'
-                                          '/ Be careful or try resetting this program')
-            SER = 0
-            try:
-                SER.close()
-            except Exception:
-                pass
-        except Exception:
-            SER = 0
-            try:
-                SER.close()
-            except Exception:
-                pass
-
 """
 if _ARDUINO or _SIMULATION:
     try:
@@ -131,14 +105,6 @@ if _ARDUINO or _SIMULATION:
     except IOError:
         raise Exception('File not found: ' + mapping_file)
 """
-
-if Conf.solver:
-    # NumPy library for solving linear equations in another way
-    import numpy as np
-
-if Conf.graphics:
-    # library for drawing
-    from graphics import Arrow3D
 
 
 def logtime(prev_time, title):
@@ -163,12 +129,12 @@ def error(delta):
     """
     Error function using least-square method
     """
-    sumerr = 0
-    for deltaelement in delta:
-        sumerr += deltaelement**2
-    sumerr = math.sqrt(sumerr)
+    sum_of_errors = 0
+    for delta_element in delta:
+        sum_of_errors += delta_element**2
+        sum_of_errors = math.sqrt(sum_of_errors)
 
-    return sumerr
+    return sum_of_errors
 
 
 class Truss(object):
@@ -176,23 +142,28 @@ class Truss(object):
     General structure class
     """
     def __init__(self, name):
+        # Serial connection
+        self.serial_connection = False  # Holds serial connection
+        # General data
         self.name = name              # Name of structure
+        # Project data
+        # Truss data
         self.known_f_a = []           # Nodes without supports
-        self.known_f_notzero = []     # Nodes with loads
+        self.known_f_not_zero = []     # Nodes with loads
         self.dof = 3                  # Truss's degree of freedom
         self.node = []                # Element's end nodes
         self.constraint = []          # Supports
         self.force = []               # Force
-        self.nodalcoord = []          # Coordinates of nodes
-        self.nodalcoord_def = []      # Coordinates after deformations
+        self.nodal_coord = []          # Coordinates of nodes
+        self.nodal_coord_def = []      # Coordinates after deformations
         self.area = []                # Cross-sectional areas
-        self.el_mod = []                   # Material data
-        self.nodenum = 0              # Number of nodes
-        self.elenum = 0               # Number of elements
-        self.eledof = []              # Mapping between DOF and node
+        self.elastic_modulo = []                   # Material data
+        self.node_num = 0              # Number of nodes
+        self.element_num = 0               # Number of elements
+        self.element_DOF = []              # Mapping between DOF and node
         self.stiffness = []           # Global stiffness matrix
         self.mod_stiffnesses = []     # Modified stiffnesses in a hyper-matrix
-        self.ele_length = []                   # Length of the elements
+        self.element_length = []                   # Length of the elements
         self._norm_stiff = []                  # E/L
         self._cx = []
         self._cy = []
@@ -203,35 +174,76 @@ class Truss(object):
         self.force_new = []
         self.stiff_new = []
         self.displacement = []        # Relative displacements
-        self._stiffisfresh = 0
-        self._postprocessed = 0
-        self.init_disp = []
-        self.stresscolor = []         # Color mapping for stresses
+        self._stiff_is_fresh = 0
+        self._post_processed = 0
+        self._init_displacement = []
+        self.stress_color = []         # Color mapping for stresses
         self.known_dis_a = []
         self.stress = []              # Element's stresses
         self._io_origin = 0           # Array's first element number during IO. Default is 0.
         self.analysis = {}
-        self._mod_stiffisfresh = 0
+        self._mod_stiff_is_fresh = 0
         self.mod_displacements = []
         self.keypoint = []
-        self.keypnum = 0
+        self.keypoint_num = 0
         self.effect = []
-        self.toteffect = []
-        self.sortedeff = []
-        self.specdof_inputstring = ''
+        self.total_effect = []
+        self.sorted_effect = []
+        self.special_DOF_input_string = ''
         self.tresshold = 0.1
-        self.effectratio = []
-        self.processeddata = []          # To store last input line
+        self.effect_ratio = []
+        self.processed_data = []          # To store last input line
         self.modifications = []          # Storing modifications for model updating
-        self.readelements = [0]*9
+        self.read_elements = [0]*9
         self.arduino_mapping = []
-        self.errorlimit = 0.5
-        self.modificationlimit = 0.6
-        self.unitmodification = 0.05
+        self.error_limit = 0.5
+        self.modification_limit = 0.6
+        self.unit_modification = 0.05
         self.measurement = [0.]
-        self.numofupdates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit,
-                                             # #Updates where there were no more modification option]
-        self.iterationlimit = 20
+        self.number_of_updates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit,
+        # #Updates where there were no more modification option]
+        self.iteration_limit = 20
+
+    def open_serial(port, baudrate):
+        try:
+            connection = serial.Serial()
+            connection.baudrate = baudrate
+            connection.port = port
+
+            if connection.connection.is_open:
+                connection.connection.close()
+
+            connection.connection.open()
+            return connection
+        except serial.SerialException:
+            print(str(port) + ' port is busy. It might be occupied by this program or another one :'
+                       '/ Be careful or try resetting this program')
+            return False
+
+    def connect(self, port='', baudrate=9600):
+        self.serial_connection = False
+        PORTS = ['COM1', 'COM2', 'COM3']  # List of possible communication ports
+        port_number = 0
+
+        if port != '':
+            print('FORCED: Opening serial at port ' + str(port))
+            self.serial_connection = self.open_serial(port, baudrate)
+        else:
+            while not self.serial_connection:
+                port_number += 1
+                if port_number > len(PORTS):
+                    port_number = 1
+                time.sleep(0.6)
+                print('Opening serial at port ' + str(PORTS[port_number]))
+                self.serial_connection = self.open_serial(port, baudrate)
+
+    def disconnect(self):
+        try:
+            self.serial_connection.close()
+            return True
+        except serial.SerialException:
+            print('Serial connection cannot be closed')
+            return False
 
     def read(self, filename):
         """
@@ -255,44 +267,44 @@ class Truss(object):
             EOF - For compatibility reasons EOF should be placed after the commands
         """
         self._io_origin = 0
-        readelementnames = ["Origin", "DOF", "Elements", "Coordinates",
+        _read_element_names = ["Origin", "DOF", "Elements", "Coordinates",
                             "Cross-sections", "Materials", "Forces", "Supports", "Measured DOFs"]
 
         with open("./Structures/" + filename, "r") as sourcefile:
-            sourceline = ""
-            while sourceline != "EOF":
-                sourceline = sourcefile.readline().strip()
+            source_line = ""
+            while source_line != "EOF":
+                source_line = sourcefile.readline().strip()
 
-                if sourceline.upper() == "_ORIGIN":
-                    sourceline = sourcefile.readline().strip()
-                    self._io_origin = int(sourceline)
-                    self.readelements[0] = 1
+                if source_line.upper() == "_ORIGIN":
+                    source_line = sourcefile.readline().strip()
+                    self._io_origin = int(source_line)
+                    self.read_elements[0] = 1
 
-                if sourceline.upper() == "DOF":
-                    sourceline = sourcefile.readline().strip()
-                    self.setdof(int(sourceline))
-                    self.readelements[1] = 1
+                if source_line.upper() == "DOF":
+                    source_line = sourcefile.readline().strip()
+                    self.setdof(int(source_line))
+                    self.read_elements[1] = 1
 
-                if sourceline.upper() == "ELEMENTS":
-                    sourceline = sourcefile.readline().strip()
+                if source_line.upper() == "ELEMENTS":
+                    source_line = sourcefile.readline().strip()
                     inpstr = []
                     inpnum = []
-                    inpstr = [x.split(',') for x in sourceline.split('|')]
+                    inpstr = [x.split(',') for x in source_line.split('|')]
                     if len(inpstr[0]) == 1:
-                        inpstr = [x.split(';') for x in sourceline.split('|')]
+                        inpstr = [x.split(';') for x in source_line.split('|')]
                     if [''] in inpstr:
                         inpstr.remove([''])
                     inpnum = [[int(x[0]) - self._io_origin, int(x[1]) - self._io_origin] for x in inpstr]
                     self.setelements(inpnum)
-                    self.readelements[2] = 1
+                    self.read_elements[2] = 1
 
-                if sourceline.upper() == "COORDINATES":
-                    sourceline = sourcefile.readline().strip()
+                if source_line.upper() == "COORDINATES":
+                    source_line = sourcefile.readline().strip()
                     inpstr = []
                     inpnum = []
-                    inpstr = [x.split(',') for x in sourceline.split('|')]
+                    inpstr = [x.split(',') for x in source_line.split('|')]
                     if len(inpstr[0]) == 1:
-                        inpstr = [x.split(';') for x in sourceline.split('|')]
+                        inpstr = [x.split(';') for x in source_line.split('|')]
                     if [''] in inpstr:
                         inpstr.remove([''])
                     if self.dof == 3:
@@ -300,73 +312,73 @@ class Truss(object):
                     elif self.dof == 2:
                         inpnum = [[float(x[0]), float(x[1]), 0.] for x in inpstr]
                     self.setcoordinates(inpnum)
-                    self.readelements[3] = 1
+                    self.read_elements[3] = 1
 
-                if sourceline.upper() == "CROSS-SECTIONS":
-                    sourceline = sourcefile.readline().strip()
+                if source_line.upper() == "CROSS-SECTIONS":
+                    source_line = sourcefile.readline().strip()
                     inpstr = []
                     inpnum = []
-                    inpstr = sourceline.split(',')
+                    inpstr = source_line.split(',')
                     if len(inpstr) == 1:
-                        inpstr = sourceline.split(';')
+                        inpstr = source_line.split(';')
                     if '' in inpstr:
                         inpstr.remove('')
                     inpnum = [float(eval(x)) for x in inpstr]
                     self.setcrosssections(inpnum)
-                    self.readelements[4] = 1
+                    self.read_elements[4] = 1
 
-                if sourceline.upper() == "MATERIALS":
-                    sourceline = sourcefile.readline().strip()
+                if source_line.upper() == "MATERIALS":
+                    source_line = sourcefile.readline().strip()
                     inpstr = []
                     inpnum = []
-                    inpstr = sourceline.split(',')
+                    inpstr = source_line.split(',')
                     if len(inpstr) == 1:
-                        inpstr = sourceline.split(';')
+                        inpstr = source_line.split(';')
                     if '' in inpstr:
                         inpstr.remove('')
                     inpnum = [float(eval(x)) for x in inpstr]
                     self.setmaterials(inpnum)
-                    self.readelements[5] = 1
+                    self.read_elements[5] = 1
 
-                if sourceline.upper() == "FORCES":
-                    sourceline = sourcefile.readline().strip()
+                if source_line.upper() == "FORCES":
+                    source_line = sourcefile.readline().strip()
                     inpstr = []
                     inpnum = []
-                    inpstr = [x.split(',') for x in sourceline.split('|')]
+                    inpstr = [x.split(',') for x in source_line.split('|')]
                     if len(inpstr[0]) == 1:
-                        inpstr = [x.split(';') for x in sourceline.split('|')]
+                        inpstr = [x.split(';') for x in source_line.split('|')]
                     if [''] in inpstr:
                         inpstr.remove([''])
                     inpnum = [[int(x[0]) - self._io_origin, float(x[1])] for x in inpstr]
                     self.setforces(sorted(inpnum))
-                    self.readelements[6] = 1
+                    self.read_elements[6] = 1
 
-                if sourceline.upper() == "SUPPORTS":
-                    sourceline = sourcefile.readline().strip()
+                if source_line.upper() == "SUPPORTS":
+                    source_line = sourcefile.readline().strip()
                     inpstr = []
                     inpnum = []
-                    inpstr = [x.split(',') for x in sourceline.split('|')]
+                    inpstr = [x.split(',') for x in source_line.split('|')]
                     if len(inpstr[0]) == 1:
-                        inpstr = [x.split(';') for x in sourceline.split('|')]
+                        inpstr = [x.split(';') for x in source_line.split('|')]
                     if [''] in inpstr:
                         inpstr.remove([''])
                     inpnum = [[int(x[0]) - self._io_origin, float(x[1])] for x in inpstr]
                     self.setsupports(sorted(inpnum))
-                    self.readelements[7] = 1
+                    self.read_elements[7] = 1
 
-                if sourceline.upper() == "MEASUREMENTS":
-                    sourceline = sourcefile.readline().strip()
-                    self.specdof_inputstring = sourceline
+                if source_line.upper() == "MEASUREMENTS":
+                    source_line = sourcefile.readline().strip()
+                    self.special_DOF_input_string = source_line
                     inpstr = []
-                    self.arduino_mapping = sourceline.split(',')
+                    self.arduino_mapping = source_line.split(',')
                     self.setspecdofs(self.arduino_mapping)
-                    self.readelements[8] = 1
+                    self.read_elements[8] = 1
 
         terminate = False
-        for i, value in enumerate(self.readelements):
+        for i, value in enumerate(self.read_elements):
             if i > 0 and (i < 8 or Conf.updating):  # if i > 0:
                 if value == 0:
-                    print("The following was not found: " + readelementnames[i])
+                    print("The following was not found: " + _read_element_names[i])
                     terminate = True
         if terminate:
             raise Exception
@@ -387,7 +399,7 @@ class Truss(object):
         """
         _showvalues = 1     # Show values of forces
 
-        if self._postprocessed == 0:
+        if self._post_processed == 0:
             print('Postprocess is needed before plotting structure!')
         else:
             if scaledisplacement == 0:
@@ -408,7 +420,7 @@ class Truss(object):
                 If the warning is not ignorable, then exceptions will be raised.
             return: [0 | 1] 1 f no error found, otherwise 0.
         """
-        if len(self.nodalcoord) != len(list(k for k, _ in itertools.groupby(sorted(self.nodalcoord)))):
+        if len(self.nodal_coord) != len(list(k for k, _ in itertools.groupby(sorted(self.nodal_coord)))):
             if ignorable == 0:
                 raise Exception('Coordinate list has repeating items. Calculation is terminated')
             else:
@@ -426,41 +438,41 @@ class Truss(object):
         self.dof = dof
         if self.dof != 2 and self.dof != 3:
             raise Exception('DOF must be 2 or 3.')
-        self._stiffisfresh = 0
-        self._mod_stiffisfresh = 0
-        self._postprocessed = 0
+        self._stiff_is_fresh = 0
+        self._mod_stiff_is_fresh = 0
+        self._post_processed = 0
 
     def setelements(self, node):
         """
         Setting elements (nodal connections) in bulk mode
         """
         self.node = node
-        self.nodenum = len(set(list(itertools.chain.from_iterable(sorted(self.node)))))
-        self.elenum = len(self.node)
-        self._stiffisfresh = 0
-        self._mod_stiffisfresh = 0
-        self._postprocessed = 0
+        self.node_num = len(set(list(itertools.chain.from_iterable(sorted(self.node)))))
+        self.element_num = len(self.node)
+        self._stiff_is_fresh = 0
+        self._mod_stiff_is_fresh = 0
+        self._post_processed = 0
 
         # Creating mapping tool for elements
         for node in self.node:
-            self.eledof.append([node[0]*3, node[0]*3+1, node[0]*3+2,
+            self.element_DOF.append([node[0]*3, node[0]*3+1, node[0]*3+2,
                                 node[1]*3, node[1]*3+1, node[1]*3+2])
 
         # Initialazing matrix for all matrices
-        self.init_disp = [0.]*(3*self.nodenum)
-        self.force = [0.]*(3*self.nodenum)
-        self.stiffness = [0.]*(3*self.nodenum)
+        self._init_displacement = [0.]*(3*self.node_num)
+        self.force = [0.]*(3*self.node_num)
+        self.stiffness = [0.]*(3*self.node_num)
         self.known_f_a = []
-        self.known_f_notzero = []
+        self.known_f_not_zero = []
 
     def setcoordinates(self, coordinates):
         """
         Setting coordinates in bulk mode
         """
-        self.nodalcoord = coordinates
-        self._stiffisfresh = 0
-        self._mod_stiffisfresh = 0
-        if self.nodenum > len(self.nodalcoord):
+        self.nodal_coord = coordinates
+        self._stiff_is_fresh = 0
+        self._mod_stiff_is_fresh = 0
+        if self.node_num > len(self.nodal_coord):
             raise Exception('More coordinates are needed')
         elif not self.node:
             raise Exception('Nodes must be set before defining elements')
@@ -471,45 +483,45 @@ class Truss(object):
         Modify coordinate
         """
         if self.__checkcoordinates(True):
-            self.nodalcoord[node] = coordinate
-        self._stiffisfresh = 0
-        self._mod_stiffisfresh = 0
+            self.nodal_coord[node] = coordinate
+        self._stiff_is_fresh = 0
+        self._mod_stiff_is_fresh = 0
 
     def setcrosssections(self, area):
         """
         Setting cross-sections in bulk mode
         """
         self.area = area
-        self._stiffisfresh = 0
-        self._mod_stiffisfresh = 0
-        self._postprocessed = 0
+        self._stiff_is_fresh = 0
+        self._mod_stiff_is_fresh = 0
+        self._post_processed = 0
 
     def modcrosssection(self, element, area):
         """
         Modifying cross-sections by elements
         """
         self.area[element] = area
-        self._stiffisfresh = 0
-        self._mod_stiffisfresh = 0
-        self._postprocessed = 0
+        self._stiff_is_fresh = 0
+        self._mod_stiff_is_fresh = 0
+        self._post_processed = 0
 
     def setmaterials(self, el_mod):
         """
         Setting material data in bulk mode
         """
-        self.el_mod = el_mod
-        self._stiffisfresh = 0
-        self._mod_stiffisfresh = 0
-        self._postprocessed = 0
+        self.elastic_modulo = el_mod
+        self._stiff_is_fresh = 0
+        self._mod_stiff_is_fresh = 0
+        self._post_processed = 0
 
     def modmaterial(self, element, el_mod):
         """
         Modifying material data by elements
         """
-        self.el_mod[element] = el_mod
-        self._stiffisfresh = 0
-        self._mod_stiffisfresh = 0
-        self._postprocessed = 0
+        self.elastic_modulo[element] = el_mod
+        self._stiff_is_fresh = 0
+        self._mod_stiff_is_fresh = 0
+        self._post_processed = 0
 
     def setforces(self, forces):
         """
@@ -520,14 +532,14 @@ class Truss(object):
                 self.force[fdof] = force
             elif self.dof == 2:
                 self.force[fdof + (fdof//2)] = force
-        self._postprocessed = 0
+        self._post_processed = 0
 
     def modforce(self, element, force):
         """
         Modifying forces by each
         """
         self.force[element] = force
-        self._postprocessed = 0
+        self._post_processed = 0
 
     def setsupports(self, constraints):
         """
@@ -538,9 +550,9 @@ class Truss(object):
                 self.constraint.append([cdof, constraint])
             elif self.dof == 2:
                 self.constraint.append([cdof + (cdof // 2), constraint])
-        self._stiffisfresh = 0
-        self._mod_stiffisfresh = 0
-        self._postprocessed = 0
+        self._stiff_is_fresh = 0
+        self._mod_stiff_is_fresh = 0
+        self._post_processed = 0
 
     def setspecdofs(self, specdofs):
         """
@@ -566,8 +578,8 @@ class Truss(object):
                           "Please check the 'MEASUREMENTS' section in the input file.")
                     raise Exception
 
-        self.keypnum = len(self.analysis)
-        if self.keypnum == 0 and Conf.updating:
+        self.keypoint_num = len(self.analysis)
+        if self.keypoint_num == 0 and Conf.updating:
             print("There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file.")
             raise Exception
 
@@ -575,87 +587,87 @@ class Truss(object):
         """
         Stiffness matrix compilation
         """
-        self._postprocessed = 0
+        self._post_processed = 0
 
         if self.dof == 2:
-            for zdof in range(self.nodenum):
+            for zdof in range(self.node_num):
                 self.constraint.append([int(zdof*3+2), 0.])
         self.constraint = list(k for k, _ in itertools.groupby(sorted(self.constraint)))
 
         # Setting known forces
-        for dofloc in range(3*self.nodenum):
+        for dofloc in range(3*self.node_num):
             self.known_f_a.append(dofloc)
             if self.force[dofloc] != 0:
-                self.known_f_notzero.append(dofloc)
+                self.known_f_not_zero.append(dofloc)
 
         self.known_dis_a = []
         for constr in self.constraint:
-            self.init_disp[constr[0]] = constr[1]
+            self._init_displacement[constr[0]] = constr[1]
             self.known_dis_a.append(constr[0])
             try:
                 self.known_f_a.remove(constr[0])
-                self.known_f_notzero.remove(constr[0])
+                self.known_f_not_zero.remove(constr[0])
             except ValueError:
                 pass
 
-        ele_length = [0.]*self.elenum
-        self._norm_stiff = [0.]*self.elenum
-        self._cx = [0.]*self.elenum
-        self._cy = [0.]*self.elenum
-        self._cz = [0.]*self.elenum
-        self._s_loc = [0.]*self.elenum
-        self._loc_stiff = [0.]*self.elenum
-        self.stress = [0.]*self.elenum
+        ele_length = [0.]*self.element_num
+        self._norm_stiff = [0.]*self.element_num
+        self._cx = [0.]*self.element_num
+        self._cy = [0.]*self.element_num
+        self._cz = [0.]*self.element_num
+        self._s_loc = [0.]*self.element_num
+        self._loc_stiff = [0.]*self.element_num
+        self.stress = [0.]*self.element_num
 
-        self.stiffness = [[0.]*(len(self.nodalcoord)*3)]*(len(self.nodalcoord)*3)
+        self.stiffness = [[0.]*(len(self.nodal_coord)*3)]*(len(self.nodal_coord)*3)
 
-        for i in range(self.elenum):
-            ele_length[i] = math.sqrt((self.nodalcoord[self.node[i][1]][0]-self.nodalcoord[self.node[i][0]][0])**2 +
-                (self.nodalcoord[self.node[i][1]][1]-self.nodalcoord[self.node[i][0]][1])**2 +
-                (self.nodalcoord[self.node[i][1]][2]-self.nodalcoord[self.node[i][0]][2])**2)
+        for i in range(self.element_num):
+            ele_length[i] = math.sqrt((self.nodal_coord[self.node[i][1]][0]-self.nodal_coord[self.node[i][0]][0])**2 +
+                                      (self.nodal_coord[self.node[i][1]][1]-self.nodal_coord[self.node[i][0]][1])**2 +
+                                      (self.nodal_coord[self.node[i][1]][2]-self.nodal_coord[self.node[i][0]][2])**2)
 
-            self._cx[i] = (self.nodalcoord[self.node[i][1]][0]-self.nodalcoord[self.node[i][0]][0])/ele_length[i]
-            self._cy[i] = (self.nodalcoord[self.node[i][1]][1]-self.nodalcoord[self.node[i][0]][1])/ele_length[i]
-            self._cz[i] = (self.nodalcoord[self.node[i][1]][2]-self.nodalcoord[self.node[i][0]][2])/ele_length[i]
-            self._norm_stiff[i] = self.el_mod[i]/ele_length[i]
+            self._cx[i] = (self.nodal_coord[self.node[i][1]][0]-self.nodal_coord[self.node[i][0]][0])/ele_length[i]
+            self._cy[i] = (self.nodal_coord[self.node[i][1]][1]-self.nodal_coord[self.node[i][0]][1])/ele_length[i]
+            self._cz[i] = (self.nodal_coord[self.node[i][1]][2]-self.nodal_coord[self.node[i][0]][2])/ele_length[i]
+            self._norm_stiff[i] = self.elastic_modulo[i]/ele_length[i]
             self._s_loc[i] = [[self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i], -self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i]],
-                [self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i], -self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i]],
-                [self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2, -self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2],
-                [-self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i], self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i]],
-                [-self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i], self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i]],
-                [-self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2, self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2]]
+                              [self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i], -self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i]],
+                              [self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2, -self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2],
+                              [-self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i], self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i]],
+                              [-self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i], self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i]],
+                              [-self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2, self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2]]
             self._loc_stiff[i] = [[y * self.area[i] * self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
-            ele_dof_vec = self.eledof[i]
+            ele_dof_vec = self.element_DOF[i]
 
-            stiffincrement = [0.]*(len(self.nodalcoord)*3)
+            stiffincrement = [0.]*(len(self.nodal_coord)*3)
 
             for j in range(3*2):
                 for k in range(3*2):
                     stiffincrement[ele_dof_vec[k]] = self._loc_stiff[i][j][k]
                 self.stiffness[ele_dof_vec[j]] = [x + y for x, y in zip(self.stiffness[ele_dof_vec[j]], stiffincrement)]
-        self._stiffisfresh = 1
+        self._stiff_is_fresh = 1
 
     def calcmodstiffness(self, index, magnitude):
         """
         Convergency step in stiffness matrix modification
         """
         if not self.mod_stiffnesses:
-            self.mod_stiffnesses = [0.]*(self.elenum+1)
+            self.mod_stiffnesses = [0.]*(self.element_num+1)
 
-        # for loopindex in range(self.elenum):
-        _mod_stiffnesses_temp = [[0.]*(len(self.nodalcoord)*3)]*(len(self.nodalcoord)*3)
+        # for loopindex in range(self.element_num):
+        _mod_stiffnesses_temp = [[0.]*(len(self.nodal_coord)*3)]*(len(self.nodal_coord)*3)
 
-        for i in range(self.elenum):
+        for i in range(self.element_num):
             if i == index:
-                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i] + magnitude)  # self.el_mod[i]/ele_length[i]
+                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i] + magnitude)  # self.elastic_modulo[i]/ele_length[i]
             else:
-                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i])  # self.el_mod[i]/ele_length[i]
+                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i])  # self.elastic_modulo[i]/ele_length[i]
 
             _mod_loc_stiff = [[y*self.area[i]*_mod_norm_stiff for y in x] for x in self._s_loc[i]]
 
-            ele_dof_vec = self.eledof[i]
+            ele_dof_vec = self.element_DOF[i]
 
-            stiffincrement = [0.]*(len(self.nodalcoord)*3)
+            stiffincrement = [0.]*(len(self.nodal_coord)*3)
 
             for j in range(3*2):
                 for k in range(3*2):
@@ -669,20 +681,20 @@ class Truss(object):
         """
         Main solver of the code
         """
-        if self._stiffisfresh == 0:
+        if self._stiff_is_fresh == 0:
             if Conf.log:
                 print('Stiffness matrix is recalculated')
             self.calcstiffness()
 
-        self.dis_new = [0.]*(self.nodenum*3-len(self.constraint))
-        self.force_new = [0.]*(self.nodenum*3-len(self.constraint))
-        self.stiff_new = [[0.]*(self.nodenum*3-len(self.constraint))]*(self.nodenum*3-len(self.constraint))
+        self.dis_new = [0.]*(self.node_num*3-len(self.constraint))
+        self.force_new = [0.]*(self.node_num*3-len(self.constraint))
+        self.stiff_new = [[0.]*(self.node_num*3-len(self.constraint))]*(self.node_num*3-len(self.constraint))
 
         # known force array
         for i, known_f_a in enumerate(self.known_f_a):
             self.force_new[i] = self.force[known_f_a]
 
-        stiffincrement = [0.]*(self.nodenum*3-len(self.constraint))
+        stiffincrement = [0.]*(self.node_num*3-len(self.constraint))
         for i, kfai in enumerate(self.known_f_a):
             for j, kfaj in enumerate(self.known_f_a):
                 stiffincrement[j] = self.stiffness[kfai][kfaj]
@@ -698,33 +710,33 @@ class Truss(object):
                 print('NumPy solver')
             self.dis_new = np.linalg.solve(np.array(self.stiff_new), np.array(self.force_new))
 
-        self.displacement = deepcopy(self.init_disp)
+        self.displacement = deepcopy(self._init_displacement)
 
         for i, known_f_a in enumerate(self.known_f_a):
             self.displacement[known_f_a] = self.dis_new[i]
 
         # Deformed shape
-        self.nodalcoord_def = []
-        for i in range(self.nodenum):
-            self.nodalcoord_def.append([self.nodalcoord[i][0] + self.displacement[i*3+0],
-                self.nodalcoord[i][1] + self.displacement[i*3+1], self.nodalcoord[i][2] + self.displacement[i*3+2]])
+        self.nodal_coord_def = []
+        for i in range(self.node_num):
+            self.nodal_coord_def.append([self.nodal_coord[i][0] + self.displacement[i*3+0],
+                                        self.nodal_coord[i][1] + self.displacement[i*3+1], self.nodal_coord[i][2] + self.displacement[i*3+2]])
 
         # Postrpocesses
         self.postprocess()
 
-        self.mod_displacements = [0.]*(self.elenum+1)
+        self.mod_displacements = [0.]*(self.element_num+1)
 
     def solvemodstruct(self, index):
         """
         Solver for the modified structures. 'Index' shows the actual modification number.
         """
 
-        self.mod_displacements[index] = [0.]*(self.nodenum*3)
+        self.mod_displacements[index] = [0.]*(self.node_num*3)
 
-        dis_new = [0.]*(self.nodenum*3-len(self.constraint))
-        stiff_new = [[0.]*(self.nodenum*3-len(self.constraint))]*(self.nodenum*3-len(self.constraint))
+        dis_new = [0.]*(self.node_num*3-len(self.constraint))
+        stiff_new = [[0.]*(self.node_num*3-len(self.constraint))]*(self.node_num*3-len(self.constraint))
 
-        stiffincrement = [0.]*(self.nodenum*3-len(self.constraint))
+        stiffincrement = [0.]*(self.node_num*3-len(self.constraint))
         for i, kfai in enumerate(self.known_f_a):
             for j, kfaj in enumerate(self.known_f_a):
                 stiffincrement[j] = self.mod_stiffnesses[index][kfai][kfaj]
@@ -736,7 +748,7 @@ class Truss(object):
         else:
             dis_new = np.linalg.solve(np.array(stiff_new), np.array(self.force_new))
 
-        mod_displacement_temp = deepcopy(self.init_disp)
+        mod_displacement_temp = deepcopy(self._init_displacement)
 
         for i, kfa in enumerate(self.known_f_a):
             mod_displacement_temp[kfa] = dis_new[i] - self.dis_new[i]
@@ -753,54 +765,54 @@ class Truss(object):
         return effect: [efffect on 1. point, effect on 2. point, ..., modification number]
                        where each line number shows the corresponding modification number
         """
-        self.effect = [[0.]*(self.keypnum + 2)]*self.elenum
-        self.toteffect = [0.]*self.keypnum
-        self.sortedeff = [[[0.]*(self.keypnum + 2)]*self.elenum]*self.keypnum
+        self.effect = [[0.]*(self.keypoint_num + 2)]*self.element_num
+        self.total_effect = [0.]*self.keypoint_num
+        self.sorted_effect = [[[0.]*(self.keypoint_num + 2)]*self.element_num]*self.keypoint_num
 
-        effect_temp = [0.]*(self.keypnum + 2)
+        effect_temp = [0.]*(self.keypoint_num + 2)
 
-        for modnum in range(self.elenum):
-            effect_temp[self.keypnum] = int(modnum)
+        for modnum in range(self.element_num):
+            effect_temp[self.keypoint_num] = int(modnum)
             for j, dofnum in enumerate(self.keypoint):
                 try:
                     effect_temp[j] = self.mod_displacements[modnum][dofnum]
                     self.effect[modnum] = [x for x in effect_temp]
-                    self.toteffect[j] += abs(self.effect[modnum][j])
+                    self.total_effect[j] += abs(self.effect[modnum][j])
                 except IndexError:
                     print("Maybe the mapping data is invalid.")
                     print("Please check the \'arduino_mapping.txt\' input whether the given DOFs are correct or not.")
                     raise IndexError
 
-        self.effectratio = deepcopy(self.effect)
-        for i in range(self.elenum):
-            for j in range(self.keypnum):
-                if self.toteffect[j] > 0:
-                    self.effectratio[i][j] = abs(self.effectratio[i][j]/self.toteffect[j])
+        self.effect_ratio = deepcopy(self.effect)
+        for i in range(self.element_num):
+            for j in range(self.keypoint_num):
+                if self.total_effect[j] > 0:
+                    self.effect_ratio[i][j] = abs(self.effect_ratio[i][j]/self.total_effect[j])
                 else:
-                    self.effectratio[i][j] = 0
+                    self.effect_ratio[i][j] = 0
 
         # print("   \'effectratio\' is not used yet")
 
         # Sort by effectiveness
-        for i in range(self.keypnum):
-            self.sortedeff[i] = deepcopy(self.effect)
+        for i in range(self.keypoint_num):
+            self.sorted_effect[i] = deepcopy(self.effect)
 
             # Check sign of the effect
-            for ktemp in range(self.elenum):
-                if self.sortedeff[i][ktemp][i] < 0:
-                    for jtemp in range(self.keypnum):
-                        self.sortedeff[i][ktemp][jtemp] = abs(self.sortedeff[i][ktemp][jtemp])
-                        self.sortedeff[i][ktemp][self.keypnum + 1] = -1
+            for ktemp in range(self.element_num):
+                if self.sorted_effect[i][ktemp][i] < 0:
+                    for jtemp in range(self.keypoint_num):
+                        self.sorted_effect[i][ktemp][jtemp] = abs(self.sorted_effect[i][ktemp][jtemp])
+                        self.sorted_effect[i][ktemp][self.keypoint_num + 1] = -1
                 else:
-                    self.sortedeff[i][ktemp][self.keypnum + 1] = +1
+                    self.sorted_effect[i][ktemp][self.keypoint_num + 1] = +1
 
-            for j in range(self.keypnum):
+            for j in range(self.keypoint_num):
                 if i != j and j != 0:
-                    self.sortedeff[i] = swap_col(sorted(swap_col(self.sortedeff[i], 0, j), reverse=True), 0, j)
+                    self.sorted_effect[i] = swap_col(sorted(swap_col(self.sorted_effect[i], 0, j), reverse=True), 0, j)
             if i != 0:
-                self.sortedeff[i] = swap_col(sorted(swap_col(self.sortedeff[i], 0, i), reverse=True), 0, i)
+                self.sorted_effect[i] = swap_col(sorted(swap_col(self.sorted_effect[i], 0, i), reverse=True), 0, i)
             else:
-                self.sortedeff[i] = sorted(self.sortedeff[i], reverse=True)
+                self.sorted_effect[i] = sorted(self.sorted_effect[i], reverse=True)
 
     def difference(self, num_displ, measurement):
         """
@@ -820,7 +832,7 @@ class Truss(object):
                 print('The given measurement location cannot be matched with the input data.')
                 print('The available nodes are: {\'NAMES\': mapping addresses}')
                 print(self.analysis)
-                SER.close()
+                self.serial.close()
                 raise Exception('Watchpoint name error')
 
             delta.append(measured - num_displ[dof])
@@ -831,9 +843,9 @@ class Truss(object):
         """
         Modell updating - core function
         """
-        # modnum = min(10, self.elenum)
-        modnum = self.elenum
-        self.modifications = [0.0]*self.elenum
+        # modnum = min(10, self.element_num)
+        modnum = self.element_num
+        self.modifications = [0.0]*self.element_num
 
         if not _SIMULATION:
             appendix = ""
@@ -844,55 +856,55 @@ class Truss(object):
         j = 0
 
         print("-----")
-        print("Step: 0/" + str(self.iterationlimit))
+        print("Step: 0/" + str(self.iteration_limit))
 
         # Optimization loop
-        while error(newdelta) > self.errorlimit and j <= self.iterationlimit and (self.capable() or j <= 1):
+        while error(newdelta) > self.error_limit and j <= self.iteration_limit and (self.capable() or j <= 1):
             j += 1
 
             print("Error: " + str(error(newdelta)))
             print("-----")
-            print("Step: " + str(j) + "/" + str(self.iterationlimit))
+            print("Step: " + str(j) + "/" + str(self.iteration_limit))
 
             ratio = [0.]*modnum
             unit = 0
 
             prevmodifications = self.modifications
 
-            for index in range(self.elenum):
-                self.modifications[index] = min(abs(self.modifications[index] - self.unitmodification),
-                                                self.modificationlimit) * \
-                                            math.copysign(1, self.modifications[index] - self.unitmodification)
+            for index in range(self.element_num):
+                self.modifications[index] = min(abs(self.modifications[index] - self.unit_modification),
+                                                self.modification_limit) * \
+                                            math.copysign(1, self.modifications[index] - self.unit_modification)
                 self.calcmodstiffness(index, self.modifications[index])
                 self.solvemodstruct(index)
             self.evaluate()
 
-            self.calcmodstiffness(self.elenum, 0)
-            self.solvemodstruct(self.elenum)
+            self.calcmodstiffness(self.element_num, 0)
+            self.solvemodstruct(self.element_num)
 
-            newdelta = self.difference(self.mod_displacements[self.elenum], self.measurement)
+            newdelta = self.difference(self.mod_displacements[self.element_num], self.measurement)
 
-            for i, effect in enumerate(self.toteffect):
+            for i, effect in enumerate(self.total_effect):
                 if effect == 0.0:
                     print("None of the variables has effect on " + str(self.arduino_mapping[i]))
                     print("Model updating has no solution.")
                     raise Exception
 
-            for i in range(self.elenum):
-                modificationnumber = self.sortedeff[0][i][1]
-                ratio[modificationnumber] = abs(self.sortedeff[0][i][0] / self.toteffect[0]) * \
-                                            math.copysign(1, self.sortedeff[0][i][2])
-                unit += abs(ratio[modificationnumber]*self.sortedeff[0][i][0])
+            for i in range(self.element_num):
+                modificationnumber = self.sorted_effect[0][i][1]
+                ratio[modificationnumber] = abs(self.sorted_effect[0][i][0] / self.total_effect[0]) * \
+                                            math.copysign(1, self.sorted_effect[0][i][2])
+                unit += abs(ratio[modificationnumber]*self.sorted_effect[0][i][0])
 
             scale = newdelta[0]/unit
-            for i in range(self.elenum):
-                modificationnumber = self.sortedeff[0][i][1]
+            for i in range(self.element_num):
+                modificationnumber = self.sorted_effect[0][i][1]
                 self.modifications[modificationnumber] = min(abs(prevmodifications[modificationnumber] -
-                                                                 self.unitmodification*ratio[modificationnumber]),
-                                                             self.modificationlimit)\
-                    * math.copysign(1, prevmodifications[modificationnumber] -
-                                    self.unitmodification*ratio[modificationnumber])
-                    # the last part is already the sign itself without the sign function
+                                                                 self.unit_modification*ratio[modificationnumber]),
+                                                             self.modification_limit) \
+                                                         * math.copysign(1, prevmodifications[modificationnumber] -
+                                                                         self.unit_modification*ratio[modificationnumber])
+                # the last part is already the sign itself without the sign function
 
             print("Ratio: " + str(scale))
 
@@ -904,21 +916,21 @@ class Truss(object):
 
         with open("./Structures/" + self.name + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
             if j > 1:
-                if j <= self.iterationlimit and self.capable():
-                    self.numofupdates[0] += 1
+                if j <= self.iteration_limit and self.capable():
+                    self.number_of_updates[0] += 1
                     outfile.write("Update state: SUCCESSFUL\n")
-                if not j <= self.iterationlimit:
-                    self.numofupdates[1] += 1
+                if not j <= self.iteration_limit:
+                    self.number_of_updates[1] += 1
                     outfile.write("Update state: Run out of iteration limit\n")
                 if not self.capable() and j > 1:
-                    self.numofupdates[2] += 1
+                    self.number_of_updates[2] += 1
                     outfile.write("Update state: No more possible modification\n")
             else:
                 outfile.write("Update state: Optimization was skipped\n")
             outfile.write("Requiered iterations: " + str(j) + "\n")
             outfile.write("Measurement: " + str(self.measurement) + "\n")
             outfile.write("Original delta: " + str(delta) + "\n")
-            outfile.write("New delta: " + str(newdelta) + " (limit: " + str(self.errorlimit) + ")\n")
+            outfile.write("New delta: " + str(newdelta) + " (limit: " + str(self.error_limit) + ")\n")
             outfile.write("Final error: " + str(error(newdelta)) + "\n")
             outfile.write("Modifications [%]: \n")
             outfile.write(str(self.modifications) + "\n")
@@ -926,7 +938,7 @@ class Truss(object):
             outfile.write(str(self.displacement) + "\n")
             if j > 1:
                 outfile.write("New displacements: \n")
-                outfile.write(str(self.mod_displacements[self.elenum]) + "\n")
+                outfile.write(str(self.mod_displacements[self.element_num]) + "\n")
             outfile.write("----------------------\n")
 
     def capable(self):
@@ -934,7 +946,7 @@ class Truss(object):
         Function telling whether there are more options to modify
         """
         for variable in self.modifications:
-            if 0.01 < abs(variable) <= 0.95*self.modificationlimit:
+            if 0.01 < abs(variable) <= 0.95*self.modification_limit:
                 capable = True
         return capable
 
@@ -943,7 +955,7 @@ class Truss(object):
         Setting general stop parameter for model updating
         """
         if errorlimit > 0.0:
-            self.errorlimit = errorlimit
+            self.error_limit = errorlimit
         else:
             print("The error limit must be a positive number")
             raise Exception
@@ -953,7 +965,7 @@ class Truss(object):
         Setting modification limit for members (model updating)
         """
         if 0.0 < modificationlimit < 1.0:
-            self.modificationlimit = modificationlimit
+            self.modification_limit = modificationlimit
         else:
             print("The modification limit must be higher than 0.0 and lower than 1.0")
             raise Exception
@@ -963,7 +975,7 @@ class Truss(object):
         Setting modification step (model updating)
         """
         if 0.01 <= abs(unitmodification) < 0.5:
-            self.unitmodification = unitmodification
+            self.unit_modification = unitmodification
         else:
             print("The absolut value of the unit modification must be minimum 0.01 and maximum 0.5")
             raise Exception
@@ -973,7 +985,7 @@ class Truss(object):
         Setting maximum number of iterations (model updating)
         """
         if 1 < int(iterationlimit) <= math.pow(10, 4):
-            self.iterationlimit = int(iterationlimit)
+            self.iteration_limit = int(iterationlimit)
         else:
             print("The iterationlimit must be between 2 and 10.000")
             raise Exception
@@ -992,7 +1004,7 @@ class Truss(object):
         readerror = False
 
         try:
-            arduinoline = SER.readline()
+            arduinoline = self.serial_connection.readline()
             if len(arduinoline) > 0:
                 arduinovalues = arduinoline.split(',')
                 try:
@@ -1007,28 +1019,28 @@ class Truss(object):
                         for i in range(len(self.arduino_mapping)):
                             data[i] = float(arduinovalues[i]) - float(base[i][1])
 
-                            if abs(data[i] - self.processeddata[i]) > maxdifference:
+                            if abs(data[i] - self.processed_data[i]) > maxdifference:
                                 bigdifference = True
                             if abs(float(arduinovalues[i])) < 2.0:
                                 readerror = True
 
-                        self.processeddata = data
+                        self.processed_data = data
                         newdata = True
 
                     except ValueError:
                         print("Value error... continuing")
-                        SER.flushInput()
+                        self.serial_connection.flushInput()
                         time.sleep(0.5)
                     except Exception:
                         print("Type error: " + str(arduinovalues) + "... continuing")
-                        SER.flushInput()
+                        self.serial_connection.flushInput()
                         time.sleep(0.5)
 
-            SER.flushInput()
+            self.serial_connection.flushInput()
 
         except serial.SerialTimeoutException:
             print("Data could not be read... continuing")
-            SER.flushInput()
+            self.serial_connection.flushInput()
             time.sleep(0.5)
 
         if newdata and not bigdifference and not readerror:
@@ -1079,7 +1091,7 @@ class Truss(object):
                 try:
                     for i in range(len(self.arduino_mapping)):
                         data[i] = float(arduinovalues[i])
-                    self.processeddata = data
+                    self.processed_data = data
                 except Exception:
                     print("Type error: " + str(arduinovalues) + "... continuing")
 
@@ -1102,7 +1114,7 @@ class Truss(object):
         """
         General function to manage model updatin procedure.
         """
-        self.processeddata = [0.]*len(self.arduino_mapping)
+        self.processed_data = [0.]*len(self.arduino_mapping)
 
         if not _SIMULATION:
             base = self.calibrate()
@@ -1159,16 +1171,16 @@ class Truss(object):
         while answer_1 not in ['Y', 'N']:
             answer_1 = input('Can we start the calibration? (y/n) ').upper()
         if answer_1 == 'N':
-            SER.close()
+            self.serial_connection.close()
             raise Exception('Calibration is terminated')
         else:
             try:
-                SER.flushInput()
+                self.serial_connection.flushInput()
                 # time.sleep(0.2)
-                arduinoline = ''  # SER.readline()
+                arduinoline = ''  # self.serial_connection.readline()
                 while len(arduinoline) == 0:
                     time.sleep(0.2)
-                    arduinoline = SER.readline()
+                    arduinoline = self.serial_connection.readline()
 
                 if len(arduinoline) > 0:
                     arduinovalues = arduinoline.split(',')
@@ -1196,10 +1208,10 @@ class Truss(object):
 
         if restart == 'Y':
             print("Restarting calibration")
-            SER.flushInput()
+            self.serial_connection.flushInput()
             return self.calibrate()
         elif restart == 'N':
-            SER.close()
+            self.serial_connection.close()
             raise Exception('Calibration is terminated')
         if accept == 'Y':
             return measurement
@@ -1210,7 +1222,7 @@ class Truss(object):
         """
         self._reactions()
         self._stresses()
-        self._postprocessed = 1
+        self._post_processed = 1
 
     def _reactions(self):
         """
@@ -1227,22 +1239,22 @@ class Truss(object):
 
         Last part: Coloring elements for graphical output
         """
-        self.stress = [0.]*self.elenum
-        for element in range(self.elenum):
+        self.stress = [0.]*self.element_num
+        for element in range(self.element_num):
             locstiff = [-self._cx[element], -self._cy[element], -self._cz[element],
-                         self._cx[element], self._cy[element], self._cz[element]]
+                        self._cx[element], self._cy[element], self._cz[element]]
             for i in range(3*2):
-                self.stress[element] += locstiff[i]*self.displacement[self.eledof[element][i]]
+                self.stress[element] += locstiff[i]*self.displacement[self.element_DOF[element][i]]
             self.stress[element] = self.stress[element]*self._norm_stiff[element]
 
         smax = max([abs(min(self.stress)), max(self.stress), 0.000000001])
-        self.stresscolor = [float(x)/float(smax) for x in self.stress]
+        self.stress_color = [float(x)/float(smax) for x in self.stress]
 
     def postprocessed(self):
         """
         Tells if the structure's postprocess part is already calcuated
         """
-        return self._postprocessed
+        return self._post_processed
 
     def writeresults(self, fname):
         """
@@ -1252,16 +1264,16 @@ class Truss(object):
         for i in self.node:
             out_element += str(i[0] + self._io_origin) + ', ' + str(i[1] + self._io_origin) + ' | '
         out_coords = ''
-        for i in self.nodalcoord:
+        for i in self.nodal_coord:
             out_coords += str(i[0]) + ', ' + str(i[1]) + ', ' + str(i[2]) + ' | '
         out_crsect = ''
         for i in self.area:
             out_crsect += str(i) + ', '
         out_materials = ''
-        for i in self.el_mod:
+        for i in self.elastic_modulo:
             out_materials += str(i) + ', '
         out_forces = ''
-        for forcedof in self.known_f_notzero:
+        for forcedof in self.known_f_not_zero:
             if self.dof == 3:
                 out_forces += str(forcedof + self._io_origin) + ', ' + str(self.force[forcedof]) + ' | '
             elif self.dof == 2 and i % 3 != 2:
@@ -1273,12 +1285,12 @@ class Truss(object):
             elif i[0] % 3 != 2:
                 out_supports += str(i[0] - i[0]//3 + self._io_origin) + ', ' + str(i[1]) + ' | '
         # Not elegant solution
-        out_specdofs = self.specdof_inputstring
+        out_specdofs = self.special_DOF_input_string
         try:
             with open("./Structures/" + fname, 'w') as outfile:
                 # Writing data
                 outfile.write('Calculation of \'' + self.name + '\':\n\n')
-    
+
                 outfile.write('Reactions\n')
                 # for i in range(len(self.force)//3):
                 prev = -1
@@ -1306,7 +1318,7 @@ class Truss(object):
                                 outfile.write(str(i//3 + self._io_origin) + ', ' + nodalforce)
                         prev = i//3
                 outfile.write('\n')
-    
+
                 outfile.write('Displacements\n')
                 for i in range(len(self.displacement)//3):
                     if i < 100:
@@ -1314,10 +1326,10 @@ class Truss(object):
                         if i < 9:
                             outfile.write(' ')
                     outfile.write(str(i + self._io_origin) + ', ' + "{:10.3f}".format(self.displacement[i*3 + 0]) +
-                          ', ' + "{:10.3f}".format(self.displacement[i*3 + 1]) +
-                          ', ' + "{:10.3f}".format(self.displacement[i*3 + 2]) + ', ' + '\n')
+                                  ', ' + "{:10.3f}".format(self.displacement[i*3 + 1]) +
+                                  ', ' + "{:10.3f}".format(self.displacement[i*3 + 2]) + ', ' + '\n')
                 outfile.write('\n')
-    
+
                 outfile.write('Stresses\n')
                 for i, stress in enumerate(self.stress):
                     if i < 100:
@@ -1326,7 +1338,7 @@ class Truss(object):
                             outfile.write(' ')
                     outfile.write(str(i + self._io_origin) + ', ' + "{:10.3f}".format(stress) + '\n')
                 outfile.write('\n')
-    
+
                 # Saving original input
                 outfile.write('----- Original input: -----\n\n')
                 outfile.write('_ORIGIN\n')
@@ -1349,9 +1361,9 @@ class Truss(object):
                 outfile.write(out_specdofs + '\n\n')
                 outfile.write('EOF\n')
         except FileNotFoundError:
-            print("Error: Please manually create the 'Structures' folder" 
-              "in the root of the project")
-            
+            print("Error: Please manually create the 'Structures' folder"
+                  "in the root of the project")
+
 
 ##################################
 #   BEGINNING OF THE MAIN PART   #
@@ -1425,7 +1437,7 @@ PARTTIME = logtime(PARTTIME, "Writing results to the output file")
 
 if Conf.arduino:
     # Closing Arduino port
-    SER.close()
+    TRUSS.close_serial()
 
 if Conf.log:
     TAC = time.time()
