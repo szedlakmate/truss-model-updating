@@ -11,17 +11,10 @@ import math
 import time
 import datetime
 import numpy as np
-try:
-    import serial
-except ImportError:
-    print("You tried to import \'serial\' without installing \'pySerial\'.")
-    print("Please first install pySerial: http://playground.arduino.cc/Interfacing/Python")
-    raise Exception('pyserial package not found')
 from copy import deepcopy
 try:
     from truss_extras import TrussFramework
     from graphics import Arrow3D
-    from config import Configuration
     from extra_math import invert as invert
     from extra_math import mat_vec_mult as mat_vec_mult
     from extra_math import swap_col as swap_col
@@ -31,109 +24,12 @@ except ImportError:
     raise Exception('Requirement is missing')
 
 
-"""
- COMPATIBILITY MODES:
-     0: User defined
-     1: DEPRECATED
-     2: Android
-     3: Most information (with numpy)
-     4: Maximum compatibility
-"""
-
-_COMPATIBLE_MODE = 0
-_SIMULATION = 1                     # Simulating measurements based on input file
-
-Conf = Configuration(_COMPATIBLE_MODE, _SIMULATION)
-
-
-if _COMPATIBLE_MODE == 0*0:
-    #** User defined ***
-    # Modify as needed #
-    Conf.mode_name = "User defined"
-    Conf.log = 1                 # Logging time
-    Conf.graphics = 1            # Graphical features
-    Conf.solver = 1              # 0: Basic solver, 1: NumPy solver
-    Conf.OSlib = 1  # Basic OS file features (e.g. file size)
-    Conf.updating = 0            # Model Updating: On/ Off
-    Conf.arduino = 0             # Arduino input: On/Off
-    Conf.debug = 0               # Debugging mode
-    Conf.realistic_simulation = 0  # Wait as long as it was originally. Only valid with _SIMULATION = 1
-
-if Conf.OSlib:
-    try:
-        if not os.path.exists("./Structures/"):
-            os.makedirs("./Structures")
-    except FileNotFoundError:
-        print("Error: Please manually create the 'Structures' folder"
-              "in the root of the project")
-
-
-if Conf.simulation or not Conf.updating:
-    _ARDUINO = 0
-
-if _COMPATIBLE_MODE == 2:
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
-
-if Conf.log:
-    TIC = time.time()
-    print('------------------------------------')
-    print('Truss calculation program')
-    print('Created by Máté Szedlák (23/11/2016)')
-    print('Compatibility mode: ' + Conf.mode_name)
-    if Conf.solver == 0:
-        print('- Solver is set to default')
-    elif Conf.solver == 1:
-        print('- Solver is set to NumPy')
-    else:
-        raise Exception("Solver settings are invalid!")
-    if Conf.updating:
-        print('+ Model updating is turned ON')
-        if Conf.simulation:
-            print('Input data is SIMULATED!')
-    else:
-        print('- Model updating is turned OFF')
-    print('------------------------------------')
-
-
-"""
-if _ARDUINO or _SIMULATION:
-    try:
-        mapping_file = 'arduino_mapping.txt'
-        with open(mapping_file, "r") as textfile:
-            line = textfile.readline().strip()
-            arduino_mapping = line.upper().split(',')
-
-    except IOError:
-        raise Exception('File not found: ' + mapping_file)
-"""
-
-
-def log_time(prev_time, title):
-    """
-    Calculating and printing the time consumption of tasks
-
-    Should be called with the previously saved part-time and the name of the actual task
-    At the first call, should be called with TIC value. The input argument
-    should be overwritten by this funvtion's return value.
-
-
-    :param previous_time: time at lap-starting (sub-timer)
-    :param message: message will be printed
-    :return: returns actual time to start new lap (sub-timer)
-    """
-    if Conf.log:
-        new_time = time.time()
-        print(title)
-        print('Time: ' + str("{:10.3f}".format(new_time - prev_time)))
-        print('------------------------------------')
-        return new_time
-    else:
-        return 0
-
-
 def error(delta):
     """
     Error function using least-square method
+
+    :param delta: error vector
+    :return: sum of errors
     """
     sum_of_errors = 0
     for delta_element in delta:
@@ -152,9 +48,9 @@ class Truss(TrussFramework):
         """
         Checking coordinates for repeating elements.
 
-            ignorable: [True | False] If the warning is ignorable, only message apperas and the input becomes neglected.
+        :param ignorable: [True | False] If the warning is ignorable, only message apperas and the input becomes neglected.
                 If the warning is not ignorable, then exceptions will be raised.
-            return: [0 | 1] 1 f no error found, otherwise 0.
+        :return: [0 | 1] 1 f no error found, otherwise 0.
         """
         if len(self.nodal_coord) != len(list(k for k, _ in itertools.groupby(sorted(self.nodal_coord)))):
             if ignorable == 0:
@@ -165,14 +61,14 @@ class Truss(TrussFramework):
         else:
             return 1
 
-    def set_DOF(self, dof):
+    def set_DOF(self, DOF):
         """
         Setting problem's degree of freedom
-
-            dof: [2 | 3] Model's Degree Of Freedom.
+        :param DOF: [2 | 3] Model's Degree Of Freedom
+        :return: None
         """
-        self.dof = dof
-        if self.dof != 2 and self.dof != 3:
+        self.DOF = DOF
+        if self.DOF != 2 and self.DOF != 3:
             raise Exception('DOF must be 2 or 3.')
         self._stiff_is_fresh = 0
         self._mod_stiff_is_fresh = 0
@@ -264,9 +160,9 @@ class Truss(TrussFramework):
         Set forces
         """
         for fdof, force in forces:
-            if self.dof == 3:
+            if self.DOF == 3:
                 self.force[fdof] = force
-            elif self.dof == 2:
+            elif self.DOF == 2:
                 self.force[fdof + (fdof//2)] = force
         self._post_processed = 0
 
@@ -282,9 +178,9 @@ class Truss(TrussFramework):
         Set supports
         """
         for cdof, constraint in constraints:
-            if self.dof == 3:
+            if self.DOF == 3:
                 self.constraint.append([cdof, constraint])
-            elif self.dof == 2:
+            elif self.DOF == 2:
                 self.constraint.append([cdof + (cdof // 2), constraint])
         self._stiff_is_fresh = 0
         self._mod_stiff_is_fresh = 0
@@ -306,7 +202,7 @@ class Truss(TrussFramework):
                 self.keypoint.append(node*3+1)
 
             if 'Z' in dofname:
-                if self.dof == 3:
+                if self.DOF == 3:
                     self.analysis[dofname] = node*3+2
                     self.keypoint.append(node*3+2)
                 else:
@@ -315,7 +211,7 @@ class Truss(TrussFramework):
                     raise Exception
 
         self.keypoint_num = len(self.analysis)
-        if self.keypoint_num == 0 and Conf.updating:
+        if self.keypoint_num == 0 and self.configuration.updating:
             print("There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file.")
             raise Exception
 
@@ -325,7 +221,7 @@ class Truss(TrussFramework):
         """
         self._post_processed = 0
 
-        if self.dof == 2:
+        if self.DOF == 2:
             for zdof in range(self.node_num):
                 self.constraint.append([int(zdof*3+2), 0.])
         self.constraint = list(k for k, _ in itertools.groupby(sorted(self.constraint)))
@@ -336,10 +232,10 @@ class Truss(TrussFramework):
             if self.force[dofloc] != 0:
                 self.known_f_not_zero.append(dofloc)
 
-        self.known_dis_a = []
+        self.known_displacement_a = []
         for constr in self.constraint:
             self._init_displacement[constr[0]] = constr[1]
-            self.known_dis_a.append(constr[0])
+            self.known_displacement_a.append(constr[0])
             try:
                 self.known_f_a.remove(constr[0])
                 self.known_f_not_zero.remove(constr[0])
@@ -418,7 +314,7 @@ class Truss(TrussFramework):
         Main solver of the code
         """
         if self._stiff_is_fresh == 0:
-            if Conf.log:
+            if self.configuration.log:
                 print('Stiffness matrix is recalculated')
             self.calculate_stiffness_matrix()
 
@@ -437,12 +333,12 @@ class Truss(TrussFramework):
             self.stiff_new[i] = [x + y for x, y in zip(self.stiff_new[i], stiffness_increment)]
 
         # SOLVING THE STRUCTURE
-        if Conf.solver == 0:
-            if Conf.log:
+        if self.configuration.solver == 0:
+            if self.configuration.log:
                 print('Built-in solver')
             self.dis_new = mat_vec_mult(invert(self.stiff_new), self.force_new)
         else:
-            if Conf.log:
+            if self.configuration.log:
                 print('NumPy solver')
             self.dis_new = np.linalg.solve(np.array(self.stiff_new), np.array(self.force_new))
 
@@ -479,7 +375,7 @@ class Truss(TrussFramework):
             stiff_new[i] = [x + y for x, y in zip(stiff_new[i], stiffness_increment)]
 
         # SOLVING THE MODIFIED STRUCTURE
-        if Conf.solver == 0:
+        if self.configuration.solver == 0:
             dis_new = mat_vec_mult(invert(stiff_new), self.force_new)
         else:
             dis_new = np.linalg.solve(np.array(stiff_new), np.array(self.force_new))
@@ -583,7 +479,7 @@ class Truss(TrussFramework):
         modnum = self.element_num
         self.modifications = [0.0]*self.element_num
 
-        if not _SIMULATION:
+        if not self.configuration.simulation:
             appendix = ""
         else:
             appendix = " - SIMULATED"
@@ -732,7 +628,7 @@ class Truss(TrussFramework):
         """
         self.processed_data = [0.]*len(self.arduino_mapping)
 
-        if not _SIMULATION:
+        if not self.configuration.simulation:
             base = self.calibrate()
             filemode = 'a'
         else:
@@ -745,30 +641,30 @@ class Truss(TrussFramework):
 
         with open("./Structures/" + self.name + ' - Input Data.txt', filemode) as input_file:
             # Saving input data
-            if not _SIMULATION:
+            if not self.configuration.simulation:
                 input_file.write('Input data of \'' + self.name + '\':\n\n')
                 input_file.write('Start Time: ' +
                                 str(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')) + "\n")
                 input_file.write('Base: ' + str(base) + '\n')
 
-            inputline = "[],0.0"
+            new_line = "[],0.0"
             for i in range(1000):
-                if not _SIMULATION:
+                if not self.configuration.simulation:
                     delta = self.readarduino(base, input_file)
                     self.optimize(delta)
                 else:
                     try:
                         delta = None
-                        previous_line = inputline
-                        inputline = input_file.readline()
-                        if not inputline == '':
-                            delta = self.simulate_arduino(inputline, previous_line)
+                        previous_line = new_line
+                        new_line = input_file.readline()
+                        if not new_line == '':
+                            delta = self.simulate_arduino(new_line, previous_line)
                     except Exception:
                         pass
                     if delta:
                         self.optimize(delta)
         print("Update statistics:")
-        print("Totally updated models: " + str(TRUSS.num_of_updates[0] + TRUSS.num_of_updates[1]++ TRUSS.num_of_updates[2]))
+        print("Totally updated models: " + str(TRUSS.num_of_updates[0] + TRUSS.num_of_updates[1] + TRUSS.num_of_updates[2]))
         print("  Successfully updated models: " + str(TRUSS.num_of_updates[0]))
         print("  Updates with running out of possibilities: " + str(TRUSS.num_of_updates[2]))
         print("  Updates did not finshed: " + str(TRUSS.num_of_updates[1]))
@@ -777,7 +673,7 @@ class Truss(TrussFramework):
         """
         Calculates reaction forces and stresses
 
-        :return null
+        :return None
         """
         self._reactions()
         self._stresses()
@@ -787,10 +683,10 @@ class Truss(TrussFramework):
         """
         Calculates reaction forces
         """
-        for i in self.known_dis_a:
+        for i in self.known_displacement_a:
             self.force[i] = 0
-            for j, displ in enumerate(self.displacement):
-                self.force[i] += self.stiffness[i][j]*displ
+            for j, displacement in enumerate(self.displacement):
+                self.force[i] += self.stiffness[i][j]*displacement
 
     def _stresses(self):
         """
@@ -800,69 +696,60 @@ class Truss(TrussFramework):
         """
         self.stress = [0.]*self.element_num
         for element in range(self.element_num):
-            locstiff = [-self._cx[element], -self._cy[element], -self._cz[element],
+            local_stiffness = [-self._cx[element], -self._cy[element], -self._cz[element],
                         self._cx[element], self._cy[element], self._cz[element]]
             for i in range(3*2):
-                self.stress[element] += locstiff[i]*self.displacement[self.element_DOF[element][i]]
+                self.stress[element] += local_stiffness[i]*self.displacement[self.element_DOF[element][i]]
             self.stress[element] = self.stress[element]*self._norm_stiff[element]
 
-        smax = max([abs(min(self.stress)), max(self.stress), 0.000000001])
-        self.stress_color = [float(x)/float(smax) for x in self.stress]
+        s_max = max([abs(min(self.stress)), max(self.stress), 0.000000001])
+        self.stress_color = [float(x)/float(s_max) for x in self.stress]
 
 ##################################
 #   BEGINNING OF THE MAIN PART   #
 ##################################
 
-part_time = log_time(TIC, "Initialization")
 
-#  Define new truss
+#  Define new structure
 TRUSS = Truss('bridge')
-if not Conf.debug:
+
+if TRUSS.configuration.log:
+    TRUSS.configuration.start_logging()
+
+if not TRUSS.configuration.debug:
     TRUSS.name = input('Test name: ')
 else:
     print("*** Debug mode ***")
     print("*** The following file will be opened: " + TRUSS.name + ".str")
 
-# Read input file
-# TRUSS.read('lab_01.txt')
-
-try:
-    TRUSS.read(TRUSS.name + ".str")
-except IOError:
-    print("The following file could not be opened: " + "./Structures/" + TRUSS.name + ".str")
-    print("Please make sure that the structural data is available for the program in the running directory.")
-    raise IOError
-
-# if _ARDUINO or _SIMULATION:                # deprecated
-#    TRUSS.set_special_DOFs(arduino_mapping)
-
-part_time = log_time(part_time, "Setting up structure")
+TRUSS.read(TRUSS.name + ".str")
+TRUSS.configuration.part_time("Setting up structure")
 
 # Calculate stiffness-matrix
 TRUSS.calculate_stiffness_matrix()
-# TRUSS.calculate_stiffness_matrix_plate()
+TRUSS.configuration.part_time("Calculating Stiffness Matrix")
 
-part_time = log_time(part_time, "Calculating Stiffness Matrix")
 
 # Solve structure
 TRUSS.solve()
-# TRUSS.solve_plate()
+TRUSS.configuration.part_time("Solving")
 
-part_time = log_time(part_time, "Solving")
 
-if Conf.updating:
+# Update iteration
+if TRUSS.configuration.updating:
     TRUSS.set_unit_modification(0.05)
     TRUSS.set_error_limit(1.2)
     TRUSS.set_modification_limit(0.7)
     TRUSS.set_iteration_limit(100)
     TRUSS.update_model()
+    TRUSS.configuration.part_time("Updating numerical model")
 
-part_time = log_time(part_time, "Updating numerical model")
 
-if Conf.graphics:
+# Plotting
+if TRUSS.configuration.graphics:
     # Plot settings:
     # O: Original D: Deformed S: Supports F: Forces R: Reactions
-    # ScD: Scale displacments (Z-axis) (def:1.0) ScF: Scale forces (def:1.0)
+    # ScD: Scale displacements (Z-axis) (def:1.0) ScF: Scale forces (def:1.0)
     # ScS: Scale Support signs (Z-axis) (def:1.0)
     # Save: Save plot to file
 
@@ -870,26 +757,19 @@ if Conf.graphics:
     TRUSS.plot(1, 0, 1, 1, 0, 1.0, 0.0, 0.0, True)
     TRUSS.plot(1, 1, 1, 0, 0, 1.0, 0.0, 0.0, True)
     TRUSS.plot(0, 1, 1, 1, 1, 2.0, 0.0, 0.0, True)
-    # pass
+    TRUSS.configuration.part_time("Plotting")
 
-part_time = log_time(part_time, "Plotting")
 
 # Write results to file
-TRUSS.writeresults("./Structures/" + TRUSS.name + ' - Results.txt')
+TRUSS.write_results("Structures/" + TRUSS.name + ' - Results.txt')
+TRUSS.configuration.part_time("Wrote results to the output file")
 
-part_time = log_time(part_time, "Writing results to the output file")
 
-if Conf.arduino:
-    # Closing Arduino port
+# Closing Arduino port
+if TRUSS.configuration.arduino:
     TRUSS.close_serial()
 
-if Conf.log:
-    TAC = time.time()
-    TOTALTIME = TAC-TIC
-    if Conf.updating:
-        print("Update statistics:")
-        print("Totally updated models: " + str(TRUSS.num_of_updates[0] + TRUSS.num_of_updates[1] + TRUSS.num_of_updates[2]))
-        print("  Successfully updated models: " + str(TRUSS.num_of_updates[0]))
-        print("  Updates with running out of possibilities: " + str(TRUSS.num_of_updates[2]))
-        print("  Updates did not finished: " + str(TRUSS.num_of_updates[1]))
-    print('Total time: ' + str("{:10.3f}".format(TOTALTIME)))
+
+# End logging
+if TRUSS.configuration.log:
+    TRUSS.end_logging()

@@ -51,7 +51,7 @@ class Arrow3D(FancyArrowPatch):
         fig = plt.figure()
         _ax = fig.add_subplot(111, projection='3d')
 
-        if struct.dof == 2:
+        if struct.DOF == 2:
             _ax.view_init(elev=90., azim=-90.)
             _ax.w_zaxis.line.set_lw(0.)
             _ax.set_zticklabels([])
@@ -69,7 +69,7 @@ class Arrow3D(FancyArrowPatch):
         xframe = max(deltax * 0.05, 2)
         yframe = max(deltay * 1.5, 2)
 
-        if struct.dof == 3:
+        if struct.DOF == 3:
             plot_height = plot_width * ((deltay + yframe*2)/(deltax + xframe*2)) * 0.3
         else:
             plot_height = plot_width * 0.5 * 0.5
@@ -197,7 +197,7 @@ class Arrow3D(FancyArrowPatch):
                         _ax.set_yticklabels([])
                         _ax.set_zticklabels([])
                         if not i//3 == e_previous//3:
-                            if struct.dof == 3:
+                            if struct.DOF == 3:
                                 _ax.text(struct.nodal_coord[i//3][0],
                                     struct.nodal_coord[i//3][1],
                                     struct.nodal_coord[i//3][2],
@@ -205,7 +205,7 @@ class Arrow3D(FancyArrowPatch):
                                     "{:10.2f}".format(struct.force[(i//3)*3+1])+'\n' +
                                     "{:10.2f}".format(struct.force[(i//3)*3+2]),
                                     fontsize=12, horizontalalignment='right')
-                            elif struct.dof == 2:
+                            elif struct.DOF == 2:
                                 _ax.text(struct.nodal_coord[i//3][0],
                                     struct.nodal_coord[i//3][1],
                                     struct.nodal_coord[i//3][2],
@@ -225,7 +225,7 @@ class Arrow3D(FancyArrowPatch):
                 else:
                     f_dir = [0., 0., -1.0 * scale_sup * z_correction]
                     col = 'brown'
-                if i % 3 != 2 or struct.dof == 3:
+                if i % 3 != 2 or struct.DOF == 3:
                     _ax.plot([struct.nodal_coord[i//3][0], struct.nodal_coord[i//3][0]+f_dir[0]],
                         [struct.nodal_coord[i//3][1], struct.nodal_coord[i//3][1]+f_dir[1]],
                         zs=[struct.nodal_coord[i//3][2], struct.nodal_coord[i//3][2]+f_dir[2]],

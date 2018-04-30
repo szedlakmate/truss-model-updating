@@ -5,7 +5,7 @@ Created on April 30 18:49:40 2018
 3D truss model updater program created by Máté Szedlák.
 Copyright MIT, Máté Szedlák 2016-2018.
 """
-import math
+import os
 import time
 try:
     import serial
@@ -15,7 +15,6 @@ except ImportError:
     raise Exception('pyserial package not found')
 try:
     from graphics import Arrow3D
-    from config import Configuration
     from extra_math import invert as invert
     from extra_math import mat_vec_mult as mat_vec_mult
     from extra_math import swap_col as swap_col
@@ -25,33 +24,150 @@ except ImportError:
     raise Exception('Requirement is missing')
 
 
-"""
- COMPATIBILITY MODES:
-     0: User defined
-     1: DEPRECATED
-     2: Android
-     3: Most information (with numpy)
-     4: Maximum compatibility
-"""
-
-_COMPATIBLE_MODE = 0
-_SIMULATION = 1                     # Simulating measurements based on input file
-
-Conf = Configuration(_COMPATIBLE_MODE, _SIMULATION)
-
-def error(delta):
+class TrussConfiguration(object):
     """
-    Error function using least-square method
-
-    :param delta: error vector
-    :return: sum of errors
+    Truss configuration file
     """
-    sum_of_errors = 0
-    for delta_element in delta:
-        sum_of_errors += delta_element**2
-        sum_of_errors = math.sqrt(sum_of_errors)
+    def __init__(self, compatibility_mode=4, simulation=0):
+        """
+        :param compatibility_mode:  0: User defined, 1: DEPRECATED, 2: Android, 3: Most information (with numpy), 4: Maximum compatibility_mode
+        :param simulation: 0: False, 1: True
+        """
+        self.TIC = time.time()
+        self.TAC = 0
+        self.TOTAL_TIME = 0
+        self.previous_time = self.TIC
+        self.compatibility_mode = compatibility_mode
+        self.simulation = simulation
 
-    return sum_of_errors
+        if self.compatibility_mode == 0:
+            ### User defined ###
+            # Modify as needed #
+            self.mode_name = "User defined"
+            self.log = 1  # Logging time
+            self.graphics = 1  # Graphical features
+            self.solver = 1  # 0: Basic solver, 1: NumPy solver
+            self.OSlib = 1  # Basic OS file features (e.g. file size)
+            self.updating = 0  # Model Updating: On/ Off
+            self.arduino = 0  # Arduino input: On/Off
+            self.debug = 1  # Debugging mode
+            self.realistic_simulation = 0  # Wait as long as it was originally. Only valid with _SIMULATION = 1
+
+        elif self.compatibility_mode == 1:
+            ### "Processing 3" mode ###
+            # DO NOT MODIFY
+            self.mode_name = "Processing 3"
+            self.log = 1*1
+            self.graphics = 0*0
+            self.solver = 0*0
+            self.OSlib = 0*0
+            self.updating = 1*1
+            self.arduino = 1*1
+            self.debug = 0*0
+            self.realistic_simulation = 1*1
+
+        elif self.compatibility_mode == 2:
+            ### Android mode ###
+            # DO NOT MODIFY
+            self.mode_name = "Android"
+            self.log = 1*1
+            self.graphics = 0*0
+            self.solver = 0*0
+            self.OSlib = 1*1
+            self.updating = 0*0
+            self.arduino = 0*0
+            self.debug = 0*0
+            self.realistic_simulation = 1*1
+
+        elif self.compatibility_mode == 3:
+            ### Informative ###
+            # DO NOT MODIFY
+            self.mode_name = "Informative mode"
+            self.log = 1*1
+            self.graphics = 1*1
+            self.solver = 1*1
+            self.OSlib = 1*1
+            self.updating = 1*1
+            self.arduino = 1*1
+            self.debug = 0*0
+            self.realistic_simulation = 1*1
+
+        else:
+            ### Maximum compatibility_mode ###
+            # DO NOT MODIFY
+            self.mode_name = "Maximum compatibility_mode"
+            self.log = 0*0
+            self.graphics = 0*0
+            self.solver = 0*0
+            self.OSlib = 0*0
+            self.updating = 0*0
+            self.arduino = 0*0
+            self.debug = 0*0
+            self.realistic_simulation = 1*1
+
+        if self.OSlib:
+            try:
+                if not os.path.exists("./Structures/"):
+                    os.makedirs("./Structures")
+            except FileNotFoundError:
+                print("Error: Please manually create the 'Structures' folder in the root of the project")
+
+        if self.simulation or not self.updating:
+            self.arduino = 0
+
+        if self.compatibility_mode == 2:
+            os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+    def start_logging(self):
+        self.part_time("Initialization")
+
+        print('------------------------------------')
+        print('Truss calculation program')
+        print('Created by Máté Szedlák (23/11/2016)')
+        print('Compatibility mode: ' + self.mode_name)
+        if self.solver == 0:
+            print('- Solver is set to default')
+        elif self.solver == 1:
+            print('- Solver is set to NumPy')
+        else:
+            raise Exception("Solver settings are invalid!")
+        if self.updating:
+            print('+ Model updating is turned ON')
+            if self.simulation:
+                print('Input data is SIMULATED!')
+        else:
+            print('- Model updating is turned OFF')
+        print('------------------------------------')
+
+    def end_logging(self, truss):
+        self.TAC = time.time()
+        self.TOTAL_TIME = self.TAC - self.TIC
+        if self.updating:
+            print("Update statistics:")
+            print("Totally updated models: " + str(
+                truss.num_of_updates[0] + truss.num_of_updates[1] + truss.num_of_updates[2]))
+            print("  Successfully updated models: " + str(truss.num_of_updates[0]))
+            print("  Updates with running out of possibilities: " + str(truss.num_of_updates[2]))
+            print("  Updates did not finished: " + str(truss.num_of_updates[1]))
+        # print('Total time: ' + str("{:10.3f}".format(self.TOTAL_TIME)))
+        print("Total time: {:10.3f}".format(self.TOTAL_TIME))
+
+    def part_time(self, message):
+        """
+        Calculating and printing the time consumption of tasks
+
+        Should be called with the previously saved part-time and the name of the actual task
+        At the first call, should be called with TIC value. The input argument
+        should be overwritten by this function's return value.
+
+        :param message: message will be printed
+        :return: returns actual time to start new lap (sub-timer)
+        """
+        new_time = time.time()
+        print(message)
+        print('Time: ' + str("{:10.3f}".format(new_time - self.previous_time)))
+        print('------------------------------------')
+        self.previous_time = new_time
 
 
 class TrussFramework(object):
@@ -63,15 +179,20 @@ class TrussFramework(object):
     - Plot functions
     """
     def __init__(self, name):
+        """
+        Truss Updater framework object.
+        :param name: Name of the structure
+        """
         # Serial connection
         self.serial_connection = False  # Holds serial connection
         # General data
         self.name = name              # Name of structure
         # Project data
-        # Truss data
+        self.configuration = TrussConfiguration(compatibility_mode=0, simulation=1)
+        # Truss datau
         self.known_f_a = []           # Nodes without supports
         self.known_f_not_zero = []     # Nodes with loads
-        self.dof = 3                  # Truss's degree of freedom
+        self.DOF = 3                  # Truss's degree of freedom
         self.node = []                # Element's end nodes
         self.constraint = []          # Supports
         self.force = []               # Force
@@ -138,7 +259,7 @@ class TrussFramework(object):
             return connection
         except serial.SerialException:
             print(str(port) + ' port is busy. It might be occupied by this program or another one :'
-                       '/ Be careful or try resetting this program')
+                              '/ Be careful or try resetting this program')
             return False
 
     def connect(self, port='', baudrate=9600):
@@ -189,115 +310,120 @@ class TrussFramework(object):
         """
         self._io_origin = 0
         _read_element_names = ["Origin", "DOF", "Elements", "Coordinates",
-                            "Cross-sections", "Materials", "Forces", "Supports", "Measured DOFs"]
+                               "Cross-sections", "Materials", "Forces", "Supports", "Measured DOFs"]
 
-        with open("./Structures/" + filename, "r") as sourcefile:
-            source_line = ""
-            while source_line != "EOF":
-                source_line = sourcefile.readline().strip()
-
-                if source_line.upper() == "_ORIGIN":
+        try:
+            with open("./Structures/" + filename, "r") as sourcefile:
+                source_line = ""
+                while source_line != "EOF":
                     source_line = sourcefile.readline().strip()
-                    self._io_origin = int(source_line)
-                    self.read_elements[0] = 1
 
-                if source_line.upper() == "DOF":
-                    source_line = sourcefile.readline().strip()
-                    self.set_DOF(int(source_line))
-                    self.read_elements[1] = 1
+                    if source_line.upper() == "_ORIGIN":
+                        source_line = sourcefile.readline().strip()
+                        self._io_origin = int(source_line)
+                        self.read_elements[0] = 1
 
-                if source_line.upper() == "ELEMENTS":
-                    source_line = sourcefile.readline().strip()
-                    inpstr = []
-                    inpnum = []
-                    inpstr = [x.split(',') for x in source_line.split('|')]
-                    if len(inpstr[0]) == 1:
-                        inpstr = [x.split(';') for x in source_line.split('|')]
-                    if [''] in inpstr:
-                        inpstr.remove([''])
-                    inpnum = [[int(x[0]) - self._io_origin, int(x[1]) - self._io_origin] for x in inpstr]
-                    self.set_elements(inpnum)
-                    self.read_elements[2] = 1
+                    if source_line.upper() == "DOF":
+                        source_line = sourcefile.readline().strip()
+                        self.set_DOF(int(source_line))
+                        self.read_elements[1] = 1
 
-                if source_line.upper() == "COORDINATES":
-                    source_line = sourcefile.readline().strip()
-                    inpstr = []
-                    inpnum = []
-                    inpstr = [x.split(',') for x in source_line.split('|')]
-                    if len(inpstr[0]) == 1:
-                        inpstr = [x.split(';') for x in source_line.split('|')]
-                    if [''] in inpstr:
-                        inpstr.remove([''])
-                    if self.dof == 3:
-                        inpnum = [[float(x[0]), float(x[1]), float(x[2])] for x in inpstr]
-                    elif self.dof == 2:
-                        inpnum = [[float(x[0]), float(x[1]), 0.] for x in inpstr]
-                    self.set_coordinates(inpnum)
-                    self.read_elements[3] = 1
+                    if source_line.upper() == "ELEMENTS":
+                        source_line = sourcefile.readline().strip()
+                        inpstr = []
+                        inpnum = []
+                        inpstr = [x.split(',') for x in source_line.split('|')]
+                        if len(inpstr[0]) == 1:
+                            inpstr = [x.split(';') for x in source_line.split('|')]
+                        if [''] in inpstr:
+                            inpstr.remove([''])
+                        inpnum = [[int(x[0]) - self._io_origin, int(x[1]) - self._io_origin] for x in inpstr]
+                        self.set_elements(inpnum)
+                        self.read_elements[2] = 1
 
-                if source_line.upper() == "CROSS-SECTIONS":
-                    source_line = sourcefile.readline().strip()
-                    inpstr = []
-                    inpnum = []
-                    inpstr = source_line.split(',')
-                    if len(inpstr) == 1:
-                        inpstr = source_line.split(';')
-                    if '' in inpstr:
-                        inpstr.remove('')
-                    inpnum = [float(eval(x)) for x in inpstr]
-                    self.set_crosssections(inpnum)
-                    self.read_elements[4] = 1
+                    if source_line.upper() == "COORDINATES":
+                        source_line = sourcefile.readline().strip()
+                        inpstr = []
+                        inpnum = []
+                        inpstr = [x.split(',') for x in source_line.split('|')]
+                        if len(inpstr[0]) == 1:
+                            inpstr = [x.split(';') for x in source_line.split('|')]
+                        if [''] in inpstr:
+                            inpstr.remove([''])
+                        if self.DOF == 3:
+                            inpnum = [[float(x[0]), float(x[1]), float(x[2])] for x in inpstr]
+                        elif self.DOF == 2:
+                            inpnum = [[float(x[0]), float(x[1]), 0.] for x in inpstr]
+                        self.set_coordinates(inpnum)
+                        self.read_elements[3] = 1
 
-                if source_line.upper() == "MATERIALS":
-                    source_line = sourcefile.readline().strip()
-                    inpstr = []
-                    inpnum = []
-                    inpstr = source_line.split(',')
-                    if len(inpstr) == 1:
-                        inpstr = source_line.split(';')
-                    if '' in inpstr:
-                        inpstr.remove('')
-                    inpnum = [float(eval(x)) for x in inpstr]
-                    self.set_materials(inpnum)
-                    self.read_elements[5] = 1
+                    if source_line.upper() == "CROSS-SECTIONS":
+                        source_line = sourcefile.readline().strip()
+                        inpstr = []
+                        inpnum = []
+                        inpstr = source_line.split(',')
+                        if len(inpstr) == 1:
+                            inpstr = source_line.split(';')
+                        if '' in inpstr:
+                            inpstr.remove('')
+                        inpnum = [float(eval(x)) for x in inpstr]
+                        self.set_crosssections(inpnum)
+                        self.read_elements[4] = 1
 
-                if source_line.upper() == "FORCES":
-                    source_line = sourcefile.readline().strip()
-                    inpstr = []
-                    inpnum = []
-                    inpstr = [x.split(',') for x in source_line.split('|')]
-                    if len(inpstr[0]) == 1:
-                        inpstr = [x.split(';') for x in source_line.split('|')]
-                    if [''] in inpstr:
-                        inpstr.remove([''])
-                    inpnum = [[int(x[0]) - self._io_origin, float(x[1])] for x in inpstr]
-                    self.set_forces(sorted(inpnum))
-                    self.read_elements[6] = 1
+                    if source_line.upper() == "MATERIALS":
+                        source_line = sourcefile.readline().strip()
+                        inpstr = []
+                        inpnum = []
+                        inpstr = source_line.split(',')
+                        if len(inpstr) == 1:
+                            inpstr = source_line.split(';')
+                        if '' in inpstr:
+                            inpstr.remove('')
+                        inpnum = [float(eval(x)) for x in inpstr]
+                        self.set_materials(inpnum)
+                        self.read_elements[5] = 1
 
-                if source_line.upper() == "SUPPORTS":
-                    source_line = sourcefile.readline().strip()
-                    inpstr = []
-                    inpnum = []
-                    inpstr = [x.split(',') for x in source_line.split('|')]
-                    if len(inpstr[0]) == 1:
-                        inpstr = [x.split(';') for x in source_line.split('|')]
-                    if [''] in inpstr:
-                        inpstr.remove([''])
-                    inpnum = [[int(x[0]) - self._io_origin, float(x[1])] for x in inpstr]
-                    self.set_supports(sorted(inpnum))
-                    self.read_elements[7] = 1
+                    if source_line.upper() == "FORCES":
+                        source_line = sourcefile.readline().strip()
+                        inpstr = []
+                        inpnum = []
+                        inpstr = [x.split(',') for x in source_line.split('|')]
+                        if len(inpstr[0]) == 1:
+                            inpstr = [x.split(';') for x in source_line.split('|')]
+                        if [''] in inpstr:
+                            inpstr.remove([''])
+                        inpnum = [[int(x[0]) - self._io_origin, float(x[1])] for x in inpstr]
+                        self.set_forces(sorted(inpnum))
+                        self.read_elements[6] = 1
 
-                if source_line.upper() == "MEASUREMENTS":
-                    source_line = sourcefile.readline().strip()
-                    self.special_DOF_input_string = source_line
-                    inpstr = []
-                    self.arduino_mapping = source_line.split(',')
-                    self.set_special_DOFs(self.arduino_mapping)
-                    self.read_elements[8] = 1
+                    if source_line.upper() == "SUPPORTS":
+                        source_line = sourcefile.readline().strip()
+                        inpstr = []
+                        inpnum = []
+                        inpstr = [x.split(',') for x in source_line.split('|')]
+                        if len(inpstr[0]) == 1:
+                            inpstr = [x.split(';') for x in source_line.split('|')]
+                        if [''] in inpstr:
+                            inpstr.remove([''])
+                        inpnum = [[int(x[0]) - self._io_origin, float(x[1])] for x in inpstr]
+                        self.set_supports(sorted(inpnum))
+                        self.read_elements[7] = 1
+
+                    if source_line.upper() == "MEASUREMENTS":
+                        source_line = sourcefile.readline().strip()
+                        self.special_DOF_input_string = source_line
+                        inpstr = []
+                        self.arduino_mapping = source_line.split(',')
+                        self.set_special_DOFs(self.arduino_mapping)
+                        self.read_elements[8] = 1
+        except IOError:
+            print("The following file could not be opened: " + "./Structures/" + self.name + ".str")
+            print("Please make sure that the structural data is available for the program in the running directory.")
+            raise IOError
 
         terminate = False
         for i, value in enumerate(self.read_elements):
-            if i > 0 and (i < 8 or Conf.updating):  # if i > 0:
+            if i > 0 and (i < 8 or self.configuration.updating):  # if i > 0:
                 if value == 0:
                     print("The following was not found: " + _read_element_names[i])
                     terminate = True
@@ -331,7 +457,7 @@ class TrussFramework(object):
                 scalez = 0.3                      # Scale z-axis
 
             Arrow3D.plotstructure(self, showorig, showresult, showsupports, showforces, showreactions,
-                                  scaledisplacement, scaleforce, scalez, _showvalues, saveplot, Conf.log)
+                                  scaledisplacement, scaleforce, scalez, _showvalues, saveplot, self.configuration.log)
 
     def readarduino(self, base, saveinput):
         """
@@ -418,7 +544,7 @@ class TrussFramework(object):
                 prevreadtime = float(str(prevline.split(']')[1]).split(',')[1])
                 nowreadtime = float(str(arduinoline.split(']')[1]).split(',')[1])
                 try:
-                    if Conf.realistic_simulation:
+                    if self.configuration.realistic_simulation:
                         sleeptime = nowreadtime - prevreadtime
                 except Exception:
                     pass
@@ -511,7 +637,7 @@ class TrussFramework(object):
             raise Exception('Calibration is terminated')
         if accept == 'Y':
             return measurement
-    def writeresults(self, fname):
+    def write_results(self, file_name):
         """
         Writing results to file.
         """
@@ -529,20 +655,20 @@ class TrussFramework(object):
             out_materials += str(i) + ', '
         out_forces = ''
         for forcedof in self.known_f_not_zero:
-            if self.dof == 3:
+            if self.DOF == 3:
                 out_forces += str(forcedof + self._io_origin) + ', ' + str(self.force[forcedof]) + ' | '
-            elif self.dof == 2 and i % 3 != 2:
+            elif self.DOF == 2 and i % 3 != 2:
                 out_forces += str(forcedof - forcedof//3 + self._io_origin) + ', ' + str(self.force[forcedof]) + ' | '
         out_supports = ''
         for i in self.constraint:
-            if self.dof == 3:
+            if self.DOF == 3:
                 out_supports += str(i[0] + self._io_origin) + ', ' + str(i[1]) + ' | '
             elif i[0] % 3 != 2:
                 out_supports += str(i[0] - i[0]//3 + self._io_origin) + ', ' + str(i[1]) + ' | '
         # Not elegant solution
         out_specdofs = self.special_DOF_input_string
         try:
-            with open("./Structures/" + fname, 'w') as outfile:
+            with open("./Structures/" + file_name, 'w') as outfile:
                 # Writing data
                 outfile.write('Calculation of \'' + self.name + '\':\n\n')
 
@@ -550,7 +676,7 @@ class TrussFramework(object):
                 # for i in range(len(self.force)//3):
                 prev = -1
                 for i in self.known_dis_a:
-                    if self.dof == 3 or i % 3 != 2:
+                    if self.DOF == 3 or i % 3 != 2:
                         if i//3 != prev:
                             if i < 100:
                                 outfile.write(' ')
@@ -565,7 +691,7 @@ class TrussFramework(object):
                                 nodalforce += "{:10.2f}".format(self.force[(i//3)*3+1]) + ', '
                             else:
                                 nodalforce += '            '
-                            if self.dof != 2 and (i//3)*3+2 in self.known_dis_a:
+                            if self.DOF != 2 and (i//3)*3+2 in self.known_dis_a:
                                 nodalforce += "{:10.2f}".format(self.force[(i//3)*3+2]) + '\n'
                             else:
                                 nodalforce += '          \n'
@@ -599,7 +725,7 @@ class TrussFramework(object):
                 outfile.write('_ORIGIN\n')
                 outfile.write(str(self._io_origin) + '\n\n')
                 outfile.write('DOF\n')
-                outfile.write(str(self.dof) + '\n\n')
+                outfile.write(str(self.DOF) + '\n\n')
                 outfile.write('ELEMENTS\n')
                 outfile.write(out_element + '\n\n')
                 outfile.write('COORDINATES\n')
@@ -619,3 +745,5 @@ class TrussFramework(object):
             print("Error: Please manually create the 'Structures' folder"
                   "in the root of the project")
 
+    def end_logging(self):
+        self.configuration.end_logging(self)
