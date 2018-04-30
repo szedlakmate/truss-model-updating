@@ -8,4 +8,4 @@
 
 ## Versions
 
-1. v1.0 - Original version
+1. [v1.0 - Original version](https://github.com/szedlakmate/truss-model-updating/releases/tag/v1.0)
