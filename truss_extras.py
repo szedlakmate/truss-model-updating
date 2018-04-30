@@ -5,19 +5,14 @@ Created on April 30 18:49:40 2018
 3D truss model updater program created by Máté Szedlák.
 Copyright MIT, Máté Szedlák 2016-2018.
 """
-import os
-import itertools
 import math
 import time
-import datetime
-import numpy as np
 try:
     import serial
 except ImportError:
     print("You tried to import \'serial\' without installing \'pySerial\'.")
     print("Please first install pySerial: http://playground.arduino.cc/Interfacing/Python")
     raise Exception('pyserial package not found')
-from copy import deepcopy
 try:
     from graphics import Arrow3D
     from config import Configuration
@@ -44,41 +39,12 @@ _SIMULATION = 1                     # Simulating measurements based on input fil
 
 Conf = Configuration(_COMPATIBLE_MODE, _SIMULATION)
 
-
-"""
-if _ARDUINO or _SIMULATION:
-    try:
-        mapping_file = 'arduino_mapping.txt'
-        with open(mapping_file, "r") as textfile:
-            line = textfile.readline().strip()
-            arduino_mapping = line.upper().split(',')
-
-    except IOError:
-        raise Exception('File not found: ' + mapping_file)
-"""
-
-
-def logtime(prev_time, title):
-    """
-    Calculating and printing the time consumption of tasks
-
-    Should be called with the previously saved part-time and the name of the actual task
-    At the first call, should be called with TIC value. The input argument
-    should be overwritten by this funvtion's return value.
-    """
-    if Conf.log:
-        new_time = time.time()
-        print(title)
-        print('Time: ' + str("{:10.3f}".format(new_time - prev_time)))
-        print('------------------------------------')
-        return new_time
-    else:
-        return 0
-
-
 def error(delta):
     """
     Error function using least-square method
+
+    :param delta: error vector
+    :return: sum of errors
     """
     sum_of_errors = 0
     for delta_element in delta:
@@ -90,7 +56,11 @@ def error(delta):
 
 class TrussFramework(object):
     """
-    General structure class
+    Base class for truss computing, collecting several functions:
+    - File operations (input/output)
+    - Serial communication
+    - Arduino management
+    - Plot functions
     """
     def __init__(self, name):
         # Serial connection
@@ -434,7 +404,7 @@ class TrussFramework(object):
         bigdifference = False
         readerror = False
 
-    def simulatearduino(self, arduinoline, prevline):
+    def simulate_arduino(self, arduinoline, prevline):
         """
         Simulate data, based on previous measurement
         """

@@ -115,6 +115,11 @@ def log_time(prev_time, title):
     Should be called with the previously saved part-time and the name of the actual task
     At the first call, should be called with TIC value. The input argument
     should be overwritten by this funvtion's return value.
+
+
+    :param previous_time: time at lap-starting (sub-timer)
+    :param message: message will be printed
+    :return: returns actual time to start new lap (sub-timer)
     """
     if Conf.log:
         new_time = time.time()
@@ -455,14 +460,14 @@ class Truss(TrussFramework):
         # Postrpocesses
         self.post_process()
 
-        self.mod_displacements = [0.]*(self.element_num+1)
+        self.modified_displacements = [0.]*(self.element_num+1)
 
     def solve_modified_structure(self, index):
         """
         Solver for the modified structures. 'Index' shows the actual modification number.
         """
 
-        self.mod_displacements[index] = [0.]*(self.node_num*3)
+        self.modified_displacements[index] = [0.]*(self.node_num*3)
 
         dis_new = [0.]*(self.node_num*3-len(self.constraint))
         stiff_new = [[0.]*(self.node_num*3-len(self.constraint))]*(self.node_num*3-len(self.constraint))
@@ -484,7 +489,7 @@ class Truss(TrussFramework):
         for i, kfa in enumerate(self.known_f_a):
             mod_displacement_temp[kfa] = dis_new[i] - self.dis_new[i]
 
-        self.mod_displacements[index] = [x + y for x, y in zip(self.mod_displacements[index], mod_displacement_temp)]
+        self.modified_displacements[index] = [x + y for x, y in zip(self.modified_displacements[index], mod_displacement_temp)]
 
     def evaluate(self):
         """
@@ -506,7 +511,7 @@ class Truss(TrussFramework):
             effect_temp[self.keypoint_num] = int(modnum)
             for j, dofnum in enumerate(self.keypoint):
                 try:
-                    effect_temp[j] = self.mod_displacements[modnum][dofnum]
+                    effect_temp[j] = self.modified_displacements[modnum][dofnum]
                     self.effect[modnum] = [x for x in effect_temp]
                     self.total_effect[j] += abs(self.effect[modnum][j])
                 except IndexError:
@@ -613,7 +618,7 @@ class Truss(TrussFramework):
             self.calculate_modified_stiffness_matrix(self.element_num, 0)
             self.solve_modified_structure(self.element_num)
 
-            newdelta = self.difference(self.mod_displacements[self.element_num], self.measurement)
+            newdelta = self.difference(self.modified_displacements[self.element_num], self.measurement)
 
             for i, effect in enumerate(self.total_effect):
                 if effect == 0.0:
@@ -669,7 +674,7 @@ class Truss(TrussFramework):
             outfile.write(str(self.displacement) + "\n")
             if j > 1:
                 outfile.write("New displacements: \n")
-                outfile.write(str(self.mod_displacements[self.element_num]) + "\n")
+                outfile.write(str(self.modified_displacements[self.element_num]) + "\n")
             outfile.write("----------------------\n")
 
     def capable(self):
@@ -691,32 +696,32 @@ class Truss(TrussFramework):
             print("The error limit must be a positive number")
             raise Exception
 
-    def set_modification_limit(self, modificationlimit):
+    def set_modification_limit(self, modification_limit):
         """
         Setting modification limit for members (model updating)
         """
-        if 0.0 < modificationlimit < 1.0:
-            self.modification_limit = modificationlimit
+        if 0.0 < modification_limit < 1.0:
+            self.modification_limit = modification_limit
         else:
             print("The modification limit must be higher than 0.0 and lower than 1.0")
             raise Exception
 
-    def set_unit_modification(self, unitmodification):
+    def set_unit_modification(self, unit_modification):
         """
         Setting modification step (model updating)
         """
-        if 0.01 <= abs(unitmodification) < 0.5:
-            self.unit_modification = unitmodification
+        if 0.01 <= abs(unit_modification) < 0.5:
+            self.unit_modification = unit_modification
         else:
             print("The absolut value of the unit modification must be minimum 0.01 and maximum 0.5")
             raise Exception
 
-    def set_iteration_limit(self, iterationlimit):
+    def set_iteration_limit(self, iteration_limit):
         """
         Setting maximum number of iterations (model updating)
         """
-        if 1 < int(iterationlimit) <= math.pow(10, 4):
-            self.iteration_limit = int(iterationlimit)
+        if 1 < int(iteration_limit) <= math.pow(10, 4):
+            self.iteration_limit = int(iteration_limit)
         else:
             print("The iterationlimit must be between 2 and 10.000")
             raise Exception
@@ -738,39 +743,41 @@ class Truss(TrussFramework):
                 pass
             filemode = 'r'
 
-        with open("./Structures/" + self.name + ' - Input Data.txt', filemode) as inputfile:
+        with open("./Structures/" + self.name + ' - Input Data.txt', filemode) as input_file:
             # Saving input data
             if not _SIMULATION:
-                inputfile.write('Input data of \'' + self.name + '\':\n\n')
-                inputfile.write('Start Time: ' +
+                input_file.write('Input data of \'' + self.name + '\':\n\n')
+                input_file.write('Start Time: ' +
                                 str(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')) + "\n")
-                inputfile.write('Base: ' + str(base) + '\n')
+                input_file.write('Base: ' + str(base) + '\n')
 
             inputline = "[],0.0"
             for i in range(1000):
                 if not _SIMULATION:
-                    delta = self.readarduino(base, inputfile)
+                    delta = self.readarduino(base, input_file)
                     self.optimize(delta)
                 else:
                     try:
                         delta = None
-                        previnputline = inputline
-                        inputline = inputfile.readline()
+                        previous_line = inputline
+                        inputline = input_file.readline()
                         if not inputline == '':
-                            delta = self.simulatearduino(inputline, previnputline)
+                            delta = self.simulate_arduino(inputline, previous_line)
                     except Exception:
                         pass
                     if delta:
                         self.optimize(delta)
         print("Update statistics:")
-        print("Totally updated models: " + str(TRUSS.numofupdates[0] + TRUSS.numofupdates[1]++ TRUSS.numofupdates[2]))
-        print("  Successfully updated models: " + str(TRUSS.numofupdates[0]))
-        print("  Updates with running out of possibilities: " + str(TRUSS.numofupdates[2]))
-        print("  Updates did not finshed: " + str(TRUSS.numofupdates[1]))
+        print("Totally updated models: " + str(TRUSS.num_of_updates[0] + TRUSS.num_of_updates[1]++ TRUSS.num_of_updates[2]))
+        print("  Successfully updated models: " + str(TRUSS.num_of_updates[0]))
+        print("  Updates with running out of possibilities: " + str(TRUSS.num_of_updates[2]))
+        print("  Updates did not finshed: " + str(TRUSS.num_of_updates[1]))
 
     def post_process(self):
         """
         Calculates reaction forces and stresses
+
+        :return null
         """
         self._reactions()
         self._stresses()
@@ -806,7 +813,7 @@ class Truss(TrussFramework):
 #   BEGINNING OF THE MAIN PART   #
 ##################################
 
-PARTTIME = log_time(TIC, "Initialization")
+part_time = log_time(TIC, "Initialization")
 
 #  Define new truss
 TRUSS = Truss('bridge')
@@ -829,19 +836,19 @@ except IOError:
 # if _ARDUINO or _SIMULATION:                # deprecated
 #    TRUSS.set_special_DOFs(arduino_mapping)
 
-PARTTIME = log_time(PARTTIME, "Setting up structure")
+part_time = log_time(part_time, "Setting up structure")
 
 # Calculate stiffness-matrix
 TRUSS.calculate_stiffness_matrix()
 # TRUSS.calculate_stiffness_matrix_plate()
 
-PARTTIME = log_time(PARTTIME, "Calculating Stiffness Matrix")
+part_time = log_time(part_time, "Calculating Stiffness Matrix")
 
 # Solve structure
 TRUSS.solve()
 # TRUSS.solve_plate()
 
-PARTTIME = log_time(PARTTIME, "Solving")
+part_time = log_time(part_time, "Solving")
 
 if Conf.updating:
     TRUSS.set_unit_modification(0.05)
@@ -850,7 +857,7 @@ if Conf.updating:
     TRUSS.set_iteration_limit(100)
     TRUSS.update_model()
 
-PARTTIME = log_time(PARTTIME, "Updating numerical model")
+part_time = log_time(part_time, "Updating numerical model")
 
 if Conf.graphics:
     # Plot settings:
@@ -865,12 +872,12 @@ if Conf.graphics:
     TRUSS.plot(0, 1, 1, 1, 1, 2.0, 0.0, 0.0, True)
     # pass
 
-PARTTIME = log_time(PARTTIME, "Plotting")
+part_time = log_time(part_time, "Plotting")
 
 # Write results to file
 TRUSS.writeresults("./Structures/" + TRUSS.name + ' - Results.txt')
 
-PARTTIME = log_time(PARTTIME, "Writing results to the output file")
+part_time = log_time(part_time, "Writing results to the output file")
 
 if Conf.arduino:
     # Closing Arduino port
@@ -881,8 +888,8 @@ if Conf.log:
     TOTALTIME = TAC-TIC
     if Conf.updating:
         print("Update statistics:")
-        print("Totally updated models: " + str(TRUSS.numofupdates[0] + TRUSS.numofupdates[1]++ TRUSS.numofupdates[2]))
-        print("  Successfully updated models: " + str(TRUSS.numofupdates[0]))
-        print("  Updates with running out of possibilities: " + str(TRUSS.numofupdates[2]))
-        print("  Updates did not finshed: " + str(TRUSS.numofupdates[1]))
+        print("Totally updated models: " + str(TRUSS.num_of_updates[0] + TRUSS.num_of_updates[1] + TRUSS.num_of_updates[2]))
+        print("  Successfully updated models: " + str(TRUSS.num_of_updates[0]))
+        print("  Updates with running out of possibilities: " + str(TRUSS.num_of_updates[2]))
+        print("  Updates did not finished: " + str(TRUSS.num_of_updates[1]))
     print('Total time: ' + str("{:10.3f}".format(TOTALTIME)))
