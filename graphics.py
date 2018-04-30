@@ -24,21 +24,21 @@ class Arrow3D(FancyArrowPatch):
         self.set_positions((_xs[0], _ys[0]), (_xs[1], _ys[1]))
         FancyArrowPatch.draw(self, renderer)
 
-    def plotstructure(struct, showorig, showresult, showsupports,
-            showforces, showreactions, scaledisp, scale_f, z_corr, showvalues, saveplot, log=0):
+    def plotstructure(struct, show_orig, show_result, show_supports,
+            show_forces, show_reactions, scale_displapcements, scale_forces, z_correction, show_values, save_plot, log=0):
         """
         General plotting method for structures
 
-        scaledisp: Scale drwaing of displacements
-        scale_f:   Scale force sign
-        z_corr:    Scale z-axis
+        scale_displapcements: Scale drwaing of displacements
+        scale_forces:   Scale force sign
+        z_correction:    Scale z-axis
         """
         plotname = struct.name
         plot_width = 10.0              # Plot width in inches
         xframe = 0                     # Frame width at X direction
         yframe = 0                     # Frame width at Y direction
         zframe = 0                     # Frame width at Z direction
-        scale_sup = scale_f*0.3        # Scale support sign  # All the others are input parameters
+        scale_sup = scale_forces*0.3        # Scale support sign  # All the others are input parameters
 
         # Stress coloring settings [R G B] - Examples considering pressure:
         # 0: [1, 0, 0]              Plain red
@@ -79,45 +79,45 @@ class Arrow3D(FancyArrowPatch):
         _ax.set_ylim3d(ymin - yframe, ymax + yframe)
         _ax.set_zlim3d(zmin - zframe, zmax + zframe)
 
-        if showorig == showresult:
+        if show_orig == show_result:
             _coloring = 0
 
         # Giving plot names
-        if showorig == 1 and showresult == 0 and showsupports == 1 and showreactions == 0:
+        if show_orig == 1 and show_result == 0 and show_supports == 1 and show_reactions == 0:
             plotname += ' - Initial structure'
-            if showforces:
+            if show_forces:
                 plotname += ' with forces'
-        elif showorig == 1 and showresult == 1:
+        elif show_orig == 1 and show_result == 1:
             plotname += ' - Deformation'
-            if showreactions == 0:
+            if show_reactions == 0:
                 plotname += ' with reactions'
-        elif showorig == 0 and showresult == 1:
+        elif show_orig == 0 and show_result == 1:
             plotname += ' - Stresses'
-            if showreactions == 0:
+            if show_reactions == 0:
                 plotname += ' with reactions'
         else:
             plotname += ' - Unnamed'
 
         print(plotname + ": ")
-        if showresult:
+        if show_result:
             dipslaydisplacement = deepcopy(struct.nodal_coord_def)
-            if scaledisp != 1.0:
+            if scale_displapcements != 1.0:
                 if log:
-                    print('Displacements are scaled with factor: ' + str(scaledisp))
+                    print('Displacements are scaled with factor: ' + str(scale_displapcements))
                 for i in range(struct.node_num):
                     for j in range(3):
                         dipslaydisplacement[i][j] = (struct.nodal_coord_def[i][j] -
-                        struct.nodal_coord[i][j]) * scaledisp + struct.nodal_coord[i][j]
+                        struct.nodal_coord[i][j]) * scale_displapcements + struct.nodal_coord[i][j]
 
         for i in range(struct.element_num):
             # Plot undeformed structure
-            if showorig:
+            if show_orig:
                 _ax.plot([struct.nodal_coord[struct.node[i][1]][0], struct.nodal_coord[struct.node[i][0]][0]],
                     [struct.nodal_coord[struct.node[i][1]][1], struct.nodal_coord[struct.node[i][0]][1]],
                     zs=[struct.nodal_coord[struct.node[i][1]][2], struct.nodal_coord[struct.node[i][0]][2]], color='b')
             # Plot deformed structure
-            if showresult:
-                if struct.postprocessed():
+            if show_result:
+                if struct._post_processed:
                     if struct.stress_color[i] > 0:
                         if _coloring == 1:
                             rgb_col = [0, 0, abs(struct.stress_color[i])]
@@ -154,25 +154,25 @@ class Arrow3D(FancyArrowPatch):
                         zs=[dipslaydisplacement[struct.node[i][1]][2], dipslaydisplacement[struct.node[i][0]][2]],
                         color=rgb_col)
 
-        if showforces:
+        if show_forces:
             for i in struct.known_f_not_zero:
                 if struct.force[i] < 0:
                     value = -1.0
                 else:
                     value = 1.0
                 if i % 3 == 0:
-                    f_dir = [value*scale_f, 0., 0.]
+                    f_dir = [value*scale_forces, 0., 0.]
                 elif i % 3 == 1:
-                    f_dir = [0., value*scale_f, 0.]
+                    f_dir = [0., value*scale_forces, 0.]
                 else:
-                    f_dir = [0., 0., value*scale_f*z_corr]
+                    f_dir = [0., 0., value*scale_forces*z_correction]
                 f_arrow = Arrow3D([struct.nodal_coord[i//3][0], struct.nodal_coord[i//3][0] + f_dir[0]],
                                   [struct.nodal_coord[i//3][1], struct.nodal_coord[i//3][1] + f_dir[1]],
                                   [struct.nodal_coord[i//3][2], struct.nodal_coord[i//3][2] + f_dir[2]],
                                   mutation_scale=20, lw=1, arrowstyle="-|>", color="k")
                 _ax.add_artist(f_arrow)
 
-        if showreactions:
+        if show_reactions:
             e_previous = -100
             for i in struct.known_dis_a:
                 value = 0.0             # Maybe this is useless <XXX>
@@ -181,18 +181,18 @@ class Arrow3D(FancyArrowPatch):
                 elif struct.force[i] > 0:
                     value = 1.0
                 if i % 3 == 0:
-                    f_dir = [value*scale_f, 0., 0.]
+                    f_dir = [value*scale_forces, 0., 0.]
                 elif i % 3 == 1:
-                    f_dir = [0., value*scale_f, 0.]
+                    f_dir = [0., value*scale_forces, 0.]
                 else:
-                    f_dir = [0., 0., value*scale_f*z_corr]
+                    f_dir = [0., 0., value*scale_forces*z_correction]
                 if abs(struct.force[i]) > 0:
                     f_arrow = Arrow3D([struct.nodal_coord[i//3][0], struct.nodal_coord[i//3][0] + f_dir[0]],
                                       [struct.nodal_coord[i//3][1], struct.nodal_coord[i//3][1] + f_dir[1]],
                                       [struct.nodal_coord[i//3][2], struct.nodal_coord[i//3][2] + f_dir[2]],
                                       mutation_scale=20, lw=1, arrowstyle="-|>", color="darkolivegreen")
                     _ax.add_artist(f_arrow)
-                    if showvalues:
+                    if show_values:
                         _ax.set_xticklabels([])
                         _ax.set_yticklabels([])
                         _ax.set_zticklabels([])
@@ -214,7 +214,7 @@ class Arrow3D(FancyArrowPatch):
                                     fontsize=12, horizontalalignment='right')
                 e_previous = i
 
-        if showsupports:
+        if show_supports:
             for i in struct.known_dis_a:
                 if i % 3 == 0:
                     f_dir = [-1.0 * scale_sup, 0., 0.]
@@ -223,7 +223,7 @@ class Arrow3D(FancyArrowPatch):
                     f_dir = [0., -1.0 * scale_sup, 0.]
                     col = 'y'
                 else:
-                    f_dir = [0., 0., -1.0 * scale_sup * z_corr]
+                    f_dir = [0., 0., -1.0 * scale_sup * z_correction]
                     col = 'brown'
                 if i % 3 != 2 or struct.dof == 3:
                     _ax.plot([struct.nodal_coord[i//3][0], struct.nodal_coord[i//3][0]+f_dir[0]],
@@ -231,7 +231,7 @@ class Arrow3D(FancyArrowPatch):
                         zs=[struct.nodal_coord[i//3][2], struct.nodal_coord[i//3][2]+f_dir[2]],
                         color=col, linewidth=4.0)
         plt.show()
-        if saveplot:
+        if save_plot:
             fig.savefig("./Structures/" + plotname + '.png')
             print("'" + plotname + ".png' is saved.")
             print('------------------------------------')

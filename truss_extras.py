@@ -233,7 +233,7 @@ class TrussFramework(object):
 
                 if source_line.upper() == "DOF":
                     source_line = sourcefile.readline().strip()
-                    self.setdof(int(source_line))
+                    self.set_DOF(int(source_line))
                     self.read_elements[1] = 1
 
                 if source_line.upper() == "ELEMENTS":
@@ -246,7 +246,7 @@ class TrussFramework(object):
                     if [''] in inpstr:
                         inpstr.remove([''])
                     inpnum = [[int(x[0]) - self._io_origin, int(x[1]) - self._io_origin] for x in inpstr]
-                    self.setelements(inpnum)
+                    self.set_elements(inpnum)
                     self.read_elements[2] = 1
 
                 if source_line.upper() == "COORDINATES":
@@ -262,7 +262,7 @@ class TrussFramework(object):
                         inpnum = [[float(x[0]), float(x[1]), float(x[2])] for x in inpstr]
                     elif self.dof == 2:
                         inpnum = [[float(x[0]), float(x[1]), 0.] for x in inpstr]
-                    self.setcoordinates(inpnum)
+                    self.set_coordinates(inpnum)
                     self.read_elements[3] = 1
 
                 if source_line.upper() == "CROSS-SECTIONS":
@@ -275,7 +275,7 @@ class TrussFramework(object):
                     if '' in inpstr:
                         inpstr.remove('')
                     inpnum = [float(eval(x)) for x in inpstr]
-                    self.setcrosssections(inpnum)
+                    self.set_crosssections(inpnum)
                     self.read_elements[4] = 1
 
                 if source_line.upper() == "MATERIALS":
@@ -288,7 +288,7 @@ class TrussFramework(object):
                     if '' in inpstr:
                         inpstr.remove('')
                     inpnum = [float(eval(x)) for x in inpstr]
-                    self.setmaterials(inpnum)
+                    self.set_materials(inpnum)
                     self.read_elements[5] = 1
 
                 if source_line.upper() == "FORCES":
@@ -301,7 +301,7 @@ class TrussFramework(object):
                     if [''] in inpstr:
                         inpstr.remove([''])
                     inpnum = [[int(x[0]) - self._io_origin, float(x[1])] for x in inpstr]
-                    self.setforces(sorted(inpnum))
+                    self.set_forces(sorted(inpnum))
                     self.read_elements[6] = 1
 
                 if source_line.upper() == "SUPPORTS":
@@ -314,7 +314,7 @@ class TrussFramework(object):
                     if [''] in inpstr:
                         inpstr.remove([''])
                     inpnum = [[int(x[0]) - self._io_origin, float(x[1])] for x in inpstr]
-                    self.setsupports(sorted(inpnum))
+                    self.set_supports(sorted(inpnum))
                     self.read_elements[7] = 1
 
                 if source_line.upper() == "MEASUREMENTS":
@@ -322,7 +322,7 @@ class TrussFramework(object):
                     self.special_DOF_input_string = source_line
                     inpstr = []
                     self.arduino_mapping = source_line.split(',')
-                    self.setspecdofs(self.arduino_mapping)
+                    self.set_special_DOFs(self.arduino_mapping)
                     self.read_elements[8] = 1
 
         terminate = False

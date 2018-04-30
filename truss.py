@@ -108,7 +108,7 @@ if _ARDUINO or _SIMULATION:
 """
 
 
-def logtime(prev_time, title):
+def log_time(prev_time, title):
     """
     Calculating and printing the time consumption of tasks
 
@@ -143,7 +143,7 @@ class Truss(TrussFramework):
     General structure class
     """
 
-    def __checkcoordinates(self, ignorable):
+    def _check_coordinates(self, ignorable):
         """
         Checking coordinates for repeating elements.
 
@@ -160,7 +160,7 @@ class Truss(TrussFramework):
         else:
             return 1
 
-    def setdof(self, dof):
+    def set_DOF(self, dof):
         """
         Setting problem's degree of freedom
 
@@ -173,7 +173,7 @@ class Truss(TrussFramework):
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
 
-    def setelements(self, node):
+    def set_elements(self, node):
         """
         Setting elements (nodal connections) in bulk mode
         """
@@ -189,14 +189,14 @@ class Truss(TrussFramework):
             self.element_DOF.append([node[0]*3, node[0]*3+1, node[0]*3+2,
                                 node[1]*3, node[1]*3+1, node[1]*3+2])
 
-        # Initialazing matrix for all matrices
+        # Initializing matrix for all matrices
         self._init_displacement = [0.]*(3*self.node_num)
         self.force = [0.]*(3*self.node_num)
         self.stiffness = [0.]*(3*self.node_num)
         self.known_f_a = []
         self.known_f_not_zero = []
 
-    def setcoordinates(self, coordinates):
+    def set_coordinates(self, coordinates):
         """
         Setting coordinates in bulk mode
         """
@@ -207,18 +207,18 @@ class Truss(TrussFramework):
             raise Exception('More coordinates are needed')
         elif not self.node:
             raise Exception('Nodes must be set before defining elements')
-        self.__checkcoordinates(False)
+        self._check_coordinates(False)
 
-    def modcoordinate(self, node, coordinate):
+    def modify_coordinate(self, node, coordinate):
         """
         Modify coordinate
         """
-        if self.__checkcoordinates(True):
+        if self._check_coordinates(True):
             self.nodal_coord[node] = coordinate
         self._stiff_is_fresh = 0
         self._mod_stiff_is_fresh = 0
 
-    def setcrosssections(self, area):
+    def set_crosssections(self, area):
         """
         Setting cross-sections in bulk mode
         """
@@ -227,7 +227,7 @@ class Truss(TrussFramework):
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
 
-    def modcrosssection(self, element, area):
+    def modify_crosssection(self, element, area):
         """
         Modifying cross-sections by elements
         """
@@ -236,7 +236,7 @@ class Truss(TrussFramework):
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
 
-    def setmaterials(self, el_mod):
+    def set_materials(self, el_mod):
         """
         Setting material data in bulk mode
         """
@@ -245,7 +245,7 @@ class Truss(TrussFramework):
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
 
-    def modmaterial(self, element, el_mod):
+    def modify_material(self, element, el_mod):
         """
         Modifying material data by elements
         """
@@ -254,7 +254,7 @@ class Truss(TrussFramework):
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
 
-    def setforces(self, forces):
+    def set_forces(self, forces):
         """
         Set forces
         """
@@ -265,14 +265,14 @@ class Truss(TrussFramework):
                 self.force[fdof + (fdof//2)] = force
         self._post_processed = 0
 
-    def modforce(self, element, force):
+    def modify_force(self, element, force):
         """
         Modifying forces by each
         """
         self.force[element] = force
         self._post_processed = 0
 
-    def setsupports(self, constraints):
+    def set_supports(self, constraints):
         """
         Set supports
         """
@@ -285,7 +285,7 @@ class Truss(TrussFramework):
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
 
-    def setspecdofs(self, specdofs):
+    def set_special_DOFs(self, specdofs):
         """
         Set special nodal DOFs
         """
@@ -314,7 +314,7 @@ class Truss(TrussFramework):
             print("There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file.")
             raise Exception
 
-    def calcstiffness(self):
+    def calculate_stiffness_matrix(self):
         """
         Stiffness matrix compilation
         """
@@ -370,17 +370,17 @@ class Truss(TrussFramework):
             self._loc_stiff[i] = [[y * self.area[i] * self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
             ele_dof_vec = self.element_DOF[i]
 
-            stiffincrement = [0.]*(len(self.nodal_coord)*3)
+            stiffness_increment = [0.]*(len(self.nodal_coord)*3)
 
             for j in range(3*2):
                 for k in range(3*2):
-                    stiffincrement[ele_dof_vec[k]] = self._loc_stiff[i][j][k]
-                self.stiffness[ele_dof_vec[j]] = [x + y for x, y in zip(self.stiffness[ele_dof_vec[j]], stiffincrement)]
+                    stiffness_increment[ele_dof_vec[k]] = self._loc_stiff[i][j][k]
+                self.stiffness[ele_dof_vec[j]] = [x + y for x, y in zip(self.stiffness[ele_dof_vec[j]], stiffness_increment)]
         self._stiff_is_fresh = 1
 
-    def calcmodstiffness(self, index, magnitude):
+    def calculate_modified_stiffness_matrix(self, index, magnitude):
         """
-        Convergency step in stiffness matrix modification
+        Convergence step in stiffness matrix modification
         """
         if not self.mod_stiffnesses:
             self.mod_stiffnesses = [0.]*(self.element_num+1)
@@ -390,21 +390,21 @@ class Truss(TrussFramework):
 
         for i in range(self.element_num):
             if i == index:
-                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i] + magnitude)  # self.elastic_modulo[i]/ele_length[i]
+                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i] + magnitude)  # E[i]/L[i]
             else:
-                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i])  # self.elastic_modulo[i]/ele_length[i]
+                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i])  # E[i]/L[i]
 
             _mod_loc_stiff = [[y*self.area[i]*_mod_norm_stiff for y in x] for x in self._s_loc[i]]
 
             ele_dof_vec = self.element_DOF[i]
 
-            stiffincrement = [0.]*(len(self.nodal_coord)*3)
+            stiffness_increment = [0.]*(len(self.nodal_coord)*3)
 
             for j in range(3*2):
                 for k in range(3*2):
-                    stiffincrement[ele_dof_vec[k]] = _mod_loc_stiff[j][k]
+                    stiffness_increment[ele_dof_vec[k]] = _mod_loc_stiff[j][k]
                 _mod_stiffnesses_temp[ele_dof_vec[j]] = [x + y for x, y in
-                                                         zip(_mod_stiffnesses_temp[ele_dof_vec[j]], stiffincrement)]
+                                                         zip(_mod_stiffnesses_temp[ele_dof_vec[j]], stiffness_increment)]
 
         self.mod_stiffnesses[index] = _mod_stiffnesses_temp
 
@@ -415,7 +415,7 @@ class Truss(TrussFramework):
         if self._stiff_is_fresh == 0:
             if Conf.log:
                 print('Stiffness matrix is recalculated')
-            self.calcstiffness()
+            self.calculate_stiffness_matrix()
 
         self.dis_new = [0.]*(self.node_num*3-len(self.constraint))
         self.force_new = [0.]*(self.node_num*3-len(self.constraint))
@@ -425,11 +425,11 @@ class Truss(TrussFramework):
         for i, known_f_a in enumerate(self.known_f_a):
             self.force_new[i] = self.force[known_f_a]
 
-        stiffincrement = [0.]*(self.node_num*3-len(self.constraint))
+        stiffness_increment = [0.]*(self.node_num*3-len(self.constraint))
         for i, kfai in enumerate(self.known_f_a):
             for j, kfaj in enumerate(self.known_f_a):
-                stiffincrement[j] = self.stiffness[kfai][kfaj]
-            self.stiff_new[i] = [x + y for x, y in zip(self.stiff_new[i], stiffincrement)]
+                stiffness_increment[j] = self.stiffness[kfai][kfaj]
+            self.stiff_new[i] = [x + y for x, y in zip(self.stiff_new[i], stiffness_increment)]
 
         # SOLVING THE STRUCTURE
         if Conf.solver == 0:
@@ -453,11 +453,11 @@ class Truss(TrussFramework):
                                         self.nodal_coord[i][1] + self.displacement[i*3+1], self.nodal_coord[i][2] + self.displacement[i*3+2]])
 
         # Postrpocesses
-        self.postprocess()
+        self.post_process()
 
         self.mod_displacements = [0.]*(self.element_num+1)
 
-    def solvemodstruct(self, index):
+    def solve_modified_structure(self, index):
         """
         Solver for the modified structures. 'Index' shows the actual modification number.
         """
@@ -467,11 +467,11 @@ class Truss(TrussFramework):
         dis_new = [0.]*(self.node_num*3-len(self.constraint))
         stiff_new = [[0.]*(self.node_num*3-len(self.constraint))]*(self.node_num*3-len(self.constraint))
 
-        stiffincrement = [0.]*(self.node_num*3-len(self.constraint))
+        stiffness_increment = [0.]*(self.node_num*3-len(self.constraint))
         for i, kfai in enumerate(self.known_f_a):
             for j, kfaj in enumerate(self.known_f_a):
-                stiffincrement[j] = self.mod_stiffnesses[index][kfai][kfaj]
-            stiff_new[i] = [x + y for x, y in zip(stiff_new[i], stiffincrement)]
+                stiffness_increment[j] = self.mod_stiffnesses[index][kfai][kfaj]
+            stiff_new[i] = [x + y for x, y in zip(stiff_new[i], stiffness_increment)]
 
         # SOLVING THE MODIFIED STRUCTURE
         if Conf.solver == 0:
@@ -606,12 +606,12 @@ class Truss(TrussFramework):
                 self.modifications[index] = min(abs(self.modifications[index] - self.unit_modification),
                                                 self.modification_limit) * \
                                             math.copysign(1, self.modifications[index] - self.unit_modification)
-                self.calcmodstiffness(index, self.modifications[index])
-                self.solvemodstruct(index)
+                self.calculate_modified_stiffness_matrix(index, self.modifications[index])
+                self.solve_modified_structure(index)
             self.evaluate()
 
-            self.calcmodstiffness(self.element_num, 0)
-            self.solvemodstruct(self.element_num)
+            self.calculate_modified_stiffness_matrix(self.element_num, 0)
+            self.solve_modified_structure(self.element_num)
 
             newdelta = self.difference(self.mod_displacements[self.element_num], self.measurement)
 
@@ -681,7 +681,7 @@ class Truss(TrussFramework):
                 capable = True
         return capable
 
-    def seterrorlimit(self, errorlimit):
+    def set_error_limit(self, errorlimit):
         """
         Setting general stop parameter for model updating
         """
@@ -691,7 +691,7 @@ class Truss(TrussFramework):
             print("The error limit must be a positive number")
             raise Exception
 
-    def setmodificationlimit(self, modificationlimit):
+    def set_modification_limit(self, modificationlimit):
         """
         Setting modification limit for members (model updating)
         """
@@ -701,7 +701,7 @@ class Truss(TrussFramework):
             print("The modification limit must be higher than 0.0 and lower than 1.0")
             raise Exception
 
-    def setunitmodification(self, unitmodification):
+    def set_unit_modification(self, unitmodification):
         """
         Setting modification step (model updating)
         """
@@ -711,7 +711,7 @@ class Truss(TrussFramework):
             print("The absolut value of the unit modification must be minimum 0.01 and maximum 0.5")
             raise Exception
 
-    def setiterationlimit(self, iterationlimit):
+    def set_iteration_limit(self, iterationlimit):
         """
         Setting maximum number of iterations (model updating)
         """
@@ -721,7 +721,7 @@ class Truss(TrussFramework):
             print("The iterationlimit must be between 2 and 10.000")
             raise Exception
 
-    def updatemodel(self):
+    def update_model(self):
         """
         General function to manage model updatin procedure.
         """
@@ -768,7 +768,7 @@ class Truss(TrussFramework):
         print("  Updates with running out of possibilities: " + str(TRUSS.numofupdates[2]))
         print("  Updates did not finshed: " + str(TRUSS.numofupdates[1]))
 
-    def postprocess(self):
+    def post_process(self):
         """
         Calculates reaction forces and stresses
         """
@@ -802,17 +802,11 @@ class Truss(TrussFramework):
         smax = max([abs(min(self.stress)), max(self.stress), 0.000000001])
         self.stress_color = [float(x)/float(smax) for x in self.stress]
 
-    def postprocessed(self):
-        """
-        Tells if the structure's postprocess part is already calcuated
-        """
-        return self._post_processed
-
 ##################################
 #   BEGINNING OF THE MAIN PART   #
 ##################################
 
-PARTTIME = logtime(TIC, "Initialization")
+PARTTIME = log_time(TIC, "Initialization")
 
 #  Define new truss
 TRUSS = Truss('bridge')
@@ -833,30 +827,30 @@ except IOError:
     raise IOError
 
 # if _ARDUINO or _SIMULATION:                # deprecated
-#    TRUSS.setspecdofs(arduino_mapping)
+#    TRUSS.set_special_DOFs(arduino_mapping)
 
-PARTTIME = logtime(PARTTIME, "Setting up structure")
+PARTTIME = log_time(PARTTIME, "Setting up structure")
 
 # Calculate stiffness-matrix
-TRUSS.calcstiffness()
-# TRUSS.calcstiffness_plate()
+TRUSS.calculate_stiffness_matrix()
+# TRUSS.calculate_stiffness_matrix_plate()
 
-PARTTIME = logtime(PARTTIME, "Calculating Stiffness Matrix")
+PARTTIME = log_time(PARTTIME, "Calculating Stiffness Matrix")
 
 # Solve structure
 TRUSS.solve()
 # TRUSS.solve_plate()
 
-PARTTIME = logtime(PARTTIME, "Solving")
+PARTTIME = log_time(PARTTIME, "Solving")
 
 if Conf.updating:
-    TRUSS.setunitmodification(0.05)
-    TRUSS.seterrorlimit(1.2)
-    TRUSS.setmodificationlimit(0.7)
-    TRUSS.setiterationlimit(100)
-    TRUSS.updatemodel()
+    TRUSS.set_unit_modification(0.05)
+    TRUSS.set_error_limit(1.2)
+    TRUSS.set_modification_limit(0.7)
+    TRUSS.set_iteration_limit(100)
+    TRUSS.update_model()
 
-PARTTIME = logtime(PARTTIME, "Updating numerical model")
+PARTTIME = log_time(PARTTIME, "Updating numerical model")
 
 if Conf.graphics:
     # Plot settings:
@@ -871,12 +865,12 @@ if Conf.graphics:
     TRUSS.plot(0, 1, 1, 1, 1, 2.0, 0.0, 0.0, True)
     # pass
 
-PARTTIME = logtime(PARTTIME, "Plotting")
+PARTTIME = log_time(PARTTIME, "Plotting")
 
 # Write results to file
 TRUSS.writeresults("./Structures/" + TRUSS.name + ' - Results.txt')
 
-PARTTIME = logtime(PARTTIME, "Writing results to the output file")
+PARTTIME = log_time(PARTTIME, "Writing results to the output file")
 
 if Conf.arduino:
     # Closing Arduino port
