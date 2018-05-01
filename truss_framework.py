@@ -186,14 +186,14 @@ class TrussFramework(object):
         self.known_f_a = []           # Nodes without supports
         self.known_f_not_zero = []     # Nodes with loads
         self.DOF = 3                  # Truss's degree of freedom
-        self.node = []                # Element's end nodes
+        self.nodal_connections = []                # Element's end nodes
         self.constraint = []          # Supports
         self.force = []               # Force
         self.nodal_coord = []          # Coordinates of nodes
         self.nodal_coord_def = []      # Coordinates after deformations
-        self.area = []                # Cross-sectional areas
+        self.cross_sectional_area_list = []                # Cross-sectional areas
         self.elastic_modulo = []                   # Material data
-        self.node_num = 0              # Number of nodes
+        self.number_of_nodes = 0              # Number of nodes
         self.element_num = 0               # Number of elements
         self.element_DOF = []              # Mapping between DOF and node
         self.stiffness = []           # Global stiffness matrix
@@ -630,18 +630,19 @@ class TrussFramework(object):
             raise Exception('Calibration is terminated')
         if accept == 'Y':
             return measurement
+
     def write_results(self, file_name):
         """
         Writing results to file.
         """
         out_element = ''
-        for i in self.node:
+        for i in self.nodal_connections:
             out_element += str(i[0] + self._io_origin) + ', ' + str(i[1] + self._io_origin) + ' | '
         out_coords = ''
         for i in self.nodal_coord:
             out_coords += str(i[0]) + ', ' + str(i[1]) + ', ' + str(i[2]) + ' | '
         out_crsect = ''
-        for i in self.area:
+        for i in self.cross_sectional_area_list:
             out_crsect += str(i) + ', '
         out_materials = ''
         for i in self.elastic_modulo:

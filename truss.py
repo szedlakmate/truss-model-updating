@@ -3,6 +3,7 @@
 Created on April 30 18:49:40 2018
 
 3D truss model updater program created by Máté Szedlák.
+For more information please check the README
 Copyright MIT, Máté Szedlák 2016-2018.
 """
 import os
@@ -21,14 +22,13 @@ try:
     from extra_math import swap_col as swap_col
 except ImportError:
     print("Input data is missing")
-    print("Please check the truss_extras.py, config.py, graphics.py and extra_math.py files.")
-    raise Exception('Requirement is missing')
+    print("Please check the truss_framework.py, truss_graphics.py and extra_math.py files.")
+    raise Exception('External file is missing')
 
 
 def error(delta):
     """
     Error function using least-square method
-
     :param delta: error vector
     :return: sum of errors using least-square method
     """
@@ -42,25 +42,25 @@ def error(delta):
 
 class Truss(TrussFramework):
     """
-    General structure class
+    Object for solving a truss
     """
 
     def _check_coordinates(self, ignorable):
         """
-        Checking coordinates for repeating elements.
+        Checking coordinates for repeated elements during input file reading.
 
-        :param ignorable: [True | False] If the warning is ignorable, only message apperas and the input becomes neglected.
-                If the warning is not ignorable, then exceptions will be raised.
-        :return: [0 | 1] 1 f no error found, otherwise 0.
+        :param ignorable: [True|False] If the warning is ignorable, only message appears and the input is neglected.
+                If the warning is not ignorable, exceptions will be raised.
+        :return: [True|False] True if no error found, otherwise False.
         """
         if len(self.nodal_coord) != len(list(k for k, _ in itertools.groupby(sorted(self.nodal_coord)))):
             if ignorable == 0:
                 raise Exception('Coordinate list has repeating items. Calculation is terminated')
             else:
                 print("This node already exists. Input is ignored.")
-            return 0
+            return False
         else:
-            return 1
+            return True
 
     def set_DOF(self, DOF):
         """
@@ -71,69 +71,94 @@ class Truss(TrussFramework):
         self.DOF = DOF
         if self.DOF != 2 and self.DOF != 3:
             raise Exception('DOF must be 2 or 3.')
+        # Set freshness flags after geometry modification
         self._stiff_is_fresh = 0
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
 
-    def set_elements(self, node):
+    def set_elements(self, nodal_connection_list):
         """
         Setting elements (nodal connections) in bulk mode
+
+        :param nodal_connection_list: an array of arrays, where each sub-array is a pair of integers, namely [i, j].
+        i, j are the ID's of the nodes and an element is i -> j.
+        :return: None
         """
-        self.node = node
-        self.node_num = len(set(list(itertools.chain.from_iterable(sorted(self.node)))))
-        self.element_num = len(self.node)
+        self.nodal_connections = nodal_connection_list
+        self.number_of_nodes = len(set(list(itertools.chain.from_iterable(sorted(self.nodal_connections)))))
+        self.element_num = len(self.nodal_connections)
+        # Set freshness flags after geometry modification
         self._stiff_is_fresh = 0
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
 
         # Creating mapping tool for elements
-        for node in self.node:
+        for node in self.nodal_connections:
             self.element_DOF.append([node[0]*3, node[0]*3+1, node[0]*3+2,
                                 node[1]*3, node[1]*3+1, node[1]*3+2])
 
         # Initializing matrix for all matrices
-        self._init_displacement = [0.]*(3*self.node_num)
-        self.force = [0.]*(3*self.node_num)
-        self.stiffness = [0.]*(3*self.node_num)
+        self._init_displacement = [0.]*(3*self.number_of_nodes)
+        self.force = [0.]*(3*self.number_of_nodes)
+        self.stiffness = [0.]*(3*self.number_of_nodes)
         self.known_f_a = []
         self.known_f_not_zero = []
 
-    def set_coordinates(self, coordinates):
+    def set_coordinates(self, coordinate_list):
         """
         Setting coordinates in bulk mode
+
+        :param coordinate_list: An array of coordinate arrays enlisting ALL the nodal coordinates
+        :return: None
         """
-        self.nodal_coord = coordinates
+        self.nodal_coord = coordinate_list
         self._stiff_is_fresh = 0
         self._mod_stiff_is_fresh = 0
-        if self.node_num > len(self.nodal_coord):
+        if self.number_of_nodes > len(self.nodal_coord):
             raise Exception('More coordinates are needed')
-        elif not self.node:
+        elif not self.nodal_connections:
             raise Exception('Nodes must be set before defining elements')
         self._check_coordinates(False)
 
-    def modify_coordinate(self, node, coordinate):
+    def modify_coordinate(self, node_ID, new_coordinate):
         """
-        Modify coordinate
+        Modify one node's coordinates
+
+        :param node_ID: the ID of the changeable node
+        :param new_coordinate: new coordinates wrapped by an array
+        :return: Bool - True uf the modification was applied, False otherwise.
+
+        @example: self.modify_coordinate(5, [1.2, 3.6])  # 2D
         """
         if self._check_coordinates(True):
-            self.nodal_coord[node] = coordinate
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
+            self.nodal_coord[node_ID] = new_coordinate
+            self._stiff_is_fresh = 0
+            self._mod_stiff_is_fresh = 0
+            return True
+        else:
+            return False
 
-    def set_crosssections(self, area):
+    def set_crosssections(self, area_list):
         """
         Setting cross-sections in bulk mode
+
+        :param area_list: an array enlisting the cross-sectional data
+        :return: None
         """
-        self.area = area
+        self.cross_sectional_area_list = area_list
         self._stiff_is_fresh = 0
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
 
-    def modify_crosssection(self, element, area):
+    def modify_crosssection(self, element_ID, new_area):
         """
         Modifying cross-sections by elements
+
+        :param element_ID: the ID of the changeable element
+        :param new_area: thenew cross-sectional area
+        :return: None
         """
-        self.area[element] = area
+        self.cross_sectional_area_list[element_ID] = new_area
         self._stiff_is_fresh = 0
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
@@ -223,12 +248,12 @@ class Truss(TrussFramework):
         self._post_processed = 0
 
         if self.DOF == 2:
-            for zdof in range(self.node_num):
+            for zdof in range(self.number_of_nodes):
                 self.constraint.append([int(zdof*3+2), 0.])
         self.constraint = list(k for k, _ in itertools.groupby(sorted(self.constraint)))
 
         # Setting known forces
-        for dofloc in range(3*self.node_num):
+        for dofloc in range(3*self.number_of_nodes):
             self.known_f_a.append(dofloc)
             if self.force[dofloc] != 0:
                 self.known_f_not_zero.append(dofloc)
@@ -255,13 +280,13 @@ class Truss(TrussFramework):
         self.stiffness = [[0.]*(len(self.nodal_coord)*3)]*(len(self.nodal_coord)*3)
 
         for i in range(self.element_num):
-            ele_length[i] = math.sqrt((self.nodal_coord[self.node[i][1]][0]-self.nodal_coord[self.node[i][0]][0])**2 +
-                                      (self.nodal_coord[self.node[i][1]][1]-self.nodal_coord[self.node[i][0]][1])**2 +
-                                      (self.nodal_coord[self.node[i][1]][2]-self.nodal_coord[self.node[i][0]][2])**2)
+            ele_length[i] = math.sqrt((self.nodal_coord[self.nodal_connections[i][1]][0]-self.nodal_coord[self.nodal_connections[i][0]][0])**2 +
+                                      (self.nodal_coord[self.nodal_connections[i][1]][1]-self.nodal_coord[self.nodal_connections[i][0]][1])**2 +
+                                      (self.nodal_coord[self.nodal_connections[i][1]][2]-self.nodal_coord[self.nodal_connections[i][0]][2])**2)
 
-            self._cx[i] = (self.nodal_coord[self.node[i][1]][0]-self.nodal_coord[self.node[i][0]][0])/ele_length[i]
-            self._cy[i] = (self.nodal_coord[self.node[i][1]][1]-self.nodal_coord[self.node[i][0]][1])/ele_length[i]
-            self._cz[i] = (self.nodal_coord[self.node[i][1]][2]-self.nodal_coord[self.node[i][0]][2])/ele_length[i]
+            self._cx[i] = (self.nodal_coord[self.nodal_connections[i][1]][0]-self.nodal_coord[self.nodal_connections[i][0]][0])/ele_length[i]
+            self._cy[i] = (self.nodal_coord[self.nodal_connections[i][1]][1]-self.nodal_coord[self.nodal_connections[i][0]][1])/ele_length[i]
+            self._cz[i] = (self.nodal_coord[self.nodal_connections[i][1]][2]-self.nodal_coord[self.nodal_connections[i][0]][2])/ele_length[i]
             self._norm_stiff[i] = self.elastic_modulo[i]/ele_length[i]
             self._s_loc[i] = [[self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i], -self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i]],
                               [self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i], -self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i]],
@@ -269,7 +294,7 @@ class Truss(TrussFramework):
                               [-self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i], self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i]],
                               [-self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i], self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i]],
                               [-self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2, self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2]]
-            self._loc_stiff[i] = [[y * self.area[i] * self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
+            self._loc_stiff[i] = [[y * self.cross_sectional_area_list[i] * self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
             ele_dof_vec = self.element_DOF[i]
 
             stiffness_increment = [0.]*(len(self.nodal_coord)*3)
@@ -296,7 +321,7 @@ class Truss(TrussFramework):
             else:
                 _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i])  # E[i]/L[i]
 
-            _mod_loc_stiff = [[y*self.area[i]*_mod_norm_stiff for y in x] for x in self._s_loc[i]]
+            _mod_loc_stiff = [[y*self.cross_sectional_area_list[i]*_mod_norm_stiff for y in x] for x in self._s_loc[i]]
 
             ele_dof_vec = self.element_DOF[i]
 
@@ -319,15 +344,15 @@ class Truss(TrussFramework):
                 print('Stiffness matrix is recalculated')
             self.calculate_stiffness_matrix()
 
-        self.dis_new = [0.]*(self.node_num*3-len(self.constraint))
-        self.force_new = [0.]*(self.node_num*3-len(self.constraint))
-        self.stiff_new = [[0.]*(self.node_num*3-len(self.constraint))]*(self.node_num*3-len(self.constraint))
+        self.dis_new = [0.]*(self.number_of_nodes*3-len(self.constraint))
+        self.force_new = [0.]*(self.number_of_nodes*3-len(self.constraint))
+        self.stiff_new = [[0.]*(self.number_of_nodes*3-len(self.constraint))]*(self.number_of_nodes*3-len(self.constraint))
 
         # known force array
         for i, known_f_a in enumerate(self.known_f_a):
             self.force_new[i] = self.force[known_f_a]
 
-        stiffness_increment = [0.]*(self.node_num*3-len(self.constraint))
+        stiffness_increment = [0.]*(self.number_of_nodes*3-len(self.constraint))
         for i, kfai in enumerate(self.known_f_a):
             for j, kfaj in enumerate(self.known_f_a):
                 stiffness_increment[j] = self.stiffness[kfai][kfaj]
@@ -350,7 +375,7 @@ class Truss(TrussFramework):
 
         # Deformed shape
         self.nodal_coord_def = []
-        for i in range(self.node_num):
+        for i in range(self.number_of_nodes):
             self.nodal_coord_def.append([self.nodal_coord[i][0] + self.displacement[i*3+0],
                                         self.nodal_coord[i][1] + self.displacement[i*3+1], self.nodal_coord[i][2] + self.displacement[i*3+2]])
 
@@ -364,12 +389,12 @@ class Truss(TrussFramework):
         Solver for the modified structures. 'Index' shows the actual modification number.
         """
 
-        self.modified_displacements[index] = [0.]*(self.node_num*3)
+        self.modified_displacements[index] = [0.]*(self.number_of_nodes*3)
 
-        dis_new = [0.]*(self.node_num*3-len(self.constraint))
-        stiff_new = [[0.]*(self.node_num*3-len(self.constraint))]*(self.node_num*3-len(self.constraint))
+        dis_new = [0.]*(self.number_of_nodes*3-len(self.constraint))
+        stiff_new = [[0.]*(self.number_of_nodes*3-len(self.constraint))]*(self.number_of_nodes*3-len(self.constraint))
 
-        stiffness_increment = [0.]*(self.node_num*3-len(self.constraint))
+        stiffness_increment = [0.]*(self.number_of_nodes*3-len(self.constraint))
         for i, kfai in enumerate(self.known_f_a):
             for j, kfaj in enumerate(self.known_f_a):
                 stiffness_increment[j] = self.mod_stiffnesses[index][kfai][kfaj]
@@ -635,12 +660,12 @@ class Truss(TrussFramework):
         else:
             base = ['SIMULATION']
             try:
-                os.remove(self.name + ' - UpdateResults - SIMULATED.txt')
+                os.remove(str(self.name) + ' - UpdateResults - SIMULATED.txt')
             except Exception:
                 pass
             filemode = 'r'
 
-        with open("./Structures/" + self.name + ' - Input Data.txt', filemode) as input_file:
+        with open("./Structures/" + str(self.name) + ' - Input Data.txt', filemode) as input_file:
             # Saving input data
             if not self.configuration.simulation:
                 input_file.write('Input data of \'' + self.name + '\':\n\n')
@@ -706,11 +731,11 @@ class Truss(TrussFramework):
         s_max = max([abs(min(self.stress)), max(self.stress), 0.000000001])
         self.stress_color = [float(x)/float(s_max) for x in self.stress]
 
+
+
 ##################################
 #   BEGINNING OF THE MAIN PART   #
 ##################################
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("input", help="Input file, stored in the ./Structure folder [*.str]", )

@@ -8,7 +8,7 @@ This program was written to show a numerical model updating example on 3D trusse
 
 The program has 2 major features:
 
-#### Truss Solver
+#### 1) Truss Solver
 
 General program for solving a truss with the following attributes:
 
@@ -17,7 +17,7 @@ General program for solving a truss with the following attributes:
 * Supports
 * Forces on the nodes (no moments)
 
-#### Model Updating
+#### 2) Model Updating
 
 Using the `Truss Solver`, considering the given loads, the displacements can be calculated. Of course
 if we add measurements, a delta vector can be computed from the calculated and measured displacements.

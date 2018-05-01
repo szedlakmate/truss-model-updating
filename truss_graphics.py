@@ -56,12 +56,12 @@ class Arrow3D(FancyArrowPatch):
             _ax.w_zaxis.line.set_lw(0.)
             _ax.set_zticklabels([])
 
-        xmin = min(list(struct.nodal_coord[x][0] for x in range(struct.node_num)))
-        xmax = max(list(struct.nodal_coord[x][0] for x in range(struct.node_num)))
-        ymin = min(list(struct.nodal_coord[x][1] for x in range(struct.node_num)))
-        ymax = max(list(struct.nodal_coord[x][1] for x in range(struct.node_num)))
-        zmin = min(list(struct.nodal_coord[x][2] for x in range(struct.node_num)))
-        zmax = max(list(struct.nodal_coord[x][2] for x in range(struct.node_num)))
+        xmin = min(list(struct.nodal_coord[x][0] for x in range(struct.number_of_nodes)))
+        xmax = max(list(struct.nodal_coord[x][0] for x in range(struct.number_of_nodes)))
+        ymin = min(list(struct.nodal_coord[x][1] for x in range(struct.number_of_nodes)))
+        ymax = max(list(struct.nodal_coord[x][1] for x in range(struct.number_of_nodes)))
+        zmin = min(list(struct.nodal_coord[x][2] for x in range(struct.number_of_nodes)))
+        zmax = max(list(struct.nodal_coord[x][2] for x in range(struct.number_of_nodes)))
 
         deltax = xmax - xmin
         deltay = ymax - ymin
@@ -104,7 +104,7 @@ class Arrow3D(FancyArrowPatch):
             if scale_displapcements != 1.0:
                 if log:
                     print('Displacements are scaled with factor: ' + str(scale_displapcements))
-                for i in range(struct.node_num):
+                for i in range(struct.number_of_nodes):
                     for j in range(3):
                         dipslaydisplacement[i][j] = (struct.nodal_coord_def[i][j] -
                         struct.nodal_coord[i][j]) * scale_displapcements + struct.nodal_coord[i][j]
@@ -112,9 +112,9 @@ class Arrow3D(FancyArrowPatch):
         for i in range(struct.element_num):
             # Plot undeformed structure
             if show_orig:
-                _ax.plot([struct.nodal_coord[struct.node[i][1]][0], struct.nodal_coord[struct.node[i][0]][0]],
-                    [struct.nodal_coord[struct.node[i][1]][1], struct.nodal_coord[struct.node[i][0]][1]],
-                    zs=[struct.nodal_coord[struct.node[i][1]][2], struct.nodal_coord[struct.node[i][0]][2]], color='b')
+                _ax.plot([struct.nodal_coord[struct.nodal_connections[i][1]][0], struct.nodal_coord[struct.nodal_connections[i][0]][0]],
+                    [struct.nodal_coord[struct.nodal_connections[i][1]][1], struct.nodal_coord[struct.nodal_connections[i][0]][1]],
+                    zs=[struct.nodal_coord[struct.nodal_connections[i][1]][2], struct.nodal_coord[struct.nodal_connections[i][0]][2]], color='b')
             # Plot deformed structure
             if show_result:
                 if struct._post_processed:
@@ -149,9 +149,9 @@ class Arrow3D(FancyArrowPatch):
                 else:
                     print('Stresses are not calculated')
                     rgb_col = [1, 0, 0]
-                _ax.plot([dipslaydisplacement[struct.node[i][1]][0], dipslaydisplacement[struct.node[i][0]][0]],
-                        [dipslaydisplacement[struct.node[i][1]][1], dipslaydisplacement[struct.node[i][0]][1]],
-                        zs=[dipslaydisplacement[struct.node[i][1]][2], dipslaydisplacement[struct.node[i][0]][2]],
+                _ax.plot([dipslaydisplacement[struct.nodal_connections[i][1]][0], dipslaydisplacement[struct.nodal_connections[i][0]][0]],
+                        [dipslaydisplacement[struct.nodal_connections[i][1]][1], dipslaydisplacement[struct.nodal_connections[i][0]][1]],
+                        zs=[dipslaydisplacement[struct.nodal_connections[i][1]][2], dipslaydisplacement[struct.nodal_connections[i][0]][2]],
                         color=rgb_col)
 
         if show_forces:
