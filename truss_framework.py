@@ -2,7 +2,7 @@
 """
 Created on April 30 18:49:40 2018
 
-3D truss model updater program created by Máté Szedlák.
+TrussFramework created by Máté Szedlák.
 Copyright MIT, Máté Szedlák 2016-2018.
 """
 import os
@@ -14,7 +14,7 @@ except ImportError:
     print("Please first install pySerial: http://playground.arduino.cc/Interfacing/Python")
     raise Exception('pyserial package not found')
 try:
-    from graphics import Arrow3D
+    from truss_graphics import Arrow3D
     from extra_math import invert as invert
     from extra_math import mat_vec_mult as mat_vec_mult
     from extra_math import swap_col as swap_col

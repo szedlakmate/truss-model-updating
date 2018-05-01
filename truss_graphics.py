@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Dec 27 10:02:39 2017
+Extended by Máté Szedlák
 """
 from copy import deepcopy
 import matplotlib.pyplot as plt
@@ -44,7 +44,7 @@ class Arrow3D(FancyArrowPatch):
         # 0: [1, 0, 0]              Plain red
         # 1: [x, 0, 0]              Red to Black
         # 2: [1, 1-x, 0-x]          Red to White
-        # 3: [1, (1-x)/2, (1-x)/2]  Red to MildRed - Distincts pressure and tension
+        # 3: [1, (1-x)/2, (1-x)/2]  Red to MildRed - Distinct pressure and tension
         # 4: [x, 1-x, 0]            Red to Green
         _coloring = 3  # € [0, 1, 2, 3, 4]
 

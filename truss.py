@@ -14,8 +14,8 @@ import datetime
 import numpy as np
 from copy import deepcopy
 try:
-    from truss_extras import TrussFramework
-    from graphics import Arrow3D
+    from truss_framework import TrussFramework
+    from truss_graphics import Arrow3D
     from extra_math import invert as invert
     from extra_math import mat_vec_mult as mat_vec_mult
     from extra_math import swap_col as swap_col
