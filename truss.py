@@ -715,9 +715,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("input", help="Input file, stored in the ./Structure folder [*.str]", )
     parser.add_argument("-t", "--title", help="Title of the project", default="structure")
-    parser.add_argument("-c", "--compatibility", metavar='int', type=int, choices=range(5), default=3,
-                        help="0: User defined, 1: DEPRECATED, 2: Android, 3: Most information (with numpy), "
-                             "4: Maximum compatibility mode")
+    parser.add_argument("-c", "--compatibility", metavar='int', type=int, choices=range(4), default=2,
+                        help="0: User defined, 1: Most information (with numpy), "
+                             "2: Maximum compatibility mode, 3: Android")
     parser.add_argument("-s", "--simulation", metavar='int', type=int, choices=range(2), default=0,
                         help="0: No / 1: Yes")
     args = parser.parse_args()

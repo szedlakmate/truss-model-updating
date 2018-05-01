@@ -28,14 +28,16 @@ class TrussConfiguration(object):
     """
     Truss configuration file
     """
-    def __init__(self, input_file, compatibility_mode=4, simulation=0):
+    def __init__(self, input_file, compatibility_mode=2, simulation=0):
         """
         :param input_file: Input file, stored in the ./Structure folder [*.str]
         :param title: Title of the project
-        :param compatibility_mode:  0: User defined, 1: DEPRECATED, 2: Android, 3: Most information (with numpy),
-        4: Maximum compatibility mode
+        :param compatibility_mode: 0: User defined, 1: Most information (with numpy),
+        2: Maximum compatibility mode, 3: Android
         :param simulation: 0: False, 1: True
         """
+        DO_NOT_MODIFY_ON = 1
+        DO_NOT_MODIFY_OFF = 0
 
         self.input_file = input_file
         self.TIC = time.time()
@@ -59,56 +61,43 @@ class TrussConfiguration(object):
             self.realistic_simulation = 0  # Wait as long as it was originally. Only valid with _SIMULATION = 1
 
         elif self.compatibility_mode == 1:
-            ### "Processing 3" mode ###
-            # DO NOT MODIFY
-            self.mode_name = "Processing 3"
-            self.log = 1*1
-            self.graphics = 0*0
-            self.solver = 0*0
-            self.OSlib = 0*0
-            self.updating = 1*1
-            self.arduino = 1*1
-            self.debug = 0*0
-            self.realistic_simulation = 1*1
-
-        elif self.compatibility_mode == 2:
-            ### Android mode ###
-            # DO NOT MODIFY
-            self.mode_name = "Android"
-            self.log = 1*1
-            self.graphics = 0*0
-            self.solver = 0*0
-            self.OSlib = 1*1
-            self.updating = 0*0
-            self.arduino = 0*0
-            self.debug = 0*0
-            self.realistic_simulation = 1*1
-
-        elif self.compatibility_mode == 3:
             ### Informative ###
             # DO NOT MODIFY
             self.mode_name = "Informative mode"
-            self.log = 1*1
-            self.graphics = 1*1
-            self.solver = 1*1
-            self.OSlib = 1*1
-            self.updating = 1*1
-            self.arduino = 1*1
-            self.debug = 0*0
-            self.realistic_simulation = 1*1
+            self.log = DO_NOT_MODIFY_ON
+            self.graphics = DO_NOT_MODIFY_ON
+            self.solver = DO_NOT_MODIFY_ON
+            self.OSlib = DO_NOT_MODIFY_ON
+            self.updating = DO_NOT_MODIFY_ON
+            self.arduino = DO_NOT_MODIFY_ON
+            self.debug = DO_NOT_MODIFY_OFF
+            self.realistic_simulation = DO_NOT_MODIFY_ON
 
-        else:
-            ### Maximum compatibility_mode ###
+        elif self.compatibility_mode == 2:
+            ### Maximum compatibility mode ###
             # DO NOT MODIFY
-            self.mode_name = "Maximum compatibility_mode"
-            self.log = 0*0
-            self.graphics = 0*0
-            self.solver = 0*0
-            self.OSlib = 0*0
-            self.updating = 0*0
-            self.arduino = 0*0
-            self.debug = 0*0
-            self.realistic_simulation = 1*1
+            self.mode_name = "Maximum compatibility mode"
+            self.log = DO_NOT_MODIFY_OFF
+            self.graphics = DO_NOT_MODIFY_OFF
+            self.solver = DO_NOT_MODIFY_OFF
+            self.OSlib = DO_NOT_MODIFY_OFF
+            self.updating = DO_NOT_MODIFY_OFF
+            self.arduino = DO_NOT_MODIFY_OFF
+            self.debug = DO_NOT_MODIFY_OFF
+            self.realistic_simulation = DO_NOT_MODIFY_ON
+
+        elif self.compatibility_mode == 3:
+            ### Android mode ###
+            # DO NOT MODIFY
+            self.mode_name = "Android"
+            self.log = DO_NOT_MODIFY_ON
+            self.graphics = DO_NOT_MODIFY_OFF
+            self.solver = DO_NOT_MODIFY_OFF
+            self.OSlib = DO_NOT_MODIFY_ON
+            self.updating = DO_NOT_MODIFY_OFF
+            self.arduino = DO_NOT_MODIFY_OFF
+            self.debug = DO_NOT_MODIFY_OFF
+            self.realistic_simulation = DO_NOT_MODIFY_ON
 
         if self.OSlib:
             try:
