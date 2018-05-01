@@ -28,11 +28,16 @@ class TrussConfiguration(object):
     """
     Truss configuration file
     """
-    def __init__(self, compatibility_mode=4, simulation=0):
+    def __init__(self, input_file, compatibility_mode=4, simulation=0):
         """
-        :param compatibility_mode:  0: User defined, 1: DEPRECATED, 2: Android, 3: Most information (with numpy), 4: Maximum compatibility_mode
+        :param input_file: Input file, stored in the ./Structure folder [*.str]
+        :param title: Title of the project
+        :param compatibility_mode:  0: User defined, 1: DEPRECATED, 2: Android, 3: Most information (with numpy),
+        4: Maximum compatibility mode
         :param simulation: 0: False, 1: True
         """
+
+        self.input_file = input_file
         self.TIC = time.time()
         self.TAC = 0
         self.TOTAL_TIME = 0
@@ -123,7 +128,7 @@ class TrussConfiguration(object):
 
         print('------------------------------------')
         print('Truss calculation program')
-        print('Created by Máté Szedlák (23/11/2016)')
+        print('Created by Máté Szedlák (https://github.com/szedlakmate/truss-model-updating)')
         print('Compatibility mode: ' + self.mode_name)
         if self.solver == 0:
             print('- Solver is set to default')
@@ -178,18 +183,17 @@ class TrussFramework(object):
     - Arduino management
     - Plot functions
     """
-    def __init__(self, name):
+    def __init__(self, input_file, title, compatibility_mode, simulation):
         """
         Truss Updater framework object.
-        :param name: Name of the structure
+        :param title: Title of the structure
         """
         # Serial connection
         self.serial_connection = False  # Holds serial connection
-        # General data
-        self.name = name              # Name of structure
         # Project data
-        self.configuration = TrussConfiguration(compatibility_mode=0, simulation=1)
-        # Truss datau
+        self.title = title              # Name of structure
+        self.configuration = TrussConfiguration(input_file, compatibility_mode, simulation)
+        # Truss data
         self.known_f_a = []           # Nodes without supports
         self.known_f_not_zero = []     # Nodes with loads
         self.DOF = 3                  # Truss's degree of freedom
@@ -287,7 +291,7 @@ class TrussFramework(object):
             print('Serial connection cannot be closed')
             return False
 
-    def read(self, filename):
+    def read(self):
         """
         Input file for TRUSS.py program
         All commands must be written with uppercase characters
@@ -313,7 +317,7 @@ class TrussFramework(object):
                                "Cross-sections", "Materials", "Forces", "Supports", "Measured DOFs"]
 
         try:
-            with open("./Structures/" + filename, "r") as sourcefile:
+            with open("./Structures/" + self.configuration.input_file, "r") as sourcefile:
                 source_line = ""
                 while source_line != "EOF":
                     source_line = sourcefile.readline().strip()
@@ -417,7 +421,7 @@ class TrussFramework(object):
                         self.set_special_DOFs(self.arduino_mapping)
                         self.read_elements[8] = 1
         except IOError:
-            print("The following file could not be opened: " + "./Structures/" + self.name + ".str")
+            print("The following file could not be opened: " + "./Structures/" + self.title + ".str")
             print("Please make sure that the structural data is available for the program in the running directory.")
             raise IOError
 
@@ -670,7 +674,7 @@ class TrussFramework(object):
         try:
             with open("./Structures/" + file_name, 'w') as outfile:
                 # Writing data
-                outfile.write('Calculation of \'' + self.name + '\':\n\n')
+                outfile.write('Calculation of \'' + self.title + '\':\n\n')
 
                 outfile.write('Reactions\n')
                 # for i in range(len(self.force)//3):

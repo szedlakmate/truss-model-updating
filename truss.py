@@ -6,6 +6,7 @@ Created on April 30 18:49:40 2018
 Copyright MIT, Máté Szedlák 2016-2018.
 """
 import os
+import argparse
 import itertools
 import math
 import time
@@ -29,7 +30,7 @@ def error(delta):
     Error function using least-square method
 
     :param delta: error vector
-    :return: sum of errors
+    :return: sum of errors using least-square method
     """
     sum_of_errors = 0
     for delta_element in delta:
@@ -710,66 +711,65 @@ class Truss(TrussFramework):
 ##################################
 
 
-#  Define new structure
-TRUSS = Truss('bridge')
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("input", help="Input file, stored in the ./Structure folder [*.str]", )
+    parser.add_argument("-t", "--title", help="Title of the project", default="structure")
+    parser.add_argument("-c", "--compatibility", metavar='int', type=int, choices=range(5), default=3,
+                        help="0: User defined, 1: DEPRECATED, 2: Android, 3: Most information (with numpy), "
+                             "4: Maximum compatibility mode")
+    parser.add_argument("-s", "--simulation", metavar='int', type=int, choices=range(2), default=0,
+                        help="0: No / 1: Yes")
+    args = parser.parse_args()
 
-if TRUSS.configuration.log:
-    TRUSS.configuration.start_logging()
+    # Define new structure
+    TRUSS = Truss(str(args.input), str(args.title), args.compatibility, args.simulation)
 
-if not TRUSS.configuration.debug:
-    TRUSS.name = input('Test name: ')
-else:
-    print("*** Debug mode ***")
-    print("*** The following file will be opened: " + TRUSS.name + ".str")
+    if TRUSS.configuration.log:
+        TRUSS.configuration.start_logging()
 
-TRUSS.read(TRUSS.name + ".str")
-TRUSS.configuration.part_time("Setting up structure")
+    TRUSS.read()
+    TRUSS.configuration.part_time("Setting up structure")
 
-# Calculate stiffness-matrix
-TRUSS.calculate_stiffness_matrix()
-TRUSS.configuration.part_time("Calculating Stiffness Matrix")
+    # Calculate stiffness-matrix
+    TRUSS.calculate_stiffness_matrix()
+    TRUSS.configuration.part_time("Calculating Stiffness Matrix")
 
+    # Solve structure
+    TRUSS.solve()
+    TRUSS.configuration.part_time("Solving")
 
-# Solve structure
-TRUSS.solve()
-TRUSS.configuration.part_time("Solving")
+    # Update iteration
+    if TRUSS.configuration.updating:
+        TRUSS.set_unit_modification(0.05)
+        TRUSS.set_error_limit(1.2)
+        TRUSS.set_modification_limit(0.7)
+        TRUSS.set_iteration_limit(100)
+        TRUSS.update_model()
+        TRUSS.configuration.part_time("Updating numerical model")
 
+    # Plotting
+    if TRUSS.configuration.graphics:
+        # Plot settings:
+        # O: Original D: Deformed S: Supports F: Forces R: Reactions
+        # ScD: Scale displacements (Z-axis) (def:1.0) ScF: Scale forces (def:1.0)
+        # ScS: Scale Support signs (Z-axis) (def:1.0)
+        # Save: Save plot to file
 
-# Update iteration
-if TRUSS.configuration.updating:
-    TRUSS.set_unit_modification(0.05)
-    TRUSS.set_error_limit(1.2)
-    TRUSS.set_modification_limit(0.7)
-    TRUSS.set_iteration_limit(100)
-    TRUSS.update_model()
-    TRUSS.configuration.part_time("Updating numerical model")
+        #     plot(O, D, S, F, R, ScD, ScF, ScS, Save)
+        TRUSS.plot(1, 0, 1, 1, 0, 1.0, 0.0, 0.0, True)
+        TRUSS.plot(1, 1, 1, 0, 0, 1.0, 0.0, 0.0, True)
+        TRUSS.plot(0, 1, 1, 1, 1, 2.0, 0.0, 0.0, True)
+        TRUSS.configuration.part_time("Plotting")
 
+    # Write results to file
+    TRUSS.write_results("Structures/" + TRUSS.title + ' - Results.txt')
+    TRUSS.configuration.part_time("Wrote results to the output file")
 
-# Plotting
-if TRUSS.configuration.graphics:
-    # Plot settings:
-    # O: Original D: Deformed S: Supports F: Forces R: Reactions
-    # ScD: Scale displacements (Z-axis) (def:1.0) ScF: Scale forces (def:1.0)
-    # ScS: Scale Support signs (Z-axis) (def:1.0)
-    # Save: Save plot to file
+    # Closing Arduino port
+    if TRUSS.configuration.arduino:
+        TRUSS.close_serial()
 
-    #     plot(O, D, S, F, R, ScD, ScF, ScS, Save)
-    TRUSS.plot(1, 0, 1, 1, 0, 1.0, 0.0, 0.0, True)
-    TRUSS.plot(1, 1, 1, 0, 0, 1.0, 0.0, 0.0, True)
-    TRUSS.plot(0, 1, 1, 1, 1, 2.0, 0.0, 0.0, True)
-    TRUSS.configuration.part_time("Plotting")
-
-
-# Write results to file
-TRUSS.write_results("Structures/" + TRUSS.name + ' - Results.txt')
-TRUSS.configuration.part_time("Wrote results to the output file")
-
-
-# Closing Arduino port
-if TRUSS.configuration.arduino:
-    TRUSS.close_serial()
-
-
-# End logging
-if TRUSS.configuration.log:
-    TRUSS.end_logging()
+    # End logging
+    if TRUSS.configuration.log:
+        TRUSS.end_logging()

@@ -33,7 +33,7 @@ class Arrow3D(FancyArrowPatch):
         scale_forces:   Scale force sign
         z_correction:    Scale z-axis
         """
-        plotname = struct.name
+        plotname = struct.title
         plot_width = 10.0              # Plot width in inches
         xframe = 0                     # Frame width at X direction
         yframe = 0                     # Frame width at Y direction
