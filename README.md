@@ -15,3 +15,14 @@ This program was written to show a numerical model updating example on 3D trusse
 
 ## Quick start
 
+The program can be run the following way:
+
+    python3 truss.py <input_file.str> [project_title] [compatibility_mode] [simulation] 
+
+Example can be run by:
+
+    python3 truss.py bridge.str
+    
+For help:
+
+    python 3 truss.py -h
