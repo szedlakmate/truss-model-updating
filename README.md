@@ -2,18 +2,38 @@
 
 ## Description
 
-This program was written to show a numerical model updating example on 3D trusses.
+This program was written to show a numerical model updating example on 3D trusses. 
 
-## Requirements
+### Features
 
-* Python ^3.6
+The program has 2 major features:
+
+#### Truss Solver
+
+General program for solving a truss with the following attributes:
+
+* Geometry (nodes, elements, cross-sections)
+* Materials (E)
+* Supports
+* Forces on the nodes (no moments)
+
+#### Model Updating
+
+Using the `Truss Solver`, considering the given loads, the displacements can be calculated. Of course
+if we add measurements, a delta vector can be computed from the calculated and measured displacements.
+Using this, by modifying the used numerical model the error vector can be reduced. This part of the code
+tries to minimize the error vector by iterating. The resulted model is called updated model.  
+
+## Technical Requirements
+
+* Python 3.6 (or later)
 * External packages:
     * numpy
     * pyserial
     * matplotlib
     * mpl_toolkits
 
-## Quick start
+## Quick Start
 
 The program can be run the following way:
 
@@ -24,9 +44,19 @@ Simplest run [defaults: -t structure -c 2 -s 0]:
 
     python3 truss.py bridge.str
     
+Model updating example:
+
+* with Arduino serial input:
+
+        python3 truss.py bridge.str -c 1 -s 0
+
+* with simulation:
+
+        python3 truss.py bridge.str -c 1 -s 1
+        
 For help:
 
-    python 3 truss.py -h
+    python3 truss.py -h
 
 ## Configuration
 
@@ -42,14 +72,16 @@ The following options are available in the configuration process:
 * Debug: Speeds up runtime by some tweaks. DO NOT USE 'in production'
 * Realistic simulations: Opens the backed up input stream and fetches data with realistic delays/timing according to the timestamps. Effective only with simulation=True
 
-### Compatibility modes
+### Compatibility Modes
 
 Mode | Mode's name | Logging | Graphics | Numpy solver | OSlib | Updating | Arduino | Debug | Realistic simulation
 :-------: | :---------: | :-----: | :------: | :------: |:------:| :------: | :------: | :------: | :------:
-**0** | User defined | ✔ | ✔ | ✔ | ✔ |   |   | ✔ |   
+**0** | User defined* | ✔ | ✔ | ✔ | ✔ |   |   | ✔ |   
 **1** | Informative | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |   | ✔ 
 **2** | Maximum compatibility |  |  |  |  |  |  |  | ✔
 **3** | Android mode | ✔ |  |  | ✔ |  |  |  | ✔  
+
+*User defined may vary according to the local configurations.
 
 ### Simulations
 
@@ -64,6 +96,6 @@ As a workaround, the input stream can be recorded and saved. This backup stream 
 reused by the simulation anytime later.
 
 Turning on simulation opens the backup file and loads the measurement stream. This can be done in two different ways:
-* fast-forward: processing the data as fast as possible
+* fast-forward (default): processing the data as fast as possible
 * realistic-mode: each measurement is given to the program in a scheduled way, using the timestamps. 
  
