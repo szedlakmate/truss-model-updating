@@ -25,11 +25,11 @@ class Arrow3D(FancyArrowPatch):
         FancyArrowPatch.draw(self, renderer)
 
     def plotstructure(struct, show_orig, show_result, show_supports,
-            show_forces, show_reactions, scale_displapcements, scale_forces, z_correction, show_values, save_plot, log=0):
+            show_forces, show_reactions, scale_displacements, scale_forces, z_correction, show_values, save_plot, log=0):
         """
         General plotting method for structures
 
-        scale_displapcements: Scale drwaing of displacements
+        scale_displacements: Scale drawing of displacements
         scale_forces:   Scale force sign
         z_correction:    Scale z-axis
         """
@@ -100,17 +100,17 @@ class Arrow3D(FancyArrowPatch):
 
         print(plotname + ": ")
         if show_result:
-            dipslaydisplacement = deepcopy(struct.nodal_coord_def)
-            if scale_displapcements != 1.0:
+            dipslay_displacement = deepcopy(struct.nodal_coord_def)
+            if scale_displacements != 1.0:
                 if log:
-                    print('Displacements are scaled with factor: ' + str(scale_displapcements))
+                    print('Displacements are scaled with factor: ' + str(scale_displacements))
                 for i in range(struct.number_of_nodes):
                     for j in range(3):
-                        dipslaydisplacement[i][j] = (struct.nodal_coord_def[i][j] -
-                        struct.nodal_coord[i][j]) * scale_displapcements + struct.nodal_coord[i][j]
+                        dipslay_displacement[i][j] = (struct.nodal_coord_def[i][j] -
+                        struct.nodal_coord[i][j]) * scale_displacements + struct.nodal_coord[i][j]
 
         for i in range(struct.element_num):
-            # Plot undeformed structure
+            # Plot original structure
             if show_orig:
                 _ax.plot([struct.nodal_coord[struct.nodal_connections[i][1]][0], struct.nodal_coord[struct.nodal_connections[i][0]][0]],
                     [struct.nodal_coord[struct.nodal_connections[i][1]][1], struct.nodal_coord[struct.nodal_connections[i][0]][1]],
@@ -149,9 +149,9 @@ class Arrow3D(FancyArrowPatch):
                 else:
                     print('Stresses are not calculated')
                     rgb_col = [1, 0, 0]
-                _ax.plot([dipslaydisplacement[struct.nodal_connections[i][1]][0], dipslaydisplacement[struct.nodal_connections[i][0]][0]],
-                        [dipslaydisplacement[struct.nodal_connections[i][1]][1], dipslaydisplacement[struct.nodal_connections[i][0]][1]],
-                        zs=[dipslaydisplacement[struct.nodal_connections[i][1]][2], dipslaydisplacement[struct.nodal_connections[i][0]][2]],
+                _ax.plot([dipslay_displacement[struct.nodal_connections[i][1]][0], dipslay_displacement[struct.nodal_connections[i][0]][0]],
+                        [dipslay_displacement[struct.nodal_connections[i][1]][1], dipslay_displacement[struct.nodal_connections[i][0]][1]],
+                        zs=[dipslay_displacement[struct.nodal_connections[i][1]][2], dipslay_displacement[struct.nodal_connections[i][0]][2]],
                         color=rgb_col)
 
         if show_forces:

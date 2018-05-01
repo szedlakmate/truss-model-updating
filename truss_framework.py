@@ -209,6 +209,8 @@ class TrussFramework(object):
         self.force_new = []
         self.stiff_new = []
         self.displacement = []        # Relative displacements
+        self.known_displacement_a = []
+        self.modified_displacements = []
         self._stiff_is_fresh = 0
         self._post_processed = 0
         self._init_displacement = []
@@ -360,7 +362,7 @@ class TrussFramework(object):
                         if '' in inpstr:
                             inpstr.remove('')
                         inpnum = [float(eval(x)) for x in inpstr]
-                        self.set_crosssections(inpnum)
+                        self.set_cross_sections(inpnum)
                         self.read_elements[4] = 1
 
                     if source_line.upper() == "MATERIALS":
@@ -423,8 +425,8 @@ class TrussFramework(object):
         if terminate:
             raise Exception
 
-    def plot(self, showorig, showresult, showsupports, showforces,
-             showreactions, scaledisplacement, scaleforce, scalez, saveplot):
+    def plot(self, show_original, show_result, show_supports, show_forces,
+             show_reactions, scale_displacement, scale_force, scale_Z, save_plot):
         """
         Plot function of the Truss class
         This method calls the more general plotstructure() method.
@@ -442,17 +444,17 @@ class TrussFramework(object):
         if self._post_processed == 0:
             print('Postprocess is needed before plotting structure!')
         else:
-            if scaledisplacement == 0:
-                scaledisplacement = 1.0           # Scale drwaing of displacements
-            if scaleforce == 0:
-                scaleforce = 1.0                  # Scale force sign
-            if scalez == 0:
-                scalez = 0.3                      # Scale z-axis
+            if scale_displacement == 0:
+                scale_displacement = 1.0           # Scale drwaing of displacements
+            if scale_force == 0:
+                scale_force = 1.0                  # Scale force sign
+            if scale_Z == 0:
+                scale_Z = 0.3                      # Scale z-axis
 
-            Arrow3D.plotstructure(self, showorig, showresult, showsupports, showforces, showreactions,
-                                  scaledisplacement, scaleforce, scalez, _showvalues, saveplot, self.configuration.log)
+            Arrow3D.plotstructure(self, show_original, show_result, show_supports, show_forces, show_reactions,
+                                  scale_displacement, scale_force, scale_Z, _showvalues, save_plot, self.configuration.log)
 
-    def readarduino(self, base, saveinput):
+    def readarduino(self, base, save_input):
         """
         Read data from Arduino
         """
@@ -508,7 +510,7 @@ class TrussFramework(object):
         if newdata and not bigdifference and not readerror:
             self.measurement = zip(self.arduino_mapping, data)
 
-            saveinput.write(str(data) + ', ' + str(time.time()) + "\n")
+            save_input.write(str(data) + ', ' + str(time.time()) + "\n")
             # Calculate differences
             delta = self.difference(self.displacement, self.measurement)
 

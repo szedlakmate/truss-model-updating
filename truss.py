@@ -138,7 +138,7 @@ class Truss(TrussFramework):
         else:
             return False
 
-    def set_crosssections(self, area_list):
+    def set_cross_sections(self, area_list):
         """
         Setting cross-sections in bulk mode
 
@@ -155,7 +155,7 @@ class Truss(TrussFramework):
         Modifying cross-sections by elements
 
         :param element_ID: the ID of the changeable element
-        :param new_area: thenew cross-sectional area
+        :param new_area: the new cross-sectional area
         :return: None
         """
         self.cross_sectional_area_list[element_ID] = new_area
@@ -416,7 +416,7 @@ class Truss(TrussFramework):
     def evaluate(self):
         """
         Calculates the relative displacement of each individual available unit-modification
-        compared to the measured differencies (delta).
+        compared to the measured differences (delta).
 
         delta: [DOF number, difference]
 
@@ -490,7 +490,7 @@ class Truss(TrussFramework):
                 print('The given measurement location cannot be matched with the input data.')
                 print('The available nodes are: {\'NAMES\': mapping addresses}')
                 print(self.analysis)
-                self.serial.close()
+                self.configuration.disconnect()
                 raise Exception('Watchpoint name error')
 
             delta.append(measured - num_displ[dof])
@@ -499,7 +499,7 @@ class Truss(TrussFramework):
 
     def optimize(self, delta):
         """
-        Modell updating - core function
+        Model updating - core function
         """
         # modnum = min(10, self.element_num)
         modnum = self.element_num
@@ -572,7 +572,7 @@ class Truss(TrussFramework):
             print("Optimization could not be finished successfully.")
             print("The remaining error is: " + str(error(newdelta)))
 
-        with open("./Structures/" + self.name + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
+        with open("./Structures/" + self.title + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
             if j > 1:
                 if j <= self.iteration_limit and self.capable():
                     self.number_of_updates[0] += 1
@@ -585,7 +585,7 @@ class Truss(TrussFramework):
                     outfile.write("Update state: No more possible modification\n")
             else:
                 outfile.write("Update state: Optimization was skipped\n")
-            outfile.write("Requiered iterations: " + str(j) + "\n")
+            outfile.write("Required iterations: " + str(j) + "\n")
             outfile.write("Measurement: " + str(self.measurement) + "\n")
             outfile.write("Original delta: " + str(delta) + "\n")
             outfile.write("New delta: " + str(newdelta) + " (limit: " + str(self.error_limit) + ")\n")
@@ -603,6 +603,7 @@ class Truss(TrussFramework):
         """
         Function telling whether there are more options to modify
         """
+        capable = False
         for variable in self.modifications:
             if 0.01 < abs(variable) <= 0.95*self.modification_limit:
                 capable = True
@@ -635,7 +636,7 @@ class Truss(TrussFramework):
         if 0.01 <= abs(unit_modification) < 0.5:
             self.unit_modification = unit_modification
         else:
-            print("The absolut value of the unit modification must be minimum 0.01 and maximum 0.5")
+            print("The absolute value of the unit modification must be minimum 0.01 and maximum 0.5")
             raise Exception
 
     def set_iteration_limit(self, iteration_limit):
@@ -645,12 +646,12 @@ class Truss(TrussFramework):
         if 1 < int(iteration_limit) <= math.pow(10, 4):
             self.iteration_limit = int(iteration_limit)
         else:
-            print("The iterationlimit must be between 2 and 10.000")
+            print("The iteration limit must be between 2 and 10.000")
             raise Exception
 
     def update_model(self):
         """
-        General function to manage model updatin procedure.
+        General function to manage model updating procedure.
         """
         self.processed_data = [0.]*len(self.arduino_mapping)
 
@@ -660,15 +661,15 @@ class Truss(TrussFramework):
         else:
             base = ['SIMULATION']
             try:
-                os.remove(str(self.name) + ' - UpdateResults - SIMULATED.txt')
+                os.remove(str(self.title) + ' - UpdateResults - SIMULATED.txt')
             except Exception:
                 pass
             filemode = 'r'
 
-        with open("./Structures/" + str(self.name) + ' - Input Data.txt', filemode) as input_file:
+        with open("./Structures/" + str(self.title) + ' - Input Data.txt', filemode) as input_file:
             # Saving input data
             if not self.configuration.simulation:
-                input_file.write('Input data of \'' + self.name + '\':\n\n')
+                input_file.write('Input data of \'' + self.title + '\':\n\n')
                 input_file.write('Start Time: ' +
                                 str(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')) + "\n")
                 input_file.write('Base: ' + str(base) + '\n')
@@ -679,8 +680,8 @@ class Truss(TrussFramework):
                     delta = self.readarduino(base, input_file)
                     self.optimize(delta)
                 else:
+                    delta = None
                     try:
-                        delta = None
                         previous_line = new_line
                         new_line = input_file.readline()
                         if not new_line == '':
@@ -693,7 +694,7 @@ class Truss(TrussFramework):
         print("Totally updated models: " + str(TRUSS.num_of_updates[0] + TRUSS.num_of_updates[1] + TRUSS.num_of_updates[2]))
         print("  Successfully updated models: " + str(TRUSS.num_of_updates[0]))
         print("  Updates with running out of possibilities: " + str(TRUSS.num_of_updates[2]))
-        print("  Updates did not finshed: " + str(TRUSS.num_of_updates[1]))
+        print("  Updates did not finished: " + str(TRUSS.num_of_updates[1]))
 
     def post_process(self):
         """
@@ -732,10 +733,11 @@ class Truss(TrussFramework):
         self.stress_color = [float(x)/float(s_max) for x in self.stress]
 
 
-
 ##################################
 #   BEGINNING OF THE MAIN PART   #
 ##################################
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("input", help="Input file, stored in the ./Structure folder [*.str]", )
