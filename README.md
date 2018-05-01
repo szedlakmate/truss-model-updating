@@ -63,16 +63,16 @@ For help:
 Many settings help customization. These settings are collected in predefined profiles as written below.
 The following options are available in the configuration process:
 
-* Logging: Puts log data to the console
+* Logging: Prints log data to the console
 * Graphics: Creates and saves diagrams/pictures about the structure (uses external libraries)
-* Numpy solver: Force uses the Numpy solver instead of the built-in one
+* NumPy solver: Force uses the Numpy solver instead of the built-in one
 * Oslib: OS file action availability
 * Updating: Enables model updating
 * Arduino: Enables Arduino input stream
 * Debug: Speeds up runtime by some tweaks. DO NOT USE 'in production'
-* Realistic simulations: Opens the backed up input stream and fetches data with realistic delays/timing according to the timestamps. Effective only with simulation=True
+* Realistic simulations: Opens the saved input stream and fetches data with realistic delays/timing according to the timestamps. Effective only with simulation ON.
 
-These settings can be found in the truss_framework.py file above the lines 
+These settings can be found in the truss_framework.py file below the following lines 
 
     if self.compatibility_mode == 0:
         ### User defined ###
@@ -89,7 +89,7 @@ Mode | Mode's name | Logging | Graphics | Numpy solver | OSlib | Updating | Ardu
 **2** | Maximum compatibility |  |  |  |  |  |  |  | ✔
 **3** | Android mode | ✔ |  |  | ✔ |  |  |  | ✔  
 
-*User defined may vary according to the local configurations.
+*User defined settings may vary according to the local configurations.
 
 ### Simulations
 
