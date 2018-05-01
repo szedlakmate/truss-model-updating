@@ -72,6 +72,14 @@ The following options are available in the configuration process:
 * Debug: Speeds up runtime by some tweaks. DO NOT USE 'in production'
 * Realistic simulations: Opens the backed up input stream and fetches data with realistic delays/timing according to the timestamps. Effective only with simulation=True
 
+These settings can be found in the truss_framework.py file above the lines 
+
+    if self.compatibility_mode == 0:
+        ### User defined ###
+        # Modify as needed #
+
+If needed, please edit the User defined mode only.
+
 ### Compatibility Modes
 
 Mode | Mode's name | Logging | Graphics | Numpy solver | OSlib | Updating | Arduino | Debug | Realistic simulation
