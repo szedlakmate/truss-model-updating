@@ -88,7 +88,7 @@ class Truss(TrussFramework):
         self.nodal_connections = nodal_connection_list
         # Recalculate pending variables
         self.number_of_nodes = len(set(list(itertools.chain.from_iterable(sorted(self.nodal_connections)))))
-        self.element_num = len(self.nodal_connections)
+        self.number_of_elements = len(self.nodal_connections)
         # Set freshness flags after geometry modification
         self._stiff_is_fresh = 0
         self._mod_stiff_is_fresh = 0
@@ -253,38 +253,38 @@ class Truss(TrussFramework):
         self._post_processed = 0
 
         if self.DOF == 2:
-            for zdof in range(self.number_of_nodes):
-                self.constraint.append([int(zdof*3+2), 0.])
+            for dof_z in range(self.number_of_nodes):
+                self.constraint.append([int(dof_z*3+2), 0.])
         self.constraint = list(k for k, _ in itertools.groupby(sorted(self.constraint)))
 
         # Setting known forces
-        for dofloc in range(3*self.number_of_nodes):
-            self.known_f_a.append(dofloc)
-            if self.force[dofloc] != 0:
-                self.known_f_not_zero.append(dofloc)
+        for location in range(3*self.number_of_nodes):
+            self.known_f_a.append(location)
+            if self.force[location] != 0:
+                self.known_f_not_zero.append(location)
 
         self.known_displacement_a = []
-        for constr in self.constraint:
-            self._init_displacement[constr[0]] = constr[1]
-            self.known_displacement_a.append(constr[0])
+        for constraint in self.constraint:
+            self._init_displacement[constraint[0]] = constraint[1]
+            self.known_displacement_a.append(constraint[0])
             try:
-                self.known_f_a.remove(constr[0])
-                self.known_f_not_zero.remove(constr[0])
+                self.known_f_a.remove(constraint[0])
+                self.known_f_not_zero.remove(constraint[0])
             except ValueError:
                 pass
 
-        ele_length = [0.]*self.element_num
-        self._norm_stiff = [0.]*self.element_num
-        self._cx = [0.]*self.element_num
-        self._cy = [0.]*self.element_num
-        self._cz = [0.]*self.element_num
-        self._s_loc = [0.]*self.element_num
-        self._loc_stiff = [0.]*self.element_num
-        self.stress = [0.]*self.element_num
+        ele_length = [0.]*self.number_of_elements
+        self._norm_stiff = [0.]*self.number_of_elements
+        self._cx = [0.]*self.number_of_elements
+        self._cy = [0.]*self.number_of_elements
+        self._cz = [0.]*self.number_of_elements
+        self._s_loc = [0.]*self.number_of_elements
+        self._loc_stiff = [0.]*self.number_of_elements
+        self.stress = [0.]*self.number_of_elements
 
         self.stiffness = [[0.]*(len(self.nodal_coord)*3)]*(len(self.nodal_coord)*3)
 
-        for i in range(self.element_num):
+        for i in range(self.number_of_elements):
             ele_length[i] = math.sqrt((self.nodal_coord[self.nodal_connections[i][1]][0]-self.nodal_coord[self.nodal_connections[i][0]][0])**2 +
                                       (self.nodal_coord[self.nodal_connections[i][1]][1]-self.nodal_coord[self.nodal_connections[i][0]][1])**2 +
                                       (self.nodal_coord[self.nodal_connections[i][1]][2]-self.nodal_coord[self.nodal_connections[i][0]][2])**2)
@@ -315,12 +315,12 @@ class Truss(TrussFramework):
         Convergence step in stiffness matrix modification
         """
         if not self.mod_stiffnesses:
-            self.mod_stiffnesses = [0.]*(self.element_num+1)
+            self.mod_stiffnesses = [0.]*(self.number_of_elements+1)
 
-        # for loopindex in range(self.element_num):
+        # for loopindex in range(self.number_of_elements):
         _mod_stiffnesses_temp = [[0.]*(len(self.nodal_coord)*3)]*(len(self.nodal_coord)*3)
 
-        for i in range(self.element_num):
+        for i in range(self.number_of_elements):
             if i == index:
                 _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i] + magnitude)  # E[i]/L[i]
             else:
@@ -387,7 +387,7 @@ class Truss(TrussFramework):
         # Postrpocesses
         self.post_process()
 
-        self.modified_displacements = [0.]*(self.element_num+1)
+        self.modified_displacements = [0.]*(self.number_of_elements+1)
 
     def solve_modified_structure(self, index):
         """
@@ -428,13 +428,13 @@ class Truss(TrussFramework):
         return effect: [effect on 1. point, effect on 2. point, ..., modification number]
                        where each line number shows the corresponding modification number
         """
-        self.effect = [[0.]*(self.number_of_keypoints + 2)]*self.element_num
+        self.effect = [[0.]*(self.number_of_keypoints + 2)]*self.number_of_elements
         self.total_effect = [0.]*self.number_of_keypoints
-        self.sorted_effect = [[[0.]*(self.number_of_keypoints + 2)]*self.element_num]*self.number_of_keypoints
+        self.sorted_effect = [[[0.]*(self.number_of_keypoints + 2)]*self.number_of_elements]*self.number_of_keypoints
 
         effect_temp = [0.]*(self.number_of_keypoints + 2)
 
-        for modnum in range(self.element_num):
+        for modnum in range(self.number_of_elements):
             effect_temp[self.number_of_keypoints] = int(modnum)
             for j, dofnum in enumerate(self.keypoint):
                 try:
@@ -447,7 +447,7 @@ class Truss(TrussFramework):
                     raise IndexError
 
         self.effect_ratio = deepcopy(self.effect)
-        for i in range(self.element_num):
+        for i in range(self.number_of_elements):
             for j in range(self.number_of_keypoints):
                 if self.total_effect[j] > 0:
                     self.effect_ratio[i][j] = abs(self.effect_ratio[i][j]/self.total_effect[j])
@@ -461,7 +461,7 @@ class Truss(TrussFramework):
             self.sorted_effect[i] = deepcopy(self.effect)
 
             # Check sign of the effect
-            for ktemp in range(self.element_num):
+            for ktemp in range(self.number_of_elements):
                 if self.sorted_effect[i][ktemp][i] < 0:
                     for jtemp in range(self.number_of_keypoints):
                         self.sorted_effect[i][ktemp][jtemp] = abs(self.sorted_effect[i][ktemp][jtemp])
@@ -506,9 +506,9 @@ class Truss(TrussFramework):
         """
         Model updating - core function
         """
-        # modnum = min(10, self.element_num)
-        modnum = self.element_num
-        self.modifications = [0.0]*self.element_num
+        # modnum = min(10, self.number_of_elements)
+        modnum = self.number_of_elements
+        self.modifications = [0.0]*self.number_of_elements
 
         if not self.configuration.simulation:
             appendix = ""
@@ -534,7 +534,7 @@ class Truss(TrussFramework):
 
             prevmodifications = self.modifications
 
-            for index in range(self.element_num):
+            for index in range(self.number_of_elements):
                 self.modifications[index] = min(abs(self.modifications[index] - self.unit_modification),
                                                 self.modification_limit) * \
                                             math.copysign(1, self.modifications[index] - self.unit_modification)
@@ -542,10 +542,10 @@ class Truss(TrussFramework):
                 self.solve_modified_structure(index)
             self.evaluate()
 
-            self.calculate_modified_stiffness_matrix(self.element_num, 0)
-            self.solve_modified_structure(self.element_num)
+            self.calculate_modified_stiffness_matrix(self.number_of_elements, 0)
+            self.solve_modified_structure(self.number_of_elements)
 
-            newdelta = self.difference(self.modified_displacements[self.element_num], self.measurement)
+            newdelta = self.difference(self.modified_displacements[self.number_of_elements], self.measurement)
 
             for i, effect in enumerate(self.total_effect):
                 if effect == 0.0:
@@ -553,14 +553,14 @@ class Truss(TrussFramework):
                     print("Model updating has no solution.")
                     raise Exception
 
-            for i in range(self.element_num):
+            for i in range(self.number_of_elements):
                 modificationnumber = self.sorted_effect[0][i][1]
                 ratio[modificationnumber] = abs(self.sorted_effect[0][i][0] / self.total_effect[0]) * \
                                             math.copysign(1, self.sorted_effect[0][i][2])
                 unit += abs(ratio[modificationnumber]*self.sorted_effect[0][i][0])
 
             scale = newdelta[0]/unit
-            for i in range(self.element_num):
+            for i in range(self.number_of_elements):
                 modificationnumber = self.sorted_effect[0][i][1]
                 self.modifications[modificationnumber] = min(abs(prevmodifications[modificationnumber] -
                                                                  self.unit_modification*ratio[modificationnumber]),
@@ -601,7 +601,7 @@ class Truss(TrussFramework):
             outfile.write(str(self.displacement) + "\n")
             if j > 1:
                 outfile.write("New displacements: \n")
-                outfile.write(str(self.modified_displacements[self.element_num]) + "\n")
+                outfile.write(str(self.modified_displacements[self.number_of_elements]) + "\n")
             outfile.write("----------------------\n")
 
     def capable(self):
@@ -726,8 +726,8 @@ class Truss(TrussFramework):
 
         Last part: Coloring elements for graphical output
         """
-        self.stress = [0.]*self.element_num
-        for element in range(self.element_num):
+        self.stress = [0.]*self.number_of_elements
+        for element in range(self.number_of_elements):
             local_stiffness = [-self._cx[element], -self._cy[element], -self._cz[element],
                         self._cx[element], self._cy[element], self._cz[element]]
             for i in range(3*2):

@@ -109,7 +109,7 @@ class Arrow3D(FancyArrowPatch):
                         dipslay_displacement[i][j] = (struct.nodal_coord_def[i][j] -
                         struct.nodal_coord[i][j]) * scale_displacements + struct.nodal_coord[i][j]
 
-        for i in range(struct.element_num):
+        for i in range(struct.number_of_elements):
             # Plot original structure
             if show_orig:
                 _ax.plot([struct.nodal_coord[struct.nodal_connections[i][1]][0], struct.nodal_coord[struct.nodal_connections[i][0]][0]],

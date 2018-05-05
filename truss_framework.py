@@ -194,7 +194,7 @@ class TrussFramework(object):
         self.cross_sectional_area_list = []                # Cross-sectional areas
         self.elastic_modulo = []                   # Material data
         self.number_of_nodes = 0              # Number of nodes
-        self.element_num = 0               # Number of elements
+        self.number_of_elements = 0               # Number of elements
         self.element_DOF = []              # Mapping between DOF and node
         self.stiffness = []           # Global stiffness matrix
         self.mod_stiffnesses = []     # Modified stiffnesses in a hyper-matrix
