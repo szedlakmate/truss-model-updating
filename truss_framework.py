@@ -12,16 +12,13 @@ try:
 except ImportError:
     print("You tried to import \'serial\' without installing \'pySerial\'.")
     print("Please first install pySerial: http://playground.arduino.cc/Interfacing/Python")
-    raise Exception('pyserial package not found')
+    raise ImportError
 try:
     from truss_graphics import Arrow3D
-    from extra_math import invert as invert
-    from extra_math import mat_vec_mult as mat_vec_mult
-    from extra_math import swap_col as swap_col
 except ImportError:
     print("Input data is missing")
-    print("Please check the config.py, graphics.py and extra_math.py files.")
-    raise Exception('Requirement is missing')
+    print("Please check the truss_graphics.py file")
+    raise ImportError
 
 
 class TrussConfiguration(object):
@@ -31,13 +28,12 @@ class TrussConfiguration(object):
     def __init__(self, input_file, compatibility_mode=2, simulation=0):
         """
         :param input_file: Input file, stored in the ./Structure folder [*.str]
-        :param title: Title of the project
         :param compatibility_mode: 0: User defined, 1: Most information (with numpy),
         2: Maximum compatibility mode, 3: Android
         :param simulation: 0: False, 1: True
         """
-        DO_NOT_MODIFY_ON = 1
-        DO_NOT_MODIFY_OFF = 0
+        static_ON = 1
+        static_OFF = 0
 
         self.input_file = input_file
         self.TIC = time.time()
@@ -64,40 +60,40 @@ class TrussConfiguration(object):
             ### Informative ###
             # DO NOT MODIFY
             self.mode_name = "Informative mode"
-            self.log = DO_NOT_MODIFY_ON
-            self.graphics = DO_NOT_MODIFY_ON
-            self.solver = DO_NOT_MODIFY_ON
-            self.OSlib = DO_NOT_MODIFY_ON
-            self.updating = DO_NOT_MODIFY_ON
-            self.arduino = DO_NOT_MODIFY_ON
-            self.debug = DO_NOT_MODIFY_OFF
-            self.realistic_simulation = DO_NOT_MODIFY_ON
+            self.log = static_ON
+            self.graphics = static_ON
+            self.solver = static_ON
+            self.OSlib = static_ON
+            self.updating = static_ON
+            self.arduino = static_ON
+            self.debug = static_OFF
+            self.realistic_simulation = static_ON
 
         elif self.compatibility_mode == 2:
             ### Maximum compatibility mode ###
             # DO NOT MODIFY
             self.mode_name = "Maximum compatibility mode"
-            self.log = DO_NOT_MODIFY_OFF
-            self.graphics = DO_NOT_MODIFY_OFF
-            self.solver = DO_NOT_MODIFY_OFF
-            self.OSlib = DO_NOT_MODIFY_OFF
-            self.updating = DO_NOT_MODIFY_OFF
-            self.arduino = DO_NOT_MODIFY_OFF
-            self.debug = DO_NOT_MODIFY_OFF
-            self.realistic_simulation = DO_NOT_MODIFY_ON
+            self.log = static_OFF
+            self.graphics = static_OFF
+            self.solver = static_OFF
+            self.OSlib = static_OFF
+            self.updating = static_OFF
+            self.arduino = static_OFF
+            self.debug = static_OFF
+            self.realistic_simulation = static_ON
 
         elif self.compatibility_mode == 3:
             ### Android mode ###
             # DO NOT MODIFY
             self.mode_name = "Android"
-            self.log = DO_NOT_MODIFY_ON
-            self.graphics = DO_NOT_MODIFY_OFF
-            self.solver = DO_NOT_MODIFY_OFF
-            self.OSlib = DO_NOT_MODIFY_ON
-            self.updating = DO_NOT_MODIFY_OFF
-            self.arduino = DO_NOT_MODIFY_OFF
-            self.debug = DO_NOT_MODIFY_OFF
-            self.realistic_simulation = DO_NOT_MODIFY_ON
+            self.log = static_ON
+            self.graphics = static_OFF
+            self.solver = static_OFF
+            self.OSlib = static_ON
+            self.updating = static_OFF
+            self.arduino = static_OFF
+            self.debug = static_OFF
+            self.realistic_simulation = static_ON
 
         if self.OSlib:
             try:
@@ -197,7 +193,7 @@ class TrussFramework(object):
         self.number_of_elements = 0               # Number of elements
         self.element_DOF = []              # Mapping between DOF and node
         self.stiffness_matrix = []           # Global stiffness matrix
-        self.modified_stiffness_matrix = []     # Modified stiffnesses in a hyper-matrix
+        self.modified_stiffness_matrices = []     # Modified stiffness matrices in a hyper-matrix
         self.element_length = []                   # Length of the elements
         self._norm_stiff = []                  # E/L
         self._cx = []
@@ -279,6 +275,9 @@ class TrussFramework(object):
             return True
         except serial.SerialException:
             print('Serial connection cannot be closed')
+            return False
+        except AttributeError:
+            print('Serial connection cannot be closed because it is not managed by this thread')
             return False
 
     def read(self):

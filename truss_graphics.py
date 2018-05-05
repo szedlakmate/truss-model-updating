@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 Extended by Máté Szedlák
+
+Used sources:
+https://stackoverflow.com/questions/29188612/arrows-in-matplotlib-using-mplot3d
+https://gist.github.com/jpwspicer/ea6d20e4d8c54e9daabbc1daabbdc027
 """
 from copy import deepcopy
-import matplotlib.pyplot as plt
+from matplotlib import pyplot
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 
@@ -48,7 +52,7 @@ class Arrow3D(FancyArrowPatch):
         # 4: [x, 1-x, 0]            Red to Green
         _coloring = 3  # € [0, 1, 2, 3, 4]
 
-        fig = plt.figure()
+        fig = pyplot.figure()
         _ax = fig.add_subplot(111, projection='3d')
 
         if struct.DOF == 2:
@@ -230,7 +234,7 @@ class Arrow3D(FancyArrowPatch):
                         [struct.nodal_coord[i//3][1], struct.nodal_coord[i//3][1]+f_dir[1]],
                         zs=[struct.nodal_coord[i//3][2], struct.nodal_coord[i//3][2]+f_dir[2]],
                         color=col, linewidth=4.0)
-        plt.show()
+        pyplot.show()
         if save_plot:
             fig.savefig("./Structures/" + plotname + '.png')
             print("'" + plotname + ".png' is saved.")

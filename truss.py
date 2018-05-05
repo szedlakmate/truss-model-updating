@@ -23,7 +23,7 @@ try:
 except ImportError:
     print("Input is missing")
     print("Please check the truss_framework.py, truss_graphics.py and extra_math.py files.")
-    raise Exception('External file is missing')
+    raise ImportError
 
 
 def error(delta):
@@ -316,11 +316,11 @@ class Truss(TrussFramework):
         """
         Convergence step in stiffness matrix modification
         """
-        if not self.modified_stiffness_matrix:
-            self.modified_stiffness_matrix = [0.]*(self.number_of_elements+1)
+        if not self.modified_stiffness_matrices:
+            self.modified_stiffness_matrices = [0.]*(self.number_of_elements+1)
 
         # for loopindex in range(self.number_of_elements):
-        modified_stiffness_matrix = [[0.]*(self.number_of_nodes*3)]*(self.number_of_nodes*3)
+        modified_stiffness_matrices = [[0.]*(self.number_of_nodes*3)]*(self.number_of_nodes*3)
 
         for i in range(self.number_of_elements):
             if i == index:
@@ -337,10 +337,10 @@ class Truss(TrussFramework):
             for j in range(3*2):
                 for k in range(3*2):
                     stiffness_increment[ele_dof_vec[k]] = _mod_loc_stiff[j][k]
-                modified_stiffness_matrix[ele_dof_vec[j]] = [x + y for x, y in
-                                                         zip(modified_stiffness_matrix[ele_dof_vec[j]], stiffness_increment)]
+                modified_stiffness_matrices[ele_dof_vec[j]] = [x + y for x, y in
+                                                         zip(modified_stiffness_matrices[ele_dof_vec[j]], stiffness_increment)]
 
-        self.modified_stiffness_matrix[index] = modified_stiffness_matrix
+        self.modified_stiffness_matrices[index] = modified_stiffness_matrices
 
     def solve(self):
         """
@@ -404,7 +404,7 @@ class Truss(TrussFramework):
         stiffness_increment = [0.]*(self.number_of_nodes*3-len(self.constraint))
         for i, kfai in enumerate(self.known_f_a):
             for j, kfaj in enumerate(self.known_f_a):
-                stiffness_increment[j] = self.modified_stiffness_matrix[index][kfai][kfaj]
+                stiffness_increment[j] = self.modified_stiffness_matrices[index][kfai][kfaj]
             stiff_new[i] = [x + y for x, y in zip(stiff_new[i], stiffness_increment)]
 
         # SOLVING THE MODIFIED STRUCTURE
@@ -747,17 +747,17 @@ class Truss(TrussFramework):
 # Setup console run
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--title", help="Title of the project", default="structure")
+    parser.add_argument("-t", "--title", metavar='str', type=str, help="Title of the project", default="structure")
     parser.add_argument("-c", "--compatibility", metavar='int', type=int, choices=range(4), default=2,
                         help="0: User defined, 1: Most information (with numpy), "
                              "2: Maximum compatibility mode, 3: Android")
-    parser.add_argument("-s", "--simulation", metavar='int', type=int, choices=range(2), default=0,
-                        help="0: No / 1: Yes")
-    parser.add_argument("input", help="Input file, stored in the ./Structure folder [*.str]", )
+    parser.add_argument("-s", "--simulation", metavar='int', type=int, choices=range(2), default=0, help="0: No|1: Yes")
+    parser.add_argument("input", metavar='str', type=str, help="Input file, stored in the ./Structure folder [*.str]")
     args = parser.parse_args()
 
     # Define new structure
-    TRUSS = Truss(args.input, str(args.title), args.compatibility, args.simulation)
+    TRUSS = Truss(input_file=args.input, title=args.title, compatibility_mode=args.compatibility,
+                  simulation=args.simulation)
 
     if TRUSS.configuration.log:
         TRUSS.configuration.start_logging()
@@ -767,7 +767,7 @@ if __name__ == '__main__':
 
     # Calculate stiffness-matrix
     TRUSS.calculate_stiffness_matrix()
-    TRUSS.configuration.part_time("Calculating Stiffness Matrix")
+    TRUSS.configuration.part_time("Calculating stiffness matrix")
 
     # Solve structure
     TRUSS.solve()
