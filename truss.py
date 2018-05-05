@@ -12,16 +12,16 @@ import itertools
 import math
 import time
 import datetime
-import numpy as np
+import numpy
 from copy import deepcopy
 try:
     from truss_framework import TrussFramework
     from truss_graphics import Arrow3D
-    from extra_math import invert as invert
+    from extra_math import invert
     from extra_math import mat_vec_mult as multiply_matrix_vector
     from extra_math import swap_col as swap_columns
 except ImportError:
-    print("Input data is missing")
+    print("Input is missing")
     print("Please check the truss_framework.py, truss_graphics.py and extra_math.py files.")
     raise Exception('External file is missing')
 
@@ -101,7 +101,7 @@ class Truss(TrussFramework):
         # Initializing defaults for all matrices
         self._init_displacement = [0.]*(3*self.number_of_nodes)
         self.force = [0.]*(3*self.number_of_nodes)
-        self.stiffness = [0.]*(3*self.number_of_nodes)
+        self.stiffness_matrix = [0.]*(3*self.number_of_nodes)
         self.known_f_a = []
         self.known_f_not_zero = []
 
@@ -221,7 +221,6 @@ class Truss(TrussFramework):
         Set special nodal DOFs
         """
         self.analysis = {}
-        print(measurement_points)
 
         for location in measurement_points:
             node = int(location[:len(location)-1])-self._io_origin
@@ -273,7 +272,7 @@ class Truss(TrussFramework):
             except ValueError:
                 pass
 
-        ele_length = [0.]*self.number_of_elements
+        elements_lengths = [0.]*self.number_of_elements
         self._norm_stiff = [0.]*self.number_of_elements
         self._cx = [0.]*self.number_of_elements
         self._cy = [0.]*self.number_of_elements
@@ -282,17 +281,15 @@ class Truss(TrussFramework):
         self._loc_stiff = [0.]*self.number_of_elements
         self.stress = [0.]*self.number_of_elements
 
-        self.stiffness = [[0.]*(len(self.nodal_coord)*3)]*(len(self.nodal_coord)*3)
+        self.stiffness_matrix = [[0.]*(self.number_of_nodes*3)]*(self.number_of_nodes*3)
 
         for i in range(self.number_of_elements):
-            ele_length[i] = math.sqrt((self.nodal_coord[self.nodal_connections[i][1]][0]-self.nodal_coord[self.nodal_connections[i][0]][0])**2 +
-                                      (self.nodal_coord[self.nodal_connections[i][1]][1]-self.nodal_coord[self.nodal_connections[i][0]][1])**2 +
-                                      (self.nodal_coord[self.nodal_connections[i][1]][2]-self.nodal_coord[self.nodal_connections[i][0]][2])**2)
+            elements_lengths[i] = math.sqrt(sum([(j-i)**2 for j, i in zip(self.nodal_coord[self.nodal_connections[i][1]], self.nodal_coord[self.nodal_connections[i][0]])]))
 
-            self._cx[i] = (self.nodal_coord[self.nodal_connections[i][1]][0]-self.nodal_coord[self.nodal_connections[i][0]][0])/ele_length[i]
-            self._cy[i] = (self.nodal_coord[self.nodal_connections[i][1]][1]-self.nodal_coord[self.nodal_connections[i][0]][1])/ele_length[i]
-            self._cz[i] = (self.nodal_coord[self.nodal_connections[i][1]][2]-self.nodal_coord[self.nodal_connections[i][0]][2])/ele_length[i]
-            self._norm_stiff[i] = self.elastic_modulo[i]/ele_length[i]
+            self._cx[i] = (self.nodal_coord[self.nodal_connections[i][1]][0]-self.nodal_coord[self.nodal_connections[i][0]][0])/elements_lengths[i]
+            self._cy[i] = (self.nodal_coord[self.nodal_connections[i][1]][1]-self.nodal_coord[self.nodal_connections[i][0]][1])/elements_lengths[i]
+            self._cz[i] = (self.nodal_coord[self.nodal_connections[i][1]][2]-self.nodal_coord[self.nodal_connections[i][0]][2])/elements_lengths[i]
+            self._norm_stiff[i] = self.elastic_modulo[i]/elements_lengths[i]
             self._s_loc[i] = [[self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i], -self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i]],
                               [self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i], -self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i]],
                               [self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2, -self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2],
@@ -302,23 +299,23 @@ class Truss(TrussFramework):
             self._loc_stiff[i] = [[y * self.cross_sectional_area_list[i] * self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
             ele_dof_vec = self.element_DOF[i]
 
-            stiffness_increment = [0.]*(len(self.nodal_coord)*3)
+            stiffness_increment = [0.]*(self.number_of_nodes*3)
 
             for j in range(3*2):
                 for k in range(3*2):
                     stiffness_increment[ele_dof_vec[k]] = self._loc_stiff[i][j][k]
-                self.stiffness[ele_dof_vec[j]] = [x + y for x, y in zip(self.stiffness[ele_dof_vec[j]], stiffness_increment)]
+                self.stiffness_matrix[ele_dof_vec[j]] = [x + y for x, y in zip(self.stiffness_matrix[ele_dof_vec[j]], stiffness_increment)]
         self._stiff_is_fresh = 1
 
     def calculate_modified_stiffness_matrix(self, index, magnitude):
         """
         Convergence step in stiffness matrix modification
         """
-        if not self.mod_stiffnesses:
-            self.mod_stiffnesses = [0.]*(self.number_of_elements+1)
+        if not self.modified_stiffness_matrix:
+            self.modified_stiffness_matrix = [0.]*(self.number_of_elements+1)
 
         # for loopindex in range(self.number_of_elements):
-        _mod_stiffnesses_temp = [[0.]*(len(self.nodal_coord)*3)]*(len(self.nodal_coord)*3)
+        modified_stiffness_matrix = [[0.]*(self.number_of_nodes*3)]*(self.number_of_nodes*3)
 
         for i in range(self.number_of_elements):
             if i == index:
@@ -330,15 +327,15 @@ class Truss(TrussFramework):
 
             ele_dof_vec = self.element_DOF[i]
 
-            stiffness_increment = [0.]*(len(self.nodal_coord)*3)
+            stiffness_increment = [0.]*(self.number_of_nodes*3)
 
             for j in range(3*2):
                 for k in range(3*2):
                     stiffness_increment[ele_dof_vec[k]] = _mod_loc_stiff[j][k]
-                _mod_stiffnesses_temp[ele_dof_vec[j]] = [x + y for x, y in
-                                                         zip(_mod_stiffnesses_temp[ele_dof_vec[j]], stiffness_increment)]
+                modified_stiffness_matrix[ele_dof_vec[j]] = [x + y for x, y in
+                                                         zip(modified_stiffness_matrix[ele_dof_vec[j]], stiffness_increment)]
 
-        self.mod_stiffnesses[index] = _mod_stiffnesses_temp
+        self.modified_stiffness_matrix[index] = modified_stiffness_matrix
 
     def solve(self):
         """
@@ -360,7 +357,7 @@ class Truss(TrussFramework):
         stiffness_increment = [0.]*(self.number_of_nodes*3-len(self.constraint))
         for i, kfai in enumerate(self.known_f_a):
             for j, kfaj in enumerate(self.known_f_a):
-                stiffness_increment[j] = self.stiffness[kfai][kfaj]
+                stiffness_increment[j] = self.stiffness_matrix[kfai][kfaj]
             self.stiff_new[i] = [x + y for x, y in zip(self.stiff_new[i], stiffness_increment)]
 
         # SOLVING THE STRUCTURE
@@ -371,7 +368,7 @@ class Truss(TrussFramework):
         else:
             if self.configuration.log:
                 print('NumPy solver')
-            self.dis_new = np.linalg.solve(np.array(self.stiff_new), np.array(self.force_new))
+            self.dis_new = numpy.linalg.solve(numpy.array(self.stiff_new), numpy.array(self.force_new))
 
         self.displacement = deepcopy(self._init_displacement)
 
@@ -402,14 +399,14 @@ class Truss(TrussFramework):
         stiffness_increment = [0.]*(self.number_of_nodes*3-len(self.constraint))
         for i, kfai in enumerate(self.known_f_a):
             for j, kfaj in enumerate(self.known_f_a):
-                stiffness_increment[j] = self.mod_stiffnesses[index][kfai][kfaj]
+                stiffness_increment[j] = self.modified_stiffness_matrix[index][kfai][kfaj]
             stiff_new[i] = [x + y for x, y in zip(stiff_new[i], stiffness_increment)]
 
         # SOLVING THE MODIFIED STRUCTURE
         if self.configuration.solver == 0:
             dis_new = multiply_matrix_vector(invert(stiff_new), self.force_new)
         else:
-            dis_new = np.linalg.solve(np.array(stiff_new), np.array(self.force_new))
+            dis_new = numpy.linalg.solve(numpy.array(stiff_new), numpy.array(self.force_new))
 
         mod_displacement_temp = deepcopy(self._init_displacement)
 
@@ -718,7 +715,7 @@ class Truss(TrussFramework):
         for i in self.known_displacement_a:
             self.force[i] = 0
             for j, displacement in enumerate(self.displacement):
-                self.force[i] += self.stiffness[i][j]*displacement
+                self.force[i] += self.stiffness_matrix[i][j]*displacement
 
     def _stresses(self):
         """
@@ -755,7 +752,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Define new structure
-    TRUSS = Truss(str(args.input), str(args.title), args.compatibility, args.simulation)
+    TRUSS = Truss(args.input, str(args.title), args.compatibility, args.simulation)
 
     if TRUSS.configuration.log:
         TRUSS.configuration.start_logging()

@@ -37,8 +37,8 @@ tries to minimize the error vector by iterating. The resulted model is called up
 
 The program can be run the following way:
 
-    python3 truss.py <input_file.str> [project_title] [compatibility_mode] [simulation]
-    python3 truss.py truss.str -t example -c 1 -s 0  
+    python3 truss.py [project_title] [compatibility_mode] [simulation] <input_file.str>
+    python3 truss.py -t example -c 1 -s 0 truss.str  
 
 Simplest run [defaults: -t structure -c 2 -s 0]:
 

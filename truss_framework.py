@@ -180,8 +180,8 @@ class TrussFramework(object):
         # Serial connection
         self.serial_connection = False  # Holds serial connection
         # Project data
-        self.title = title              # Name of structure
-        self.configuration = TrussConfiguration(input_file, compatibility_mode, simulation)
+        self.title = title.replace('.str', '')  # Name of structure
+        self.configuration = TrussConfiguration(input_file.replace('.str', '') + '.str', compatibility_mode, simulation)
         # Truss data
         self.known_f_a = []           # Nodes without supports
         self.known_f_not_zero = []     # Nodes with loads
@@ -196,8 +196,8 @@ class TrussFramework(object):
         self.number_of_nodes = 0              # Number of nodes
         self.number_of_elements = 0               # Number of elements
         self.element_DOF = []              # Mapping between DOF and node
-        self.stiffness = []           # Global stiffness matrix
-        self.mod_stiffnesses = []     # Modified stiffnesses in a hyper-matrix
+        self.stiffness_matrix = []           # Global stiffness matrix
+        self.modified_stiffness_matrix = []     # Modified stiffnesses in a hyper-matrix
         self.element_length = []                   # Length of the elements
         self._norm_stiff = []                  # E/L
         self._cx = []
@@ -412,7 +412,7 @@ class TrussFramework(object):
                         self.bulk_set_measurement_points(self.arduino_mapping)
                         self.read_elements[8] = 1
         except IOError:
-            print("The following file could not be opened: " + "./Structures/" + self.title + ".str")
+            print("The following file could not be opened: " + "./Structures/" + self.configuration.input_file)
             print("Please make sure that the structural data is available for the program in the running directory.")
             raise IOError
 
