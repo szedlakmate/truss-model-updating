@@ -278,32 +278,37 @@ class Truss(TrussFramework):
         self._cy = [0.]*self.number_of_elements
         self._cz = [0.]*self.number_of_elements
         self._s_loc = [0.]*self.number_of_elements
-        self._loc_stiff = [0.]*self.number_of_elements
+        local_stiffness_matrix = [0.]*self.number_of_elements
         self.stress = [0.]*self.number_of_elements
 
         self.stiffness_matrix = [[0.]*(self.number_of_nodes*3)]*(self.number_of_nodes*3)
 
         for i in range(self.number_of_elements):
-            elements_lengths[i] = math.sqrt(sum([(j-i)**2 for j, i in zip(self.nodal_coord[self.nodal_connections[i][1]], self.nodal_coord[self.nodal_connections[i][0]])]))
+            elements_lengths[i] =\
+                math.sqrt(sum([(j-i)**2 for j, i
+                               in zip(self.nodal_coord[self.nodal_connections[i][1]],
+                                      self.nodal_coord[self.nodal_connections[i][0]])]))
 
             self._cx[i] = (self.nodal_coord[self.nodal_connections[i][1]][0]-self.nodal_coord[self.nodal_connections[i][0]][0])/elements_lengths[i]
             self._cy[i] = (self.nodal_coord[self.nodal_connections[i][1]][1]-self.nodal_coord[self.nodal_connections[i][0]][1])/elements_lengths[i]
             self._cz[i] = (self.nodal_coord[self.nodal_connections[i][1]][2]-self.nodal_coord[self.nodal_connections[i][0]][2])/elements_lengths[i]
             self._norm_stiff[i] = self.elastic_modulo[i]/elements_lengths[i]
+            
+            # local stiffness matrix calculation
             self._s_loc[i] = [[self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i], -self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i]],
                               [self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i], -self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i]],
                               [self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2, -self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2],
                               [-self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i], self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i]],
                               [-self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i], self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i]],
                               [-self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2, self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2]]
-            self._loc_stiff[i] = [[y * self.cross_sectional_area_list[i] * self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
+            local_stiffness_matrix[i] = [[y * self.cross_sectional_area_list[i] * self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
             ele_dof_vec = self.element_DOF[i]
 
             stiffness_increment = [0.]*(self.number_of_nodes*3)
 
             for j in range(3*2):
                 for k in range(3*2):
-                    stiffness_increment[ele_dof_vec[k]] = self._loc_stiff[i][j][k]
+                    stiffness_increment[ele_dof_vec[k]] = local_stiffness_matrix[i][j][k]
                 self.stiffness_matrix[ele_dof_vec[j]] = [x + y for x, y in zip(self.stiffness_matrix[ele_dof_vec[j]], stiffness_increment)]
         self._stiff_is_fresh = 1
 
@@ -739,16 +744,16 @@ class Truss(TrussFramework):
 #   BEGINNING OF THE MAIN PART   #
 ##################################
 
-
+# Setup console run
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("input", help="Input file, stored in the ./Structure folder [*.str]", )
     parser.add_argument("-t", "--title", help="Title of the project", default="structure")
     parser.add_argument("-c", "--compatibility", metavar='int', type=int, choices=range(4), default=2,
                         help="0: User defined, 1: Most information (with numpy), "
                              "2: Maximum compatibility mode, 3: Android")
     parser.add_argument("-s", "--simulation", metavar='int', type=int, choices=range(2), default=0,
                         help="0: No / 1: Yes")
+    parser.add_argument("input", help="Input file, stored in the ./Structure folder [*.str]", )
     args = parser.parse_args()
 
     # Define new structure
@@ -793,7 +798,7 @@ if __name__ == '__main__':
 
     # Write results to file
     TRUSS.write_results("Structures/" + TRUSS.title + ' - Results.txt')
-    TRUSS.configuration.part_time("Wrote results to the output file")
+    TRUSS.configuration.part_time("Wrote results to the output file : Structures/{} - Results.txt".format(TRUSS.title))
 
     # Closing Arduino port
     if TRUSS.configuration.arduino:

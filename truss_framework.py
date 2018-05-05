@@ -204,7 +204,6 @@ class TrussFramework(object):
         self._cy = []
         self._cz = []
         self._s_loc = []
-        self._loc_stiff = []          # Local stiffnes matrix
         self.dis_new = []
         self.force_new = []
         self.stiff_new = []
@@ -664,7 +663,7 @@ class TrussFramework(object):
         # Not elegant solution
         out_specdofs = self.special_DOF_input_string
         try:
-            with open("./Structures/" + file_name, 'w') as outfile:
+            with open(file_name, 'w') as outfile:
                 # Writing data
                 outfile.write('Calculation of \'' + self.title + '\':\n\n')
 
@@ -740,6 +739,7 @@ class TrussFramework(object):
         except FileNotFoundError:
             print("Error: Please manually create the 'Structures' folder"
                   "in the root of the project")
+            raise FileNotFoundError
 
     def end_logging(self):
         self.configuration.end_logging(self)
