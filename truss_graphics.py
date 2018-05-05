@@ -7,9 +7,12 @@ https://stackoverflow.com/questions/29188612/arrows-in-matplotlib-using-mplot3d
 https://gist.github.com/jpwspicer/ea6d20e4d8c54e9daabbc1daabbdc027
 """
 from copy import deepcopy
-from matplotlib import pyplot
-from matplotlib.patches import FancyArrowPatch
-from mpl_toolkits.mplot3d import proj3d
+try:
+    from matplotlib import pyplot
+    from matplotlib.patches import FancyArrowPatch
+    from mpl_toolkits.mplot3d import proj3d
+except ImportError:
+    print("Graphical libraries could not be loaded. GUI can not be used.")
 
 
 class Arrow3D(FancyArrowPatch):

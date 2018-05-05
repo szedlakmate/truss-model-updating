@@ -12,7 +12,10 @@ import itertools
 import math
 import time
 import datetime
-import numpy
+try:
+    import numpy
+except ImportError:
+    print("NumPy could not be loaded")
 from copy import deepcopy
 try:
     from truss_framework import TrussFramework
@@ -23,7 +26,7 @@ try:
 except ImportError:
     print("Input is missing")
     print("Please check the truss_framework.py, truss_graphics.py and extra_math.py files.")
-    raise ImportError
+    print("Graphical libraries could not be loaded. GUI can not be used.")
 
 
 def error(delta):

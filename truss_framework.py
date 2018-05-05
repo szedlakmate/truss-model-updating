@@ -12,13 +12,12 @@ try:
 except ImportError:
     print("You tried to import \'serial\' without installing \'pySerial\'.")
     print("Please first install pySerial: http://playground.arduino.cc/Interfacing/Python")
-    raise ImportError
+    print("Arduino input can not be used")
 try:
     from truss_graphics import Arrow3D
 except ImportError:
     print("Input data is missing")
     print("Please check the truss_graphics.py file")
-    raise ImportError
 
 
 class TrussConfiguration(object):
