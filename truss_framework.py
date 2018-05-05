@@ -222,12 +222,12 @@ class TrussFramework(object):
         self._mod_stiff_is_fresh = 0
         self.mod_displacements = []
         self.keypoint = []
-        self.keypoint_num = 0
+        self.number_of_keypoints = 0
         self.effect = []
         self.total_effect = []
         self.sorted_effect = []
         self.special_DOF_input_string = ''
-        self.tresshold = 0.1
+        self.threshold = 0.1
         self.effect_ratio = []
         self.processed_data = []          # To store last input line
         self.modifications = []          # Storing modifications for model updating
@@ -320,96 +320,96 @@ class TrussFramework(object):
 
                     if source_line.upper() == "DOF":
                         source_line = sourcefile.readline().strip()
-                        self.set_DOF(int(source_line))
+                        self.set_model_DOF(int(source_line))
                         self.read_elements[1] = 1
 
                     if source_line.upper() == "ELEMENTS":
                         source_line = sourcefile.readline().strip()
-                        inpstr = []
-                        inpnum = []
-                        inpstr = [x.split(',') for x in source_line.split('|')]
-                        if len(inpstr[0]) == 1:
-                            inpstr = [x.split(';') for x in source_line.split('|')]
-                        if [''] in inpstr:
-                            inpstr.remove([''])
-                        inpnum = [[int(x[0]) - self._io_origin, int(x[1]) - self._io_origin] for x in inpstr]
-                        self.set_elements(inpnum)
+                        input_string = []
+                        input_number = []
+                        input_string = [x.split(',') for x in source_line.split('|')]
+                        if len(input_string[0]) == 1:
+                            input_string = [x.split(';') for x in source_line.split('|')]
+                        if [''] in input_string:
+                            input_string.remove([''])
+                        input_number = [[int(x[0]) - self._io_origin, int(x[1]) - self._io_origin] for x in input_string]
+                        self.bulk_set_elements(input_number)
                         self.read_elements[2] = 1
 
                     if source_line.upper() == "COORDINATES":
                         source_line = sourcefile.readline().strip()
-                        inpstr = []
-                        inpnum = []
-                        inpstr = [x.split(',') for x in source_line.split('|')]
-                        if len(inpstr[0]) == 1:
-                            inpstr = [x.split(';') for x in source_line.split('|')]
-                        if [''] in inpstr:
-                            inpstr.remove([''])
+                        input_string = []
+                        input_number = []
+                        input_string = [x.split(',') for x in source_line.split('|')]
+                        if len(input_string[0]) == 1:
+                            input_string = [x.split(';') for x in source_line.split('|')]
+                        if [''] in input_string:
+                            input_string.remove([''])
                         if self.DOF == 3:
-                            inpnum = [[float(x[0]), float(x[1]), float(x[2])] for x in inpstr]
+                            input_number = [[float(x[0]), float(x[1]), float(x[2])] for x in input_string]
                         elif self.DOF == 2:
-                            inpnum = [[float(x[0]), float(x[1]), 0.] for x in inpstr]
-                        self.set_coordinates(inpnum)
+                            input_number = [[float(x[0]), float(x[1]), 0.] for x in input_string]
+                        self.bulk_set_coordinates(input_number)
                         self.read_elements[3] = 1
 
                     if source_line.upper() == "CROSS-SECTIONS":
                         source_line = sourcefile.readline().strip()
-                        inpstr = []
-                        inpnum = []
-                        inpstr = source_line.split(',')
-                        if len(inpstr) == 1:
-                            inpstr = source_line.split(';')
-                        if '' in inpstr:
-                            inpstr.remove('')
-                        inpnum = [float(eval(x)) for x in inpstr]
-                        self.set_cross_sections(inpnum)
+                        input_string = []
+                        input_number = []
+                        input_string = source_line.split(',')
+                        if len(input_string) == 1:
+                            input_string = source_line.split(';')
+                        if '' in input_string:
+                            input_string.remove('')
+                        input_number = [float(eval(x)) for x in input_string]
+                        self.bulk_set_cross_sections(input_number)
                         self.read_elements[4] = 1
 
                     if source_line.upper() == "MATERIALS":
                         source_line = sourcefile.readline().strip()
-                        inpstr = []
-                        inpnum = []
-                        inpstr = source_line.split(',')
-                        if len(inpstr) == 1:
-                            inpstr = source_line.split(';')
-                        if '' in inpstr:
-                            inpstr.remove('')
-                        inpnum = [float(eval(x)) for x in inpstr]
-                        self.set_materials(inpnum)
+                        input_string = []
+                        input_number = []
+                        input_string = source_line.split(',')
+                        if len(input_string) == 1:
+                            input_string = source_line.split(';')
+                        if '' in input_string:
+                            input_string.remove('')
+                        input_number = [float(eval(x)) for x in input_string]
+                        self.bulk_set_materials(input_number)
                         self.read_elements[5] = 1
 
                     if source_line.upper() == "FORCES":
                         source_line = sourcefile.readline().strip()
-                        inpstr = []
-                        inpnum = []
-                        inpstr = [x.split(',') for x in source_line.split('|')]
-                        if len(inpstr[0]) == 1:
-                            inpstr = [x.split(';') for x in source_line.split('|')]
-                        if [''] in inpstr:
-                            inpstr.remove([''])
-                        inpnum = [[int(x[0]) - self._io_origin, float(x[1])] for x in inpstr]
-                        self.set_forces(sorted(inpnum))
+                        input_string = []
+                        input_number = []
+                        input_string = [x.split(',') for x in source_line.split('|')]
+                        if len(input_string[0]) == 1:
+                            input_string = [x.split(';') for x in source_line.split('|')]
+                        if [''] in input_string:
+                            input_string.remove([''])
+                        input_number = [[int(x[0]) - self._io_origin, float(x[1])] for x in input_string]
+                        self.bulk_set_forces(sorted(input_number))
                         self.read_elements[6] = 1
 
                     if source_line.upper() == "SUPPORTS":
                         source_line = sourcefile.readline().strip()
-                        inpstr = []
-                        inpnum = []
-                        inpstr = [x.split(',') for x in source_line.split('|')]
-                        if len(inpstr[0]) == 1:
-                            inpstr = [x.split(';') for x in source_line.split('|')]
-                        if [''] in inpstr:
-                            inpstr.remove([''])
-                        inpnum = [[int(x[0]) - self._io_origin, float(x[1])] for x in inpstr]
-                        self.set_supports(sorted(inpnum))
+                        input_string = []
+                        input_number = []
+                        input_string = [x.split(',') for x in source_line.split('|')]
+                        if len(input_string[0]) == 1:
+                            input_string = [x.split(';') for x in source_line.split('|')]
+                        if [''] in input_string:
+                            input_string.remove([''])
+                        input_number = [[int(x[0]) - self._io_origin, float(x[1])] for x in input_string]
+                        self.bulk_set_supports(sorted(input_number))
                         self.read_elements[7] = 1
 
                     if source_line.upper() == "MEASUREMENTS":
                         source_line = sourcefile.readline().strip()
                         self.special_DOF_input_string = source_line
-                        inpstr = []
+                        input_string = []
                         self.arduino_mapping = source_line.split(',')
-                        self.set_special_DOFs(self.arduino_mapping)
+                        self.bulk_set_measurement_points(self.arduino_mapping)
                         self.read_elements[8] = 1
         except IOError:
             print("The following file could not be opened: " + "./Structures/" + self.title + ".str")
@@ -460,7 +460,7 @@ class TrussFramework(object):
         """
         # Read data from Arduino
 
-        maxdifference = 0.8          # Maximum input difference treshold in mm
+        maxdifference = 0.8          # Maximum input difference threshold in mm
         arduinovalues = []
         data = [0.]*len(self.arduino_mapping)
         newdata = False

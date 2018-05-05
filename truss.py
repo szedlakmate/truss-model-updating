@@ -18,8 +18,8 @@ try:
     from truss_framework import TrussFramework
     from truss_graphics import Arrow3D
     from extra_math import invert as invert
-    from extra_math import mat_vec_mult as mat_vec_mult
-    from extra_math import swap_col as swap_col
+    from extra_math import mat_vec_mult as multiply_matrix_vector
+    from extra_math import swap_col as swap_columns
 except ImportError:
     print("Input data is missing")
     print("Please check the truss_framework.py, truss_graphics.py and extra_math.py files.")
@@ -62,21 +62,21 @@ class Truss(TrussFramework):
         else:
             return True
 
-    def set_DOF(self, DOF):
+    def set_model_DOF(self, DOF):
         """
         Setting problem's degree of freedom
         :param DOF: [2 | 3] Model's Degree Of Freedom
         :return: None
         """
         self.DOF = DOF
-        if self.DOF != 2 and self.DOF != 3:
+        if self.DOF not in [2, 3]:
             raise Exception('DOF must be 2 or 3.')
         # Set freshness flags after geometry modification
         self._stiff_is_fresh = 0
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
 
-    def set_elements(self, nodal_connection_list):
+    def bulk_set_elements(self, nodal_connection_list):
         """
         Setting elements (nodal connections) in bulk mode
 
@@ -84,7 +84,9 @@ class Truss(TrussFramework):
         i, j are the ID's of the nodes and an element is i -> j.
         :return: None
         """
+        # Set attribute
         self.nodal_connections = nodal_connection_list
+        # Recalculate pending variables
         self.number_of_nodes = len(set(list(itertools.chain.from_iterable(sorted(self.nodal_connections)))))
         self.element_num = len(self.nodal_connections)
         # Set freshness flags after geometry modification
@@ -94,26 +96,28 @@ class Truss(TrussFramework):
 
         # Creating mapping tool for elements
         for node in self.nodal_connections:
-            self.element_DOF.append([node[0]*3, node[0]*3+1, node[0]*3+2,
-                                node[1]*3, node[1]*3+1, node[1]*3+2])
+            self.element_DOF.append([node[0]*3, node[0]*3+1, node[0]*3+2, node[1]*3, node[1]*3+1, node[1]*3+2])
 
-        # Initializing matrix for all matrices
+        # Initializing defaults for all matrices
         self._init_displacement = [0.]*(3*self.number_of_nodes)
         self.force = [0.]*(3*self.number_of_nodes)
         self.stiffness = [0.]*(3*self.number_of_nodes)
         self.known_f_a = []
         self.known_f_not_zero = []
 
-    def set_coordinates(self, coordinate_list):
+    def bulk_set_coordinates(self, coordinate_list):
         """
         Setting coordinates in bulk mode
 
         :param coordinate_list: An array of coordinate arrays enlisting ALL the nodal coordinates
         :return: None
         """
+        # Set attribute
         self.nodal_coord = coordinate_list
+        # Set freshness flags after geometry modification
         self._stiff_is_fresh = 0
         self._mod_stiff_is_fresh = 0
+        # Validity check
         if self.number_of_nodes > len(self.nodal_coord):
             raise Exception('More coordinates are needed')
         elif not self.nodal_connections:
@@ -138,7 +142,7 @@ class Truss(TrussFramework):
         else:
             return False
 
-    def set_cross_sections(self, area_list):
+    def bulk_set_cross_sections(self, area_list):
         """
         Setting cross-sections in bulk mode
 
@@ -150,7 +154,7 @@ class Truss(TrussFramework):
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
 
-    def modify_crosssection(self, element_ID, new_area):
+    def modify_cross_section(self, element_ID, new_area):
         """
         Modifying cross-sections by elements
 
@@ -163,7 +167,7 @@ class Truss(TrussFramework):
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
 
-    def set_materials(self, el_mod):
+    def bulk_set_materials(self, el_mod):
         """
         Setting material data in bulk mode
         """
@@ -181,15 +185,15 @@ class Truss(TrussFramework):
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
 
-    def set_forces(self, forces):
+    def bulk_set_forces(self, forces):
         """
         Set forces
         """
-        for fdof, force in forces:
+        for location, force in forces:
             if self.DOF == 3:
-                self.force[fdof] = force
+                self.force[location] = force
             elif self.DOF == 2:
-                self.force[fdof + (fdof//2)] = force
+                self.force[location + (location//2)] = force
         self._post_processed = 0
 
     def modify_force(self, element, force):
@@ -199,45 +203,46 @@ class Truss(TrussFramework):
         self.force[element] = force
         self._post_processed = 0
 
-    def set_supports(self, constraints):
+    def bulk_set_supports(self, constraints):
         """
         Set supports
         """
-        for cdof, constraint in constraints:
+        for location, constraint in constraints:
             if self.DOF == 3:
-                self.constraint.append([cdof, constraint])
+                self.constraint.append([location, constraint])
             elif self.DOF == 2:
-                self.constraint.append([cdof + (cdof // 2), constraint])
+                self.constraint.append([location + (location // 2), constraint])
         self._stiff_is_fresh = 0
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
 
-    def set_special_DOFs(self, specdofs):
+    def bulk_set_measurement_points(self, measurement_points):
         """
         Set special nodal DOFs
         """
         self.analysis = {}
+        print(measurement_points)
 
-        for dofname in specdofs:
-            node = int(dofname[:len(dofname)-1])-self._io_origin
-            if 'X' in dofname:
-                self.analysis[dofname] = node*3+0
+        for location in measurement_points:
+            node = int(location[:len(location)-1])-self._io_origin
+            if 'X' in location:
+                self.analysis[location] = node*3+0
                 self.keypoint.append(node*3+0)
-            if 'Y' in dofname:
-                self.analysis[dofname] = node*3+1
+            if 'Y' in location:
+                self.analysis[location] = node*3+1
                 self.keypoint.append(node*3+1)
 
-            if 'Z' in dofname:
+            if 'Z' in location:
                 if self.DOF == 3:
-                    self.analysis[dofname] = node*3+2
+                    self.analysis[location] = node*3+2
                     self.keypoint.append(node*3+2)
                 else:
                     print("Z-direction is not allowed in 2D structures. "
                           "Please check the 'MEASUREMENTS' section in the input file.")
                     raise Exception
 
-        self.keypoint_num = len(self.analysis)
-        if self.keypoint_num == 0 and self.configuration.updating:
+        self.number_of_keypoints = len(self.analysis)
+        if self.number_of_keypoints == 0 and self.configuration.updating:
             print("There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file.")
             raise Exception
 
@@ -362,7 +367,7 @@ class Truss(TrussFramework):
         if self.configuration.solver == 0:
             if self.configuration.log:
                 print('Built-in solver')
-            self.dis_new = mat_vec_mult(invert(self.stiff_new), self.force_new)
+            self.dis_new = multiply_matrix_vector(invert(self.stiff_new), self.force_new)
         else:
             if self.configuration.log:
                 print('NumPy solver')
@@ -402,7 +407,7 @@ class Truss(TrussFramework):
 
         # SOLVING THE MODIFIED STRUCTURE
         if self.configuration.solver == 0:
-            dis_new = mat_vec_mult(invert(stiff_new), self.force_new)
+            dis_new = multiply_matrix_vector(invert(stiff_new), self.force_new)
         else:
             dis_new = np.linalg.solve(np.array(stiff_new), np.array(self.force_new))
 
@@ -420,17 +425,17 @@ class Truss(TrussFramework):
 
         delta: [DOF number, difference]
 
-        return effect: [efffect on 1. point, effect on 2. point, ..., modification number]
+        return effect: [effect on 1. point, effect on 2. point, ..., modification number]
                        where each line number shows the corresponding modification number
         """
-        self.effect = [[0.]*(self.keypoint_num + 2)]*self.element_num
-        self.total_effect = [0.]*self.keypoint_num
-        self.sorted_effect = [[[0.]*(self.keypoint_num + 2)]*self.element_num]*self.keypoint_num
+        self.effect = [[0.]*(self.number_of_keypoints + 2)]*self.element_num
+        self.total_effect = [0.]*self.number_of_keypoints
+        self.sorted_effect = [[[0.]*(self.number_of_keypoints + 2)]*self.element_num]*self.number_of_keypoints
 
-        effect_temp = [0.]*(self.keypoint_num + 2)
+        effect_temp = [0.]*(self.number_of_keypoints + 2)
 
         for modnum in range(self.element_num):
-            effect_temp[self.keypoint_num] = int(modnum)
+            effect_temp[self.number_of_keypoints] = int(modnum)
             for j, dofnum in enumerate(self.keypoint):
                 try:
                     effect_temp[j] = self.modified_displacements[modnum][dofnum]
@@ -443,7 +448,7 @@ class Truss(TrussFramework):
 
         self.effect_ratio = deepcopy(self.effect)
         for i in range(self.element_num):
-            for j in range(self.keypoint_num):
+            for j in range(self.number_of_keypoints):
                 if self.total_effect[j] > 0:
                     self.effect_ratio[i][j] = abs(self.effect_ratio[i][j]/self.total_effect[j])
                 else:
@@ -452,23 +457,23 @@ class Truss(TrussFramework):
         # print("   \'effectratio\' is not used yet")
 
         # Sort by effectiveness
-        for i in range(self.keypoint_num):
+        for i in range(self.number_of_keypoints):
             self.sorted_effect[i] = deepcopy(self.effect)
 
             # Check sign of the effect
             for ktemp in range(self.element_num):
                 if self.sorted_effect[i][ktemp][i] < 0:
-                    for jtemp in range(self.keypoint_num):
+                    for jtemp in range(self.number_of_keypoints):
                         self.sorted_effect[i][ktemp][jtemp] = abs(self.sorted_effect[i][ktemp][jtemp])
-                        self.sorted_effect[i][ktemp][self.keypoint_num + 1] = -1
+                        self.sorted_effect[i][ktemp][self.number_of_keypoints + 1] = -1
                 else:
-                    self.sorted_effect[i][ktemp][self.keypoint_num + 1] = +1
+                    self.sorted_effect[i][ktemp][self.number_of_keypoints + 1] = +1
 
-            for j in range(self.keypoint_num):
+            for j in range(self.number_of_keypoints):
                 if i != j and j != 0:
-                    self.sorted_effect[i] = swap_col(sorted(swap_col(self.sorted_effect[i], 0, j), reverse=True), 0, j)
+                    self.sorted_effect[i] = swap_columns(sorted(swap_columns(self.sorted_effect[i], 0, j), reverse=True), 0, j)
             if i != 0:
-                self.sorted_effect[i] = swap_col(sorted(swap_col(self.sorted_effect[i], 0, i), reverse=True), 0, i)
+                self.sorted_effect[i] = swap_columns(sorted(swap_columns(self.sorted_effect[i], 0, i), reverse=True), 0, i)
             else:
                 self.sorted_effect[i] = sorted(self.sorted_effect[i], reverse=True)
 
