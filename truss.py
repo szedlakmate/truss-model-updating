@@ -19,7 +19,6 @@ except ImportError:
 from copy import deepcopy
 try:
     from truss_framework import TrussFramework
-    from truss_graphics import Arrow3D
     from extra_math import invert
     from extra_math import mat_vec_mult as multiply_matrix_vector
     from extra_math import swap_col as swap_columns

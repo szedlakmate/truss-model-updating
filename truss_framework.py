@@ -13,11 +13,6 @@ except ImportError:
     print("You tried to import \'serial\' without installing \'pySerial\'.")
     print("Please first install pySerial: http://playground.arduino.cc/Interfacing/Python")
     print("Arduino input can not be used")
-try:
-    from truss_graphics import Arrow3D
-except ImportError:
-    print("Input data is missing")
-    print("Please check the truss_graphics.py file")
 
 
 class TrussConfiguration(object):
@@ -438,6 +433,9 @@ class TrussFramework(object):
 
                 plot(O, D, S, F, R, ScD, ScF, ScS, Save)
         """
+        # Import is located here due to Android compatibility issues
+        from truss_graphics import Arrow3D
+
         _showvalues = 1     # Show values of forces
 
         if self._post_processed == 0:
