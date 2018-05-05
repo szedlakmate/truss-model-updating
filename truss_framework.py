@@ -176,6 +176,8 @@ class TrussFramework(object):
         # Serial connection
         self.serial_connection = False  # Holds serial connection
         # Project data
+        if title == '':
+            title = input_file
         self.title = title.replace('.str', '')  # Name of structure
         self.configuration = TrussConfiguration(input_file.replace('.str', '') + '.str', compatibility_mode, simulation)
         # Truss data

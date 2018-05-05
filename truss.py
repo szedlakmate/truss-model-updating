@@ -747,7 +747,8 @@ class Truss(TrussFramework):
 # Setup console run
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--title", metavar='str', type=str, help="Title of the project", default="structure")
+    parser.add_argument("-t", "--title", metavar='str', type=str,
+                        help="Manually label project. By default it comes from the input file's name.", default='')
     parser.add_argument("-c", "--compatibility", metavar='int', type=int, choices=range(4), default=2,
                         help="0: User defined, 1: Most information (with numpy), "
                              "2: Maximum compatibility mode, 3: Android")

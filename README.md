@@ -35,26 +35,30 @@ tries to minimize the error vector by iterating. The resulted model is called up
 
 ## Quick Start
 
+### Normal run
 The program can be run the following way:
 
     python3 truss.py [project_title] [compatibility_mode] [simulation] <input_file.str>
     python3 truss.py -t example -c 1 -s 0 truss.str  
 
-Simplest run [defaults: -t structure -c 2 -s 0]:
+#### Simplest run
+*[defaults: t=<input_file's name> c=2 s=0]*
 
-    python3 truss.py bridge.str
+    python3 truss.py bridge
     
-Model updating example:
+The ".str" ending is optional at the arguments.
+    
+#### Model updating example
 
 * with Arduino serial input:
 
-        python3 truss.py bridge.str -c 1 -s 0
+        python3 truss.py -c 1 -s 0 bridge.str
 
 * with simulation:
 
-        python3 truss.py bridge.str -c 1 -s 1
+        python3 truss.py -c 1 -s 1 bridge.str
         
-For help:
+#### Help
 
     python3 truss.py -h
 
@@ -91,7 +95,8 @@ Mode | Mode's name | Logging | Graphics | Numpy solver | OSlib | Updating | Ardu
 
 *User defined settings may vary according to the local configurations.
 
-**Code can be run on Android devices with 3rd party applications, like [QPython3](https://play.google.com/store/apps/details?id=org.qpython.qpy3)
+**Code can be run on Android devices with 3rd party applications, like [QPython3](https://play.google.com/store/apps/details?id=org.qpython.qpy3) or [	
+QPy3.6.](https://play.google.com/store/apps/details?id=org.qpython.qpy36)
 
 ### Simulations
 
