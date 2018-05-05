@@ -100,7 +100,8 @@ QPy3.6.](https://play.google.com/store/apps/details?id=org.qpython.qpy36)
 
 ### Simulations
 
-Generally, model updating is possible in this application by supplying measurement data by an Arduino device.
+Generally, model updating is possible in this application by supplying measurement data 
+by an Arduino Uno device***.
 This approach has a few cons:
 
 * Updating method can be run in real time only
@@ -113,4 +114,6 @@ reused by the simulation anytime later.
 Turning on simulation opens the backup file and loads the measurement stream. This can be done in two different ways:
 * fast-forward (default): processing the data as fast as possible
 * realistic-mode: each measurement is given to the program in a scheduled way, using the timestamps. 
+ 
+ ***See [this program](https://github.com/szedlakmate/arduino-ultrasound-distance-measurement) created as part of the project.
  
