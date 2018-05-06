@@ -137,4 +137,3 @@ Turning on simulation opens the backup file and loads the measurement stream. Th
 * realistic-mode: each measurement is given to the program in a scheduled way, using the timestamps. 
  
  ***See [this program](https://github.com/szedlakmate/arduino-ultrasound-distance-measurement) created as part of the project.
- 
