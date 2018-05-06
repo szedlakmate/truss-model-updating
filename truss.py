@@ -658,8 +658,7 @@ class Truss(TrussFramework):
                 pass
             filemode = 'r'
 
-        if not self.configuration.simulation:
-            with open("./Simulation-recording/" + str(self.title) + ' - Input Data.txt', filemode) as input_file:
+            with open("./Simulation/" + str(self.title) + ' - Input Data.txt', filemode) as input_file:
                 # Saving input data
                 if not self.configuration.simulation:
                     input_file.write('Input data of \'' + self.title + '\':\n\n')
@@ -685,6 +684,7 @@ class Truss(TrussFramework):
                             pass
                         if delta:
                             self.optimize(delta)
+
         print("Update statistics:")
         print("Totally updated models: " + str(self.updating_container.number_of_updates[0] + self.updating_container.number_of_updates[1] + self.updating_container.number_of_updates[2]))
         print("  Successfully updated models: " + str(self.updating_container.number_of_updates[0]))

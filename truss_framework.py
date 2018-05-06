@@ -37,7 +37,7 @@ class TrussConfiguration(object):
         self.compatibility_mode = compatibility_mode
         self.simulation = simulation
         self.updating = {'error_limit': 0.5, 'modification_limit': 0.6,
-                          'unit_modification': 0.05, 'iteration_limit': 20}
+                         'unit_modification': 0.05, 'iteration_limit': 20}
         # #Updates where there were no more modification option]
         #self.updating.iteration_limit = 20
 
@@ -128,7 +128,7 @@ class TrussConfiguration(object):
         print('------------------------------------')
 
     def end_logging(self, number_of_updates):
-        
+
         self.TAC = time.time()
         self.TOTAL_TIME = self.TAC - self.TIC
         if self.updating:
@@ -172,6 +172,7 @@ class ModelUpdatingContainer(object):
         self.arduino_mapping = []
         self.measurement = [0.]
         self.number_of_updates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit,
+        self.modified_displacements = []
 
 
 
@@ -222,7 +223,6 @@ class TrussFramework(object):
         self.stiff_new = []
         self.displacement = []        # Relative displacements
         self.known_displacement_a = []
-        self.modified_displacements = []
         self._stiff_is_fresh = 0
         self._post_processed = 0
         self._init_displacement = []
@@ -472,31 +472,31 @@ class TrussFramework(object):
         # Read data from Arduino
 
         maxdifference = 0.8          # Maximum input difference threshold in mm
-        arduinovalues = []
+        arduino_values = []
         data = [0.]*len(self.updating_container.arduino_mapping)
         newdata = False
         bigdifference = False
         readerror = False
 
         try:
-            arduinoline = self.serial_connection.readline()
-            if len(arduinoline) > 0:
-                arduinovalues = arduinoline.split(',')
+            arduino_line = self.serial_connection.readline()
+            if len(arduino_line) > 0:
+                arduino_values = arduino_line.split(',')
                 try:
-                    if arduinovalues[0][len(arduinovalues)-1] == '.':
-                        arduinovalues[0] = arduinovalues[0][:len(arduinovalues[0])-2]
+                    if arduino_values[0][len(arduino_values)-1] == '.':
+                        arduino_values[0] = arduino_values[0][:len(arduino_values[0])-2]
                     else:
-                        del arduinovalues[len(arduinovalues)-1]
+                        del arduino_values[len(arduino_values)-1]
                 except IndexError:
                     print("Index Error... continuing")
-                if len(arduinovalues) == len(self.updating_container.arduino_mapping):
+                if len(arduino_values) == len(self.updating_container.arduino_mapping):
                     try:
                         for i in range(len(self.updating_container.arduino_mapping)):
-                            data[i] = float(arduinovalues[i]) - float(base[i][1])
+                            data[i] = float(arduino_values[i]) - float(base[i][1])
 
                             if abs(data[i] - self.processed_data[i]) > maxdifference:
                                 bigdifference = True
-                            if abs(float(arduinovalues[i])) < 2.0:
+                            if abs(float(arduino_values[i])) < 2.0:
                                 readerror = True
 
                         self.processed_data = data
@@ -507,7 +507,7 @@ class TrussFramework(object):
                         self.serial_connection.flushInput()
                         time.sleep(0.5)
                     except Exception:
-                        print("Type error: " + str(arduinovalues) + "... continuing")
+                        print("Type error: " + str(arduino_values) + "... continuing")
                         self.serial_connection.flushInput()
                         time.sleep(0.5)
 
@@ -536,47 +536,29 @@ class TrussFramework(object):
         bigdifference = False
         readerror = False
 
-    def simulate_arduino(self, arduinoline, prevline):
+    def mock_delta(self, arduino_line, previous_line):
         """
         Simulate data, based on previous measurement
         """
-        arduinovalues = []
+        arduino_values = []
         data = [0.]*len(self.updating_container.arduino_mapping)
 
-        skip = 0
-        sleeptime = 0.
         try:
+            arduino_line = str(arduino_line.split(']')[0])+"]"
+            arduino_values = eval(arduino_line)
             try:
-                prevreadtime = float(str(prevline.split(']')[1]).split(',')[1])
-                nowreadtime = float(str(arduinoline.split(']')[1]).split(',')[1])
-                try:
-                    if self.configuration.realistic_simulation:
-                        sleeptime = nowreadtime - prevreadtime
-                except Exception:
-                    pass
+                for i in range(len(self.updating_container.arduino_mapping)):
+                    data[i] = float(arduino_values[i])
+                self.processed_data = data
             except Exception:
-                skip = 1
-                sleeptime = 0.
+                print("Type error: " + str(arduino_values) + "... continuing")
 
-            if not skip:
-                if not sleeptime > 0:
-                    sleeptime = 0.
-                arduinoline = str(arduinoline.split(']')[0])+"]"
-                arduinovalues = eval(arduinoline)
-                try:
-                    for i in range(len(self.updating_container.arduino_mapping)):
-                        data[i] = float(arduinovalues[i])
-                    self.processed_data = data
-                except Exception:
-                    print("Type error: " + str(arduinovalues) + "... continuing")
+            self.updating_container.measurement = zip(self.updating_container.arduino_mapping, data)
 
-                self.updating_container.measurement = zip(self.updating_container.arduino_mapping, data)
-
-                # Calculate differences
-                delta = self.difference(self.displacement, self.updating_container.measurement)
-                time.sleep(sleeptime)
-                print(delta)
-                return delta
+            # Calculate differences
+            delta = self.difference(self.displacement, self.updating_container.measurement)
+            print(delta)
+            return delta
 
         except IndexError:
             print("IndexError")
@@ -593,7 +575,7 @@ class TrussFramework(object):
         answer_1 = '0'
         restart = '0'
         accept = '0'
-        arduinovalues = []
+        arduino_values = []
         print("Before starting the model updating, the measuring tools must be calibrated.")
         print("The calibration should be done in load-free state.")
         while answer_1 not in ['Y', 'N']:
@@ -608,16 +590,16 @@ class TrussFramework(object):
             try:
                 self.serial_connection.flushInput()
                 # time.sleep(0.2)
-                arduinoline = ''  # self.serial_connection.readline()
-                while len(arduinoline) == 0:
+                arduino_line = ''  # self.serial_connection.readline()
+                while len(arduino_line) == 0:
                     time.sleep(0.2)
-                    arduinoline = self.serial_connection.readline()
+                    arduino_line = self.serial_connection.readline()
 
-                if len(arduinoline) > 0:
-                    arduinovalues = arduinoline.split(',')
-                    del arduinovalues[len(arduinovalues)-1]               # if needed!!!
-                    if len(arduinovalues) == len(self.updating_container.arduino_mapping):
-                        measurement = zip(self.updating_container.arduino_mapping, arduinovalues)
+                if len(arduino_line) > 0:
+                    arduino_values = arduino_line.split(',')
+                    del arduino_values[len(arduino_values)-1]               # if needed!!!
+                    if len(arduino_values) == len(self.updating_container.arduino_mapping):
+                        measurement = zip(self.updating_container.arduino_mapping, arduino_values)
                         print("Calibration result:")
                         print(measurement)
                         while accept not in ['Y', 'N']:
@@ -626,7 +608,7 @@ class TrussFramework(object):
                                 restart = 'Y'
                     else:
                         print("Data error. Calibartion is restarting.")
-                        print("Arduino values:" + str(arduinovalues))
+                        print("Arduino values:" + str(arduino_values))
                         restart = 'Y'
                 else:
                     print('The calibration cannot be done: no data')
@@ -667,9 +649,9 @@ class TrussFramework(object):
 
         if self.configuration.simulation:
             self.arduino_simulation_thread = self.open_simulation_thread()
-            self.configuration.prevline
+            self.configuration.previous_line
 
-            return self.simulate_arduino()
+            return self.mock_delta()
         else:
             return self.calibrate()
 
@@ -807,7 +789,7 @@ class TrussFramework(object):
             outfile.write(str(self.displacement) + "\n")
             if j > 1:
                 outfile.write("New displacements: \n")
-                outfile.write(str(self.modified_displacements[self.number_of_elements]) + "\n")
+                outfile.write(str(self.updating_container.modified_displacements[self.number_of_elements]) + "\n")
             outfile.write("----------------------\n")
 
     def end_logging(self):
