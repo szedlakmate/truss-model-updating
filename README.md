@@ -38,13 +38,13 @@ tries to minimize the error vector by iterating. The resulted model is called up
 ### Normal run
 The program can be run the following way:
 
-    python3 truss.py [project_title] [compatibility_mode] [simulation] <input_file.str>
-    python3 truss.py -t example -c 1 -s 0 truss.str  
+    python3 truss.py [project_title] [compatibility_mode] [simulation] [input_file.str]
+    python3 truss.py -t example -c 1 -s 0 -i truss.str  
 
 #### Simplest run
 *[defaults: t=<input_file's name> c=2 s=0]*
 
-    python3 truss.py bridge
+    python3 truss.py -i bridge
     
 The ".str" ending is optional at the arguments.
     
@@ -52,11 +52,11 @@ The ".str" ending is optional at the arguments.
 
 * with Arduino serial input:
 
-        python3 truss.py -c 1 -s 0 bridge.str
+        python3 truss.py -c 1 -s 0 -i bridge.str
 
 * with simulation:
 
-        python3 truss.py -c 1 -s 1 bridge.str
+        python3 truss.py -c 1 -s 1 -i bridge.str
         
 #### Help
 
