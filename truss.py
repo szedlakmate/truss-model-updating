@@ -511,6 +511,8 @@ class Truss(TrussFramework):
     def optimize(self, delta):
         """
         Model updating - core function
+        :param delta: difference between the calculated model and the latest measurement
+        :return: True - the optimization step was succeful | False - Optimization failed
         """
 
         modnum = self.number_of_elements
@@ -583,8 +585,10 @@ class Truss(TrussFramework):
         if not self.capable() and j > 1:
             print("Optimization could not be finished successfully.")
             print("The remaining error is: " + str(error(newdelta)))
+            return False
 
         self.write_output_stream(j, appendix)
+        return True
 
     def capable(self):
         """
@@ -592,8 +596,13 @@ class Truss(TrussFramework):
         """
         capable = False
         for variable in self.updating_container.modifications:
-            if 0.01 < abs(variable) <= 0.95*self.updating_container.modification_limit:
+            if abs(variable) <= 0.95 * self.updating_container.modification_limit:
                 capable = True
+                break
+            else:
+                pass
+                #print('FAIL')
+                # TODO: not to reach this part of the code
         return capable
         
     def start_model_updating(self, unit_modification=0.05, error_limit=1.2, modification_limit=0.7, iteration_limit=100):
@@ -658,13 +667,9 @@ class Truss(TrussFramework):
                             if self.updating_container.original_delta == []:
                                 self.updating_container.original_delta = delta
                                 self.updating_container.latest_delta = delta
-                            self.optimize(delta)
+                            if not self.optimize(delta):
+                                break
 
-        print("Update statistics:")
-        print("Totally updated models: " + str(self.updating_container.number_of_updates[0] + self.updating_container.number_of_updates[1] + self.updating_container.number_of_updates[2]))
-        print("  Successfully updated models: " + str(self.updating_container.number_of_updates[0]))
-        print("  Updates with running out of possibilities: " + str(self.updating_container.number_of_updates[2]))
-        print("  Updates did not finished: " + str(self.updating_container.number_of_updates[1]))
 
     def post_process(self):
         """
