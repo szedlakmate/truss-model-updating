@@ -6,12 +6,9 @@ Created on April 30 18:49:40 2018
 For more information please check the README
 Copyright MIT, Máté Szedlák 2016-2018.
 """
-import os
 import argparse
 import itertools
 import math
-import time
-import datetime
 try:
     import numpy
 except ImportError:
@@ -19,27 +16,14 @@ except ImportError:
 from copy import deepcopy
 try:
     from truss_framework import TrussFramework
+    from truss_framework import error
     from extra_math import invert
     from extra_math import mat_vec_mult as multiply_matrix_vector
     from extra_math import swap_col as swap_columns
 except ImportError:
     print("Input is missing")
-    print("Please check the truss_framework.py, truss_graphics.py and extra_math.py files.")
+    print("Please check the truss_framework.py and extra_math.py files.")
     print("Graphical libraries could not be loaded. GUI can not be used.")
-
-
-def error(delta):
-    """
-    Error function using least-square method
-    :param delta: error vector
-    :return: sum of errors using least-square method
-    """
-    sum_of_errors = 0
-    for delta_element in delta:
-        sum_of_errors += delta_element**2
-        sum_of_errors = math.sqrt(sum_of_errors)
-
-    return sum_of_errors
 
 
 class Truss(TrussFramework):
@@ -67,17 +51,18 @@ class Truss(TrussFramework):
     def set_model_DOF(self, DOF):
         """
         Setting problem's degree of freedom
+
         :param DOF: [2 | 3] Model's Degree Of Freedom
         :return: None
         """
         self.DOF = DOF
         if self.DOF not in [2, 3]:
             raise Exception('DOF must be 2 or 3.')
+        
         # Set freshness flags after geometry modification
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
-        self._post_processed = 0
+        self.invalidate_stiffness_matrices('all')
 
+    # TODO: This functions is probably not called although it should be part of the set_base() process
     def bulk_set_elements(self, nodal_connection_list):
         """
         Setting elements (nodal connections) in bulk mode
@@ -88,13 +73,13 @@ class Truss(TrussFramework):
         """
         # Set attribute
         self.nodal_connections = nodal_connection_list
+        
         # Recalculate pending variables
         self.number_of_nodes = len(set(list(itertools.chain.from_iterable(sorted(self.nodal_connections)))))
         self.number_of_elements = len(self.nodal_connections)
+        
         # Set freshness flags after geometry modification
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
-        self._post_processed = 0
+        self.invalidate_stiffness_matrices()
 
         # Creating mapping tool for elements
         for node in self.nodal_connections:
@@ -111,20 +96,24 @@ class Truss(TrussFramework):
         """
         Setting coordinates in bulk mode
 
-        :param coordinate_list: An array of coordinate arrays enlisting ALL the nodal coordinates
+        :param coordinate_list: An array of coordinate arrays (2/3 elements) enlisting ALL the nodal coordinates
         :return: None
         """
         # Set attribute
         self.nodal_coord = coordinate_list
+        
         # Set freshness flags after geometry modification
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
+        self.invalidate_stiffness_matrices('all')
+        
         # Validity check
         if self.number_of_nodes > len(self.nodal_coord):
             raise Exception('More coordinates are needed')
         elif not self.nodal_connections:
             raise Exception('Nodes must be set before defining elements')
         self._check_coordinates(False)
+
+        # TODO: move the default save locations to the new 'Rsults' folder
+
 
     def modify_coordinate(self, node_ID, new_coordinate):
         """
@@ -138,8 +127,7 @@ class Truss(TrussFramework):
         """
         if self._check_coordinates(True):
             self.nodal_coord[node_ID] = new_coordinate
-            self._stiff_is_fresh = 0
-            self._mod_stiff_is_fresh = 0
+            self.invalidate_stiffness_matrices('all')
             return True
         else:
             return False
@@ -148,13 +136,11 @@ class Truss(TrussFramework):
         """
         Setting cross-sections in bulk mode
 
-        :param area_list: an array enlisting the cross-sectional data
+        :param area_list: cross-sectional data array according to the elements
         :return: None
         """
         self.cross_sectional_area_list = area_list
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
-        self._post_processed = 0
+        self.invalidate_stiffness_matrices('all')
 
     def modify_cross_section(self, element_ID, new_area):
         """
@@ -165,60 +151,74 @@ class Truss(TrussFramework):
         :return: None
         """
         self.cross_sectional_area_list[element_ID] = new_area
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
-        self._post_processed = 0
+        self.invalidate_stiffness_matrices('all')
 
-    def bulk_set_materials(self, el_mod):
+    def bulk_set_materials(self, E):
         """
         Setting material data in bulk mode
-        """
-        self.elastic_modulo = el_mod
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
-        self._post_processed = 0
 
-    def modify_material(self, element, el_mod):
+        :param E: array of elastic modulos according to the elements
+        :return: None
+        """
+        self.elastic_modulo = E
+        self.invalidate_stiffness_matrices('all')
+
+    def modify_material(self, element_ID, E):
         """
         Modifying material data by elements
+
+        :param element_ID: ID of the element ehich should be modified
+        :param E: {number} Elastic modulo
+        :return: None
         """
-        self.elastic_modulo[element] = el_mod
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
-        self._post_processed = 0
+        self.elastic_modulo[element_ID] = E
+        self.invalidate_stiffness_matrices('all')
 
     def bulk_set_forces(self, forces):
         """
         Set forces
+
+        :param forces: matrix of forces in the following pattern: [[location, force], ...]
+        :return: None
         """
+        # DOF dependent mapping
         for location, force in forces:
             if self.DOF == 3:
                 self.force[location] = force
             elif self.DOF == 2:
                 self.force[location + (location//2)] = force
-        self._post_processed = 0
+        self.set_postprocess_needed_flag()
 
-    def modify_force(self, element, force):
+    def modify_force(self, element_ID, force):
         """
-        Modifying forces by each
+        Modifying specific force
+
+        :param element_ID: the ID of the element which should be mofidifed
+        :param force: new force value
+        :return: None
         """
-        self.force[element] = force
-        self._post_processed = 0
+        self.force[element_ID] = force
+        self.set_postprocess_needed_flag()
 
     def bulk_set_supports(self, constraints):
         """
         Set supports
+
+        :param constraints: matrix of constraints in the following pattern: [[location, constraint], ...]
+        :return:
         """
         for location, constraint in constraints:
             if self.DOF == 3:
                 self.constraint.append([location, constraint])
             elif self.DOF == 2:
                 self.constraint.append([location + (location // 2), constraint])
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
-        self._post_processed = 0
+        self.invalidate_stiffness_matrices('all')
 
-    def bulk_set_measurement_points(self, measurement_points):
+        self.set_postprocess_needed_flag()
+        
+
+
+    def bulk_set_measurement_points(self, measurement_points=['13Y']):
         """
         Set special nodal DOFs
         """
@@ -251,7 +251,7 @@ class Truss(TrussFramework):
         """
         Stiffness matrix compilation
         """
-        self._post_processed = 0
+        self.set_postprocess_needed_flag()
 
         if self.DOF == 2:
             for dof_z in range(self.number_of_nodes):
@@ -295,7 +295,7 @@ class Truss(TrussFramework):
             self._cy[i] = (self.nodal_coord[self.nodal_connections[i][1]][1]-self.nodal_coord[self.nodal_connections[i][0]][1])/elements_lengths[i]
             self._cz[i] = (self.nodal_coord[self.nodal_connections[i][1]][2]-self.nodal_coord[self.nodal_connections[i][0]][2])/elements_lengths[i]
             self._norm_stiff[i] = self.elastic_modulo[i]/elements_lengths[i]
-            
+
             # local stiffness matrix calculation
             self._s_loc[i] = [[self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i], -self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i]],
                               [self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i], -self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i]],
@@ -326,9 +326,9 @@ class Truss(TrussFramework):
 
         for i in range(self.number_of_elements):
             if i == index:
-                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i] + magnitude)  # E[i]/L[i]
+                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.updating_container.modifications[i] + magnitude)  # E[i]/L[i]
             else:
-                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i])  # E[i]/L[i]
+                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.updating_container.modifications[i])  # E[i]/L[i]
 
             _mod_loc_stiff = [[y*self.cross_sectional_area_list[i]*_mod_norm_stiff for y in x] for x in self._s_loc[i]]
 
@@ -391,14 +391,14 @@ class Truss(TrussFramework):
         # Postrpocesses
         self.post_process()
 
-        self.modified_displacements = [0.]*(self.number_of_elements+1)
+        self.updating_container.modified_displacements = [0.]*(self.number_of_elements+1)
 
     def solve_modified_structure(self, index):
         """
         Solver for the modified structures. 'Index' shows the actual modification number.
         """
 
-        self.modified_displacements[index] = [0.]*(self.number_of_nodes*3)
+        self.updating_container.modified_displacements[index] = [0.]*(self.number_of_nodes*3)
 
         dis_new = [0.]*(self.number_of_nodes*3-len(self.constraint))
         stiff_new = [[0.]*(self.number_of_nodes*3-len(self.constraint))]*(self.number_of_nodes*3-len(self.constraint))
@@ -420,7 +420,7 @@ class Truss(TrussFramework):
         for i, kfa in enumerate(self.known_f_a):
             mod_displacement_temp[kfa] = dis_new[i] - self.dis_new[i]
 
-        self.modified_displacements[index] = [x + y for x, y in zip(self.modified_displacements[index], mod_displacement_temp)]
+        self.updating_container.modified_displacements[index] = [x + y for x, y in zip(self.updating_container.modified_displacements[index], mod_displacement_temp)]
 
     def evaluate(self):
         """
@@ -432,9 +432,9 @@ class Truss(TrussFramework):
         return effect: [effect on 1. point, effect on 2. point, ..., modification number]
                        where each line number shows the corresponding modification number
         """
-        self.effect = [[0.]*(self.number_of_keypoints + 2)]*self.number_of_elements
-        self.total_effect = [0.]*self.number_of_keypoints
-        self.sorted_effect = [[[0.]*(self.number_of_keypoints + 2)]*self.number_of_elements]*self.number_of_keypoints
+        self.updating_container.effect = [[0.]*(self.number_of_keypoints + 2)]*self.number_of_elements
+        self.updating_container.total_effect = [0.]*self.number_of_keypoints
+        self.updating_container.sorted_effect = [[[0.]*(self.number_of_keypoints + 2)]*self.number_of_elements]*self.number_of_keypoints
 
         effect_temp = [0.]*(self.number_of_keypoints + 2)
 
@@ -442,19 +442,19 @@ class Truss(TrussFramework):
             effect_temp[self.number_of_keypoints] = int(modnum)
             for j, dofnum in enumerate(self.keypoint):
                 try:
-                    effect_temp[j] = self.modified_displacements[modnum][dofnum]
-                    self.effect[modnum] = [x for x in effect_temp]
-                    self.total_effect[j] += abs(self.effect[modnum][j])
+                    effect_temp[j] = self.updating_container.modified_displacements[modnum][dofnum]
+                    self.updating_container.effect[modnum] = [x for x in effect_temp]
+                    self.updating_container.total_effect[j] += abs(self.updating_container.effect[modnum][j])
                 except IndexError:
                     print("Maybe the mapping data is invalid.")
                     print("Please check the \'arduino_mapping.txt\' input whether the given DOFs are correct or not.")
                     raise IndexError
 
-        self.effect_ratio = deepcopy(self.effect)
+        self.effect_ratio = deepcopy(self.updating_container.effect)
         for i in range(self.number_of_elements):
             for j in range(self.number_of_keypoints):
-                if self.total_effect[j] > 0:
-                    self.effect_ratio[i][j] = abs(self.effect_ratio[i][j]/self.total_effect[j])
+                if self.updating_container.total_effect[j] > 0:
+                    self.effect_ratio[i][j] = abs(self.effect_ratio[i][j]/self.updating_container.total_effect[j])
                 else:
                     self.effect_ratio[i][j] = 0
 
@@ -462,24 +462,24 @@ class Truss(TrussFramework):
 
         # Sort by effectiveness
         for i in range(self.number_of_keypoints):
-            self.sorted_effect[i] = deepcopy(self.effect)
+            self.updating_container.sorted_effect[i] = deepcopy(self.updating_container.effect)
 
             # Check sign of the effect
             for ktemp in range(self.number_of_elements):
-                if self.sorted_effect[i][ktemp][i] < 0:
+                if self.updating_container.sorted_effect[i][ktemp][i] < 0:
                     for jtemp in range(self.number_of_keypoints):
-                        self.sorted_effect[i][ktemp][jtemp] = abs(self.sorted_effect[i][ktemp][jtemp])
-                        self.sorted_effect[i][ktemp][self.number_of_keypoints + 1] = -1
+                        self.updating_container.sorted_effect[i][ktemp][jtemp] = abs(self.updating_container.sorted_effect[i][ktemp][jtemp])
+                        self.updating_container.sorted_effect[i][ktemp][self.number_of_keypoints + 1] = -1
                 else:
-                    self.sorted_effect[i][ktemp][self.number_of_keypoints + 1] = +1
+                    self.updating_container.sorted_effect[i][ktemp][self.number_of_keypoints + 1] = +1
 
             for j in range(self.number_of_keypoints):
                 if i != j and j != 0:
-                    self.sorted_effect[i] = swap_columns(sorted(swap_columns(self.sorted_effect[i], 0, j), reverse=True), 0, j)
+                    self.updating_container.sorted_effect[i] = swap_columns(sorted(swap_columns(self.updating_container.sorted_effect[i], 0, j), reverse=True), 0, j)
             if i != 0:
-                self.sorted_effect[i] = swap_columns(sorted(swap_columns(self.sorted_effect[i], 0, i), reverse=True), 0, i)
+                self.updating_container.sorted_effect[i] = swap_columns(sorted(swap_columns(self.updating_container.sorted_effect[i], 0, i), reverse=True), 0, i)
             else:
-                self.sorted_effect[i] = sorted(self.sorted_effect[i], reverse=True)
+                self.updating_container.sorted_effect[i] = sorted(self.updating_container.sorted_effect[i], reverse=True)
 
     def difference(self, num_displ, measurement):
         """
@@ -492,7 +492,9 @@ class Truss(TrussFramework):
 
         delta = []
 
-        for loc, measured in measurement:
+        for measured in measurement:
+            #loc, measured = package[0], package[1]
+            loc = '13Y'
             try:
                 dof = self.analysis[loc.upper()]
             except KeyError:
@@ -509,10 +511,12 @@ class Truss(TrussFramework):
     def optimize(self, delta):
         """
         Model updating - core function
+        :param delta: difference between the calculated model and the latest measurement
+        :return: True - the optimization step was succeful | False - Optimization failed
         """
-        # modnum = min(10, self.number_of_elements)
+
         modnum = self.number_of_elements
-        self.modifications = [0.0]*self.number_of_elements
+        self.updating_container.modifications = [0.0]*self.number_of_elements
 
         if not self.configuration.simulation:
             appendix = ""
@@ -523,54 +527,55 @@ class Truss(TrussFramework):
         j = 0
 
         print("-----")
-        print("Step: 0/" + str(self.iteration_limit))
+        print("Step: 0/" + str(self.updating_container.iteration_limit))
 
         # Optimization loop
-        while error(newdelta) > self.error_limit and j <= self.iteration_limit and (self.capable() or j <= 1):
+        while error(newdelta) > self.updating_container.error_limit and j <= self.updating_container.iteration_limit and (self.capable() or j <= 1):
             j += 1
 
             print("Error: " + str(error(newdelta)))
             print("-----")
-            print("Step: " + str(j) + "/" + str(self.iteration_limit))
+            print("Step: " + str(j) + "/" + str(self.updating_container.iteration_limit))
 
             ratio = [0.]*modnum
             unit = 0
 
-            prevmodifications = self.modifications
+            prevmodifications = self.updating_container.modifications
 
             for index in range(self.number_of_elements):
-                self.modifications[index] = min(abs(self.modifications[index] - self.unit_modification),
-                                                self.modification_limit) * \
-                                            math.copysign(1, self.modifications[index] - self.unit_modification)
-                self.calculate_modified_stiffness_matrix(index, self.modifications[index])
+                self.updating_container.modifications[index] = min(abs(self.updating_container.modifications[index] - self.updating_container.unit_modification),
+                                                self.updating_container.modification_limit) * \
+                                            math.copysign(1, self.updating_container.modifications[index] - self.updating_container.unit_modification)
+                self.calculate_modified_stiffness_matrix(index, self.updating_container.modifications[index])
                 self.solve_modified_structure(index)
             self.evaluate()
 
             self.calculate_modified_stiffness_matrix(self.number_of_elements, 0)
             self.solve_modified_structure(self.number_of_elements)
 
-            newdelta = self.difference(self.modified_displacements[self.number_of_elements], self.measurement)
+            newdelta = self.difference(self.updating_container.modified_displacements[self.number_of_elements],
+                                       self.updating_container.measurement)
 
-            for i, effect in enumerate(self.total_effect):
+            for i, effect in enumerate(self.updating_container.total_effect):
                 if effect == 0.0:
                     print("None of the variables has effect on " + str(self.arduino_mapping[i]))
                     print("Model updating has no solution.")
                     raise Exception
 
             for i in range(self.number_of_elements):
-                modificationnumber = self.sorted_effect[0][i][1]
-                ratio[modificationnumber] = abs(self.sorted_effect[0][i][0] / self.total_effect[0]) * \
-                                            math.copysign(1, self.sorted_effect[0][i][2])
-                unit += abs(ratio[modificationnumber]*self.sorted_effect[0][i][0])
-
+                modificationnumber = self.updating_container.sorted_effect[0][i][1]
+                ratio[modificationnumber] = abs(self.updating_container.sorted_effect[0][i][0] / self.updating_container.total_effect[0]) * \
+                                            math.copysign(1, self.updating_container.sorted_effect[0][i][2])
+                unit += abs(ratio[modificationnumber]*self.updating_container.sorted_effect[0][i][0])
+            print(newdelta)
             scale = newdelta[0]/unit
             for i in range(self.number_of_elements):
-                modificationnumber = self.sorted_effect[0][i][1]
-                self.modifications[modificationnumber] = min(abs(prevmodifications[modificationnumber] -
-                                                                 self.unit_modification*ratio[modificationnumber]),
-                                                             self.modification_limit) \
+                modificationnumber = self.updating_container.sorted_effect[0][i][1]
+                self.updating_container.modifications[modificationnumber] = min(abs(prevmodifications[modificationnumber] -
+                                                                 self.updating_container.unit_modification*ratio[modificationnumber]),
+                                                             self.updating_container.modification_limit) \
                                                          * math.copysign(1, prevmodifications[modificationnumber] -
-                                                                         self.unit_modification*ratio[modificationnumber])
+                                                                         self.updating_container.unit_modification*ratio[modificationnumber])
                 # the last part is already the sign itself without the sign function
 
             print("Ratio: " + str(scale))
@@ -580,130 +585,91 @@ class Truss(TrussFramework):
         if not self.capable() and j > 1:
             print("Optimization could not be finished successfully.")
             print("The remaining error is: " + str(error(newdelta)))
+            return False
 
-        with open("./Structures/" + self.title + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
-            if j > 1:
-                if j <= self.iteration_limit and self.capable():
-                    self.number_of_updates[0] += 1
-                    outfile.write("Update state: SUCCESSFUL\n")
-                if not j <= self.iteration_limit:
-                    self.number_of_updates[1] += 1
-                    outfile.write("Update state: Run out of iteration limit\n")
-                if not self.capable() and j > 1:
-                    self.number_of_updates[2] += 1
-                    outfile.write("Update state: No more possible modification\n")
-            else:
-                outfile.write("Update state: Optimization was skipped\n")
-            outfile.write("Required iterations: " + str(j) + "\n")
-            outfile.write("Measurement: " + str(self.measurement) + "\n")
-            outfile.write("Original delta: " + str(delta) + "\n")
-            outfile.write("New delta: " + str(newdelta) + " (limit: " + str(self.error_limit) + ")\n")
-            outfile.write("Final error: " + str(error(newdelta)) + "\n")
-            outfile.write("Modifications [%]: \n")
-            outfile.write(str(self.modifications) + "\n")
-            outfile.write("Original displacements: \n")
-            outfile.write(str(self.displacement) + "\n")
-            if j > 1:
-                outfile.write("New displacements: \n")
-                outfile.write(str(self.modified_displacements[self.number_of_elements]) + "\n")
-            outfile.write("----------------------\n")
+        self.write_output_stream(j, appendix)
+        return True
 
     def capable(self):
         """
         Function telling whether there are more options to modify
         """
         capable = False
-        for variable in self.modifications:
-            if 0.01 < abs(variable) <= 0.95*self.modification_limit:
+        for variable in self.updating_container.modifications:
+            if abs(variable) <= 0.95 * self.updating_container.modification_limit:
                 capable = True
+                break
+            else:
+                pass
+                #print('FAIL')
+                # TODO: not to reach this part of the code
         return capable
+        
+    def start_model_updating(self, unit_modification=0.05, error_limit=1.2, modification_limit=0.7, iteration_limit=100):
+        """
+        Configuring the solver. If the iterations do not converge, settings shall be tuned here
 
-    def set_error_limit(self, errorlimit):
+        :param unit_modification: Setting modification step (model updating)
+        :param error_limit: Setting general stop parameter for model updating
+        :param modification_limit: Setting modification limit for members (model updating)
+        :param iteration_limit: Setting maximum number of iterations (model updating)
+        :return:
         """
-        Setting general stop parameter for model updating
-        """
-        if errorlimit > 0.0:
-            self.error_limit = errorlimit
+        if 0.01 <= abs(unit_modification) < 0.5:
+            self.updating_container.unit_modification = unit_modification
+        else:
+            print("The absolute value of the unit modification must be minimum 0.01 and maximum 0.5")
+            raise Exception
+        if error_limit > 0.0:
+            self.updating_container.error_limit = error_limit
         else:
             print("The error limit must be a positive number")
             raise Exception
 
-    def set_modification_limit(self, modification_limit):
-        """
-        Setting modification limit for members (model updating)
-        """
         if 0.0 < modification_limit < 1.0:
-            self.modification_limit = modification_limit
+            self.updating_container.modification_limit = modification_limit
         else:
             print("The modification limit must be higher than 0.0 and lower than 1.0")
             raise Exception
 
-    def set_unit_modification(self, unit_modification):
-        """
-        Setting modification step (model updating)
-        """
-        if 0.01 <= abs(unit_modification) < 0.5:
-            self.unit_modification = unit_modification
-        else:
-            print("The absolute value of the unit modification must be minimum 0.01 and maximum 0.5")
-            raise Exception
-
-    def set_iteration_limit(self, iteration_limit):
-        """
-        Setting maximum number of iterations (model updating)
-        """
         if 1 < int(iteration_limit) <= math.pow(10, 4):
-            self.iteration_limit = int(iteration_limit)
+            self.updating_container.iteration_limit = int(iteration_limit)
         else:
             print("The iteration limit must be between 2 and 10.000")
             raise Exception
+
+        # TODO: This call starts the optimization loop in a very unlucky way. This should be refactored!
+        self.update_model()
 
     def update_model(self):
         """
         General function to manage model updating procedure.
         """
-        self.processed_data = [0.]*len(self.arduino_mapping)
+        self.processed_data = [0.]*1 #*len(self.arduino_mapping)
 
         if not self.configuration.simulation:
-            base = self.calibrate()
+            base = self.set_base()
             filemode = 'a'
         else:
+            #self.bulk_set_measurement_points()
             base = ['SIMULATION']
-            try:
-                os.remove(str(self.title) + ' - UpdateResults - SIMULATED.txt')
-            except Exception:
-                pass
             filemode = 'r'
-
-        with open("./Structures/" + str(self.title) + ' - Input Data.txt', filemode) as input_file:
-            # Saving input data
-            if not self.configuration.simulation:
-                input_file.write('Input data of \'' + self.title + '\':\n\n')
-                input_file.write('Start Time: ' +
-                                str(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')) + "\n")
-                input_file.write('Base: ' + str(base) + '\n')
-
-            new_line = "[],0.0"
-            for i in range(1000):
-                if not self.configuration.simulation:
-                    delta = self.readarduino(base, input_file)
-                    self.optimize(delta)
-                else:
-                    delta = None
-                    try:
+            self.check_folder('Simulation')
+            with open("./Simulation/" + str(self.title) + ' - Input Data.txt', filemode) as input_file:
+                new_line = "[],0.0"
+                for i in range(1000):
+                        delta = None
                         previous_line = new_line
                         new_line = input_file.readline()
                         if not new_line == '':
-                            delta = self.simulate_arduino(new_line, previous_line)
-                    except Exception:
-                        pass
-                    if delta:
-                        self.optimize(delta)
-        print("Update statistics:")
-        print("Totally updated models: " + str(TRUSS.num_of_updates[0] + TRUSS.num_of_updates[1] + TRUSS.num_of_updates[2]))
-        print("  Successfully updated models: " + str(TRUSS.num_of_updates[0]))
-        print("  Updates with running out of possibilities: " + str(TRUSS.num_of_updates[2]))
-        print("  Updates did not finished: " + str(TRUSS.num_of_updates[1]))
+                            delta = self.mock_delta(new_line, previous_line)
+                        if delta:
+                            if self.updating_container.original_delta == []:
+                                self.updating_container.original_delta = delta
+                                self.updating_container.latest_delta = delta
+                            if not self.optimize(delta):
+                                break
+
 
     def post_process(self):
         """
@@ -751,15 +717,24 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--title", metavar='str', type=str,
                         help="Manually label project. By default it comes from the input file's name.", default='')
-    parser.add_argument("-c", "--compatibility", metavar='int', type=int, choices=range(4), default=2,
+    parser.add_argument("-c", "--compatibility", metavar='int', type=int, choices=range(4), default=1,
                         help="0: User defined, 1: Most information (with numpy), "
                              "2: Maximum compatibility mode, 3: Android")
-    parser.add_argument("-s", "--simulation", metavar='int', type=int, choices=range(2), default=0, help="0: No|1: Yes")
-    parser.add_argument("input", metavar='str', type=str, help="Input file, stored in the ./Structure folder [*.str]")
+    parser.add_argument("-s", "--simulation", metavar='int', type=int, choices=range(2), default=1, help="0: No|1: Yes")
+    parser.add_argument("-i", "--input", metavar='str', type=str, default="", help="Input file, stored in the ./Structure folder [*.str]")
     args = parser.parse_args()
 
+    if args.input != "":
+        input = args.input
+    else:
+        input = "bridge"
+        print("DEMO MODE")
+        print("You started the program in demo mode.\nThe following example is based on the bridge.str file which "
+              "is located in the Structures folder.")
+
+
     # Define new structure
-    TRUSS = Truss(input_file=args.input, title=args.title, compatibility_mode=args.compatibility,
+    TRUSS = Truss(input_file=input, title=args.title, compatibility_mode=args.compatibility,
                   simulation=args.simulation)
 
     if TRUSS.configuration.log:
@@ -776,15 +751,6 @@ if __name__ == '__main__':
     TRUSS.solve()
     TRUSS.configuration.part_time("Solving")
 
-    # Update iteration
-    if TRUSS.configuration.updating:
-        TRUSS.set_unit_modification(0.05)
-        TRUSS.set_error_limit(1.2)
-        TRUSS.set_modification_limit(0.7)
-        TRUSS.set_iteration_limit(100)
-        TRUSS.update_model()
-        TRUSS.configuration.part_time("Updating numerical model")
-
     # Plotting
     if TRUSS.configuration.graphics:
         # Plot settings:
@@ -800,12 +766,19 @@ if __name__ == '__main__':
         TRUSS.configuration.part_time("Plotting")
 
     # Write results to file
-    TRUSS.write_results("Structures/" + TRUSS.title + ' - Results.txt')
+    TRUSS.write_results()
     TRUSS.configuration.part_time("Wrote results to the output file : Structures/{} - Results.txt".format(TRUSS.title))
+
+    # Update iteration
+    if TRUSS.configuration.updating:
+        TRUSS.start_model_updating(unit_modification=0.05, error_limit=1.2, modification_limit=0.7, iteration_limit=100)
+        TRUSS.configuration.part_time("Updating numerical model")
+
+    # TODO: plot the updated model
 
     # Closing Arduino port
     if TRUSS.configuration.arduino:
-        TRUSS.close_serial()
+        TRUSS.configuration.disconnect()
 
     # End logging
     if TRUSS.configuration.log:

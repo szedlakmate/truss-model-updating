@@ -4,6 +4,9 @@
 
 This program was written to show a numerical model updating example on 3D trusses. 
 
+The concept of `model updating` can be read
+[here.](https://upcommons.upc.edu/bitstream/handle/2099.1/20685/Tesina_RoserMarre.pdf)
+
 ### Features
 
 The program has 2 major features:
@@ -21,8 +24,11 @@ General program for solving a truss with the following attributes:
 
 Using the `Truss Solver`, considering the given loads, the displacements can be calculated. Of course
 if we add measurements, a delta vector can be computed from the calculated and measured displacements.
-Using this, by modifying the used numerical model the error vector can be reduced. This part of the code
-tries to minimize the error vector by iterating. The resulted model is called updated model.  
+Using this, by modifying the used numerical model the error vector can be reduced. 
+
+In my project I have added an Arduino Uno device to supply the solver with these measurements.
+The result is a real-time measurement stream which enables the solver to continuously optimize the structure.
+This part of the code tries to minimize the error vector by iterating. The resulted model is called `updated model`.  
 
 ## Technical Requirements
 
@@ -35,16 +41,31 @@ tries to minimize the error vector by iterating. The resulted model is called up
 
 ## Quick Start
 
+#### Demo
+
+In demo mode, the program performs the following tasks:
+
+1. Loads the `bridge.str` file in the `Structures` folder, including the loads
+1. Solves the structure, calculate secondary variables like stresses
+1. Saves the results and the plots according to the settings in the `Structures` directory
+1. Enters the `model updating simulation` mode and loads the simulated on-the-fly measurement stream
+1. Based on the continuously changing measurements, the solver tries to find a possible satisfying modified model.
+This solution has the least modifications according to source model
+so possibly this was the original model instead of the given one. 
+1. In parallel, partially saves the solution steps in the `Results` folder.
+
 ### Normal run
+
 The program can be run the following way:
 
-    python3 truss.py [project_title] [compatibility_mode] [simulation] <input_file.str>
-    python3 truss.py -t example -c 1 -s 0 truss.str  
+    python3 truss.py [project_title] [compatibility_mode] [simulation] [input_file.str]
+    python3 truss.py -t example -c 1 -s 0 -i truss.str  
 
 #### Simplest run
+
 *[defaults: t=<input_file's name> c=2 s=0]*
 
-    python3 truss.py bridge
+    python3 truss.py -i bridge
     
 The ".str" ending is optional at the arguments.
     
@@ -52,11 +73,11 @@ The ".str" ending is optional at the arguments.
 
 * with Arduino serial input:
 
-        python3 truss.py -c 1 -s 0 bridge.str
+        python3 truss.py -c 1 -s 0 -i bridge.str
 
 * with simulation:
 
-        python3 truss.py -c 1 -s 1 bridge.str
+        python3 truss.py -c 1 -s 1 -i bridge.str
         
 #### Help
 
@@ -71,8 +92,8 @@ The following options are available in the configuration process:
 * Graphics: Creates and saves diagrams/pictures about the structure (uses external libraries)
 * NumPy solver: Force uses the Numpy solver instead of the built-in one
 * Oslib: OS file action availability
-* Updating: Enables model updating
-* Arduino: Enables Arduino input stream
+* Updating: Enables model updating. This feature requires real-time measurements on which the need of the update roots.
+* Arduino: Enables Arduino input stream for the real-time measurements, required by the `model updating function`
 * Debug: Speeds up runtime by some tweaks. DO NOT USE 'in production'
 * Realistic simulations: Opens the saved input stream and fetches data with realistic delays/timing according to the timestamps. Effective only with simulation ON.
 
