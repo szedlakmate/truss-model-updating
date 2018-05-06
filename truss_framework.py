@@ -19,6 +19,7 @@ class TrussConfiguration(object):
     """
     Truss configuration file
     """
+
     def __init__(self, input_file, compatibility_mode=2, simulation=0):
         """
         :param input_file: Input file, stored in the ./Structure folder [*.str]
@@ -46,10 +47,10 @@ class TrussConfiguration(object):
             # Modify as needed #
             self.mode_name = "User defined"
             self.log = 1  # Logging time
-            self.graphics = 1  # Graphical features
+            self.graphics = 0  # Graphical features
             self.solver = 1  # 0: Basic solver, 1: NumPy solver
             self.OSlib = 1  # Basic OS file features (e.g. file size)
-            self.updating = 0  # Model Updating: On/ Off
+            self.updating = 1  # Model Updating: On/ Off
             self.arduino = 0  # Arduino input: On/Off
             self.debug = 1  # Debugging mode
             self.realistic_simulation = 0  # Wait as long as it was originally. Only valid with _SIMULATION = 1
@@ -173,6 +174,9 @@ class ModelUpdatingContainer(object):
         self.measurement = [0.]
         self.number_of_updates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit,
         self.modified_displacements = []
+        self.effect = []
+        self.total_effect = []
+        self.sorted_effect = []
 
 
 
@@ -519,7 +523,8 @@ class TrussFramework(object):
             time.sleep(0.5)
 
         if newdata and not bigdifference and not readerror:
-            self.updating_container.measurement = zip(self.updating_container.arduino_mapping, data)
+            # self.updating_container.measurement = zip(self.updating_container.arduino_mapping, data)
+            self.updating_container.measurement = data
 
             save_input.write(str(data) + ', ' + str(time.time()) + "\n")
             # Calculate differences
@@ -541,11 +546,13 @@ class TrussFramework(object):
         Simulate data, based on previous measurement
         """
         arduino_values = []
-        data = [0.]*len(self.updating_container.arduino_mapping)
-
+        data = [0.]*1 #*len(self.updating_container.arduino_mapping)
         try:
             arduino_line = str(arduino_line.split(']')[0])+"]"
-            arduino_values = eval(arduino_line)
+            try:
+                arduino_values = eval(arduino_line)
+            except SyntaxError:
+                print('Error: "' + str(arduino_line) + '"')
             try:
                 for i in range(len(self.updating_container.arduino_mapping)):
                     data[i] = float(arduino_values[i])
@@ -557,13 +564,12 @@ class TrussFramework(object):
 
             # Calculate differences
             delta = self.difference(self.displacement, self.updating_container.measurement)
-            print(delta)
             return delta
 
         except IndexError:
             print("IndexError")
             # pass
-        except Exception:
+        except IndexError:
             print("Exception in simulation data")
             # pass
 
@@ -648,10 +654,13 @@ class TrussFramework(object):
     def set_base(self):
 
         if self.configuration.simulation:
-            self.arduino_simulation_thread = self.open_simulation_thread()
+            #self.arduino_simulation_thread = self.open_simulation_thread()
             self.configuration.previous_line
 
-            return self.mock_delta()
+            print("HARD CODED PART 3")
+            self.configuration.updating.base = 27
+
+            return 0 #self.mock_delta()
         else:
             return self.calibrate()
 

@@ -218,7 +218,7 @@ class Truss(TrussFramework):
         self._mod_stiff_is_fresh = 0
         self._post_processed = 0
 
-    def bulk_set_measurement_points(self, measurement_points):
+    def bulk_set_measurement_points(self, measurement_points=['13Y']):
         """
         Set special nodal DOFs
         """
@@ -295,7 +295,7 @@ class Truss(TrussFramework):
             self._cy[i] = (self.nodal_coord[self.nodal_connections[i][1]][1]-self.nodal_coord[self.nodal_connections[i][0]][1])/elements_lengths[i]
             self._cz[i] = (self.nodal_coord[self.nodal_connections[i][1]][2]-self.nodal_coord[self.nodal_connections[i][0]][2])/elements_lengths[i]
             self._norm_stiff[i] = self.elastic_modulo[i]/elements_lengths[i]
-            
+
             # local stiffness matrix calculation
             self._s_loc[i] = [[self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i], -self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i]],
                               [self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i], -self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i]],
@@ -391,14 +391,14 @@ class Truss(TrussFramework):
         # Postrpocesses
         self.post_process()
 
-        self.modified_displacements = [0.]*(self.number_of_elements+1)
+        self.updating_container.modified_displacements = [0.]*(self.number_of_elements+1)
 
     def solve_modified_structure(self, index):
         """
         Solver for the modified structures. 'Index' shows the actual modification number.
         """
 
-        self.modified_displacements[index] = [0.]*(self.number_of_nodes*3)
+        self.updating_container.modified_displacements[index] = [0.]*(self.number_of_nodes*3)
 
         dis_new = [0.]*(self.number_of_nodes*3-len(self.constraint))
         stiff_new = [[0.]*(self.number_of_nodes*3-len(self.constraint))]*(self.number_of_nodes*3-len(self.constraint))
@@ -420,7 +420,7 @@ class Truss(TrussFramework):
         for i, kfa in enumerate(self.known_f_a):
             mod_displacement_temp[kfa] = dis_new[i] - self.dis_new[i]
 
-        self.modified_displacements[index] = [x + y for x, y in zip(self.modified_displacements[index], mod_displacement_temp)]
+        self.updating_container.modified_displacements[index] = [x + y for x, y in zip(self.updating_container.modified_displacements[index], mod_displacement_temp)]
 
     def evaluate(self):
         """
@@ -432,9 +432,9 @@ class Truss(TrussFramework):
         return effect: [effect on 1. point, effect on 2. point, ..., modification number]
                        where each line number shows the corresponding modification number
         """
-        self.effect = [[0.]*(self.number_of_keypoints + 2)]*self.number_of_elements
-        self.total_effect = [0.]*self.number_of_keypoints
-        self.sorted_effect = [[[0.]*(self.number_of_keypoints + 2)]*self.number_of_elements]*self.number_of_keypoints
+        self.updating_container.effect = [[0.]*(self.number_of_keypoints + 2)]*self.number_of_elements
+        self.updating_container.total_effect = [0.]*self.number_of_keypoints
+        self.updating_container.sorted_effect = [[[0.]*(self.number_of_keypoints + 2)]*self.number_of_elements]*self.number_of_keypoints
 
         effect_temp = [0.]*(self.number_of_keypoints + 2)
 
@@ -442,19 +442,19 @@ class Truss(TrussFramework):
             effect_temp[self.number_of_keypoints] = int(modnum)
             for j, dofnum in enumerate(self.keypoint):
                 try:
-                    effect_temp[j] = self.modified_displacements[modnum][dofnum]
-                    self.effect[modnum] = [x for x in effect_temp]
-                    self.total_effect[j] += abs(self.effect[modnum][j])
+                    effect_temp[j] = self.updating_container.modified_displacements[modnum][dofnum]
+                    self.updating_container.effect[modnum] = [x for x in effect_temp]
+                    self.updating_container.total_effect[j] += abs(self.updating_container.effect[modnum][j])
                 except IndexError:
                     print("Maybe the mapping data is invalid.")
                     print("Please check the \'arduino_mapping.txt\' input whether the given DOFs are correct or not.")
                     raise IndexError
 
-        self.effect_ratio = deepcopy(self.effect)
+        self.effect_ratio = deepcopy(self.updating_container.effect)
         for i in range(self.number_of_elements):
             for j in range(self.number_of_keypoints):
-                if self.total_effect[j] > 0:
-                    self.effect_ratio[i][j] = abs(self.effect_ratio[i][j]/self.total_effect[j])
+                if self.updating_container.total_effect[j] > 0:
+                    self.effect_ratio[i][j] = abs(self.effect_ratio[i][j]/self.updating_container.total_effect[j])
                 else:
                     self.effect_ratio[i][j] = 0
 
@@ -462,24 +462,24 @@ class Truss(TrussFramework):
 
         # Sort by effectiveness
         for i in range(self.number_of_keypoints):
-            self.sorted_effect[i] = deepcopy(self.effect)
+            self.updating_container.sorted_effect[i] = deepcopy(self.updating_container.effect)
 
             # Check sign of the effect
             for ktemp in range(self.number_of_elements):
-                if self.sorted_effect[i][ktemp][i] < 0:
+                if self.updating_container.sorted_effect[i][ktemp][i] < 0:
                     for jtemp in range(self.number_of_keypoints):
-                        self.sorted_effect[i][ktemp][jtemp] = abs(self.sorted_effect[i][ktemp][jtemp])
-                        self.sorted_effect[i][ktemp][self.number_of_keypoints + 1] = -1
+                        self.updating_container.sorted_effect[i][ktemp][jtemp] = abs(self.updating_container.sorted_effect[i][ktemp][jtemp])
+                        self.updating_container.sorted_effect[i][ktemp][self.number_of_keypoints + 1] = -1
                 else:
-                    self.sorted_effect[i][ktemp][self.number_of_keypoints + 1] = +1
+                    self.updating_container.sorted_effect[i][ktemp][self.number_of_keypoints + 1] = +1
 
             for j in range(self.number_of_keypoints):
                 if i != j and j != 0:
-                    self.sorted_effect[i] = swap_columns(sorted(swap_columns(self.sorted_effect[i], 0, j), reverse=True), 0, j)
+                    self.updating_container.sorted_effect[i] = swap_columns(sorted(swap_columns(self.updating_container.sorted_effect[i], 0, j), reverse=True), 0, j)
             if i != 0:
-                self.sorted_effect[i] = swap_columns(sorted(swap_columns(self.sorted_effect[i], 0, i), reverse=True), 0, i)
+                self.updating_container.sorted_effect[i] = swap_columns(sorted(swap_columns(self.updating_container.sorted_effect[i], 0, i), reverse=True), 0, i)
             else:
-                self.sorted_effect[i] = sorted(self.sorted_effect[i], reverse=True)
+                self.updating_container.sorted_effect[i] = sorted(self.updating_container.sorted_effect[i], reverse=True)
 
     def difference(self, num_displ, measurement):
         """
@@ -492,7 +492,9 @@ class Truss(TrussFramework):
 
         delta = []
 
-        for loc, measured in measurement:
+        for measured in measurement:
+            #loc, measured = package[0], package[1]
+            loc = '13Y'
             try:
                 dof = self.analysis[loc.upper()]
             except KeyError:
@@ -504,13 +506,14 @@ class Truss(TrussFramework):
 
             delta.append(measured - num_displ[dof])
 
+        print('delta: ' + str(delta))
         return delta
 
     def optimize(self, delta):
         """
         Model updating - core function
         """
-        # modnum = min(10, self.number_of_elements)
+
         modnum = self.number_of_elements
         self.modifications = [0.0]*self.number_of_elements
 
@@ -549,29 +552,24 @@ class Truss(TrussFramework):
             self.calculate_modified_stiffness_matrix(self.number_of_elements, 0)
             self.solve_modified_structure(self.number_of_elements)
 
-            print(self.modified_displacements[self.number_of_elements])
-            print(self.measurement)
-            if not self.configuration.simulation:
-                measurement = self.measurement
-            else:
-                measurement = self.simulate_arduino()
-            newdelta = self.difference(self.modified_displacements[self.number_of_elements], measurement)
+            newdelta = self.difference(self.updating_container.modified_displacements[self.number_of_elements],
+                                       self.updating_container.measurement)
 
-            for i, effect in enumerate(self.total_effect):
+            for i, effect in enumerate(self.updating_container.total_effect):
                 if effect == 0.0:
                     print("None of the variables has effect on " + str(self.arduino_mapping[i]))
                     print("Model updating has no solution.")
                     raise Exception
 
             for i in range(self.number_of_elements):
-                modificationnumber = self.sorted_effect[0][i][1]
-                ratio[modificationnumber] = abs(self.sorted_effect[0][i][0] / self.total_effect[0]) * \
-                                            math.copysign(1, self.sorted_effect[0][i][2])
-                unit += abs(ratio[modificationnumber]*self.sorted_effect[0][i][0])
+                modificationnumber = self.updating_container.sorted_effect[0][i][1]
+                ratio[modificationnumber] = abs(self.updating_container.sorted_effect[0][i][0] / self.updating_container.total_effect[0]) * \
+                                            math.copysign(1, self.updating_container.sorted_effect[0][i][2])
+                unit += abs(ratio[modificationnumber]*self.updating_container.sorted_effect[0][i][0])
             print(newdelta)
             scale = newdelta[0]/unit
             for i in range(self.number_of_elements):
-                modificationnumber = self.sorted_effect[0][i][1]
+                modificationnumber = self.updating_container.sorted_effect[0][i][1]
                 self.modifications[modificationnumber] = min(abs(prevmodifications[modificationnumber] -
                                                                  self.unit_modification*ratio[modificationnumber]),
                                                              self.modification_limit) \
@@ -643,45 +641,23 @@ class Truss(TrussFramework):
         """
         General function to manage model updating procedure.
         """
-        print("HARD CODED PART")
         self.processed_data = [0.]*1 #*len(self.arduino_mapping)
 
         if not self.configuration.simulation:
             base = self.set_base()
             filemode = 'a'
         else:
+            #self.bulk_set_measurement_points()
             base = ['SIMULATION']
-            try:
-                #os.remove(str(self.title) + ' - UpdateResults - SIMULATED.txt')
-                print('HARD CODED PART 2')
-            except Exception:
-                pass
             filemode = 'r'
-
             with open("./Simulation/" + str(self.title) + ' - Input Data.txt', filemode) as input_file:
-                # Saving input data
-                if not self.configuration.simulation:
-                    input_file.write('Input data of \'' + self.title + '\':\n\n')
-                    input_file.write('Start Time: ' +
-                                    str(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')) + "\n")
-                    input_file.write('Base: ' + str(base) + '\n')
-
                 new_line = "[],0.0"
                 for i in range(1000):
-                    if not self.configuration.simulation:
-                        delta = self.readarduino(base, input_file)
-                        self.optimize(delta)
-                    else:
                         delta = None
-                        try:
-                            previous_line = new_line
-                            new_line = input_file.readline()
-                            if not new_line == '':
-                                print(previous_line)
-                                print(new_line)
-                                delta = self.simulate_arduino(new_line, previous_line)
-                        except Exception:
-                            pass
+                        previous_line = new_line
+                        new_line = input_file.readline()
+                        if not new_line == '':
+                            delta = self.mock_delta(new_line, previous_line)
                         if delta:
                             self.optimize(delta)
 
