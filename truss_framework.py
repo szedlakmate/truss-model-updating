@@ -156,10 +156,10 @@ class TrussConfiguration(object):
             print("  Updates with running out of possibilities: " + str(number_of_updates[2]))
             print("  Updates did not finished: " + str(number_of_updates[1]))
             # print('Total time: ' + str("{:10.3f}".format(self.TOTAL_TIME)))
-            print("Total time: {:10.3f}".format(self.TOTAL_TIME))
+            print("\nTotal time: {:10.3f}".format(self.TOTAL_TIME))
 
         else:
-            print("Total time: {:10.3f}".format(self.TOTAL_TIME))
+            print("\nTotal time: {:10.3f}".format(self.TOTAL_TIME))
 
     def part_time(self, message):
         """
