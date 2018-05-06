@@ -526,15 +526,15 @@ class Truss(TrussFramework):
         j = 0
 
         print("-----")
-        print("Step: 0/" + str(self.iteration_limit))
+        print("Step: 0/" + str(self.updating_container.iteration_limit))
 
         # Optimization loop
-        while error(newdelta) > self.error_limit and j <= self.iteration_limit and (self.capable() or j <= 1):
+        while error(newdelta) > self.updating_container.error_limit and j <= self.updating_container.iteration_limit and (self.capable() or j <= 1):
             j += 1
 
             print("Error: " + str(error(newdelta)))
             print("-----")
-            print("Step: " + str(j) + "/" + str(self.iteration_limit))
+            print("Step: " + str(j) + "/" + str(self.updating_container.iteration_limit))
 
             ratio = [0.]*modnum
             unit = 0
@@ -596,46 +596,42 @@ class Truss(TrussFramework):
             if 0.01 < abs(variable) <= 0.95*self.modification_limit:
                 capable = True
         return capable
+        
+    def start_model_updating(self, unit_modification=0.05, error_limit=1.2, modification_limit=0.7, iteration_limit=100):
+        """
+        Configuring the solver. If the iterations do not converge, settings shall be tuned here
 
-    def set_error_limit(self, errorlimit):
+        :param unit_modification: Setting modification step (model updating)
+        :param error_limit: Setting general stop parameter for model updating
+        :param modification_limit: Setting modification limit for members (model updating)
+        :param iteration_limit: Setting maximum number of iterations (model updating)
+        :return:
         """
-        Setting general stop parameter for model updating
-        """
-        if errorlimit > 0.0:
-            self.error_limit = errorlimit
+        if 0.01 <= abs(unit_modification) < 0.5:
+            self.updating_container.unit_modification = unit_modification
+        else:
+            print("The absolute value of the unit modification must be minimum 0.01 and maximum 0.5")
+            raise Exception
+        if error_limit > 0.0:
+            self.updating_container.error_limit = error_limit
         else:
             print("The error limit must be a positive number")
             raise Exception
 
-    def set_modification_limit(self, modification_limit):
-        """
-        Setting modification limit for members (model updating)
-        """
         if 0.0 < modification_limit < 1.0:
-            self.modification_limit = modification_limit
+            self.updating_container.modification_limit = modification_limit
         else:
             print("The modification limit must be higher than 0.0 and lower than 1.0")
             raise Exception
 
-    def set_unit_modification(self, unit_modification):
-        """
-        Setting modification step (model updating)
-        """
-        if 0.01 <= abs(unit_modification) < 0.5:
-            self.unit_modification = unit_modification
-        else:
-            print("The absolute value of the unit modification must be minimum 0.01 and maximum 0.5")
-            raise Exception
-
-    def set_iteration_limit(self, iteration_limit):
-        """
-        Setting maximum number of iterations (model updating)
-        """
         if 1 < int(iteration_limit) <= math.pow(10, 4):
-            self.iteration_limit = int(iteration_limit)
+            self.updating_container.iteration_limit = int(iteration_limit)
         else:
             print("The iteration limit must be between 2 and 10.000")
             raise Exception
+
+        # TODO: This call starts the optimization loop in a very unlucky way. This should be refactored!
+        self.update_model()
 
     def update_model(self):
         """
@@ -659,6 +655,9 @@ class Truss(TrussFramework):
                         if not new_line == '':
                             delta = self.mock_delta(new_line, previous_line)
                         if delta:
+                            if self.updating_container.original_delta == []:
+                                self.updating_container.original_delta = delta
+                                self.updating_container.latest_delta = delta
                             self.optimize(delta)
 
         print("Update statistics:")
@@ -749,11 +748,7 @@ if __name__ == '__main__':
 
     # Update iteration
     if TRUSS.configuration.updating:
-        TRUSS.set_unit_modification(0.05)
-        TRUSS.set_error_limit(1.2)
-        TRUSS.set_modification_limit(0.7)
-        TRUSS.set_iteration_limit(100)
-        TRUSS.update_model()
+        TRUSS.start_model_updating(unit_modification=0.05, error_limit=1.2, modification_limit=0.7, iteration_limit=100)
         TRUSS.configuration.part_time("Updating numerical model")
 
     # Plotting

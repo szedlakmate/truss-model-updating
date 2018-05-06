@@ -177,6 +177,13 @@ class ModelUpdatingContainer(object):
         self.effect = []
         self.total_effect = []
         self.sorted_effect = []
+        self.original_delta = []
+        self.latest_delta = []
+        # Solver configuration
+        self.unit_modification = 0
+        self.error_limit = 0
+        self.modification_limit = 0
+        self.iteration_limit = 0
 
 
 
@@ -560,7 +567,7 @@ class TrussFramework(object):
             except Exception:
                 print("Type error: " + str(arduino_values) + "... continuing")
 
-            self.updating_container.measurement = zip(self.updating_container.arduino_mapping, data)
+            self.updating_container.measurement = data
 
             # Calculate differences
             delta = self.difference(self.displacement, self.updating_container.measurement)
@@ -776,10 +783,10 @@ class TrussFramework(object):
     def write_output_stream(self, j, appendix):
         with open("./Structures/" + self.title + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
             if j > 1:
-                if j <= self.iteration_limit and self.capable():
+                if j <= self.updating_container.iteration_limit and self.capable():
                     self.updating_container.number_of_updates[0] += 1
                     outfile.write("Update state: SUCCESSFUL\n")
-                if not j <= self.iteration_limit:
+                if not j <= self.updating_container.iteration_limit:
                     self.updating_container.number_of_updates[1] += 1
                     outfile.write("Update state: Run out of iteration limit\n")
                 if not self.capable() and j > 1:
@@ -789,9 +796,9 @@ class TrussFramework(object):
                 outfile.write("Update state: Optimization was skipped\n")
             outfile.write("Required iterations: " + str(j) + "\n")
             outfile.write("Measurement: " + str(self.updating_container.measurement) + "\n")
-            outfile.write("Original delta: " + str(delta) + "\n")
-            outfile.write("New delta: " + str(newdelta) + " (limit: " + str(self.configuration.updating.error_limit) + ")\n")
-            outfile.write("Final error: " + str(error(newdelta)) + "\n")
+            outfile.write("Original delta: " + str(self.updating_container.original_delta) + "\n")
+            outfile.write("New delta: " + str(self.updating_container.latest_delta) + " (limit: " + str(self.configuration.updating.error_limit) + ")\n")
+            outfile.write("Final error: " + str(error(self.updating_container.latest_delta)) + "\n")
             outfile.write("Modifications [%]: \n")
             outfile.write(str(self.updating_container.modifications) + "\n")
             outfile.write("Original displacements: \n")
