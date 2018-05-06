@@ -6,12 +6,9 @@ Created on April 30 18:49:40 2018
 For more information please check the README
 Copyright MIT, Máté Szedlák 2016-2018.
 """
-#import os
 import argparse
 import itertools
 import math
-#import time
-#import datetime
 try:
     import numpy
 except ImportError:
@@ -54,17 +51,18 @@ class Truss(TrussFramework):
     def set_model_DOF(self, DOF):
         """
         Setting problem's degree of freedom
+
         :param DOF: [2 | 3] Model's Degree Of Freedom
         :return: None
         """
         self.DOF = DOF
         if self.DOF not in [2, 3]:
             raise Exception('DOF must be 2 or 3.')
+        
         # Set freshness flags after geometry modification
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
-        self._post_processed = 0
+        self.invalidate_stiffness_matrices('all')
 
+    # TODO: This functions is probably not called although it should be part of the set_base() process
     def bulk_set_elements(self, nodal_connection_list):
         """
         Setting elements (nodal connections) in bulk mode
@@ -75,13 +73,13 @@ class Truss(TrussFramework):
         """
         # Set attribute
         self.nodal_connections = nodal_connection_list
+        
         # Recalculate pending variables
         self.number_of_nodes = len(set(list(itertools.chain.from_iterable(sorted(self.nodal_connections)))))
         self.number_of_elements = len(self.nodal_connections)
+        
         # Set freshness flags after geometry modification
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
-        self._post_processed = 0
+        self.invalidate_stiffness_matrices()
 
         # Creating mapping tool for elements
         for node in self.nodal_connections:
@@ -98,20 +96,24 @@ class Truss(TrussFramework):
         """
         Setting coordinates in bulk mode
 
-        :param coordinate_list: An array of coordinate arrays enlisting ALL the nodal coordinates
+        :param coordinate_list: An array of coordinate arrays (2/3 elements) enlisting ALL the nodal coordinates
         :return: None
         """
         # Set attribute
         self.nodal_coord = coordinate_list
+        
         # Set freshness flags after geometry modification
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
+        self.invalidate_stiffness_matrices('all')
+        
         # Validity check
         if self.number_of_nodes > len(self.nodal_coord):
             raise Exception('More coordinates are needed')
         elif not self.nodal_connections:
             raise Exception('Nodes must be set before defining elements')
         self._check_coordinates(False)
+
+        # TODO: move the default save locations to the new 'Rsults' folder
+
 
     def modify_coordinate(self, node_ID, new_coordinate):
         """
@@ -125,8 +127,7 @@ class Truss(TrussFramework):
         """
         if self._check_coordinates(True):
             self.nodal_coord[node_ID] = new_coordinate
-            self._stiff_is_fresh = 0
-            self._mod_stiff_is_fresh = 0
+            self.invalidate_stiffness_matrices('all')
             return True
         else:
             return False
@@ -135,13 +136,11 @@ class Truss(TrussFramework):
         """
         Setting cross-sections in bulk mode
 
-        :param area_list: an array enlisting the cross-sectional data
+        :param area_list: cross-sectional data array according to the elements
         :return: None
         """
         self.cross_sectional_area_list = area_list
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
-        self._post_processed = 0
+        self.invalidate_stiffness_matrices('all')
 
     def modify_cross_section(self, element_ID, new_area):
         """
@@ -152,58 +151,72 @@ class Truss(TrussFramework):
         :return: None
         """
         self.cross_sectional_area_list[element_ID] = new_area
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
-        self._post_processed = 0
+        self.invalidate_stiffness_matrices('all')
 
-    def bulk_set_materials(self, el_mod):
+    def bulk_set_materials(self, E):
         """
         Setting material data in bulk mode
-        """
-        self.elastic_modulo = el_mod
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
-        self._post_processed = 0
 
-    def modify_material(self, element, el_mod):
+        :param E: array of elastic modulos according to the elements
+        :return: None
+        """
+        self.elastic_modulo = E
+        self.invalidate_stiffness_matrices('all')
+
+    def modify_material(self, element_ID, E):
         """
         Modifying material data by elements
+
+        :param element_ID: ID of the element ehich should be modified
+        :param E: {number} Elastic modulo
+        :return: None
         """
-        self.elastic_modulo[element] = el_mod
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
-        self._post_processed = 0
+        self.elastic_modulo[element_ID] = E
+        self.invalidate_stiffness_matrices('all')
 
     def bulk_set_forces(self, forces):
         """
         Set forces
+
+        :param forces: matrix of forces in the following pattern: [[location, force], ...]
+        :return: None
         """
+        # DOF dependent mapping
         for location, force in forces:
             if self.DOF == 3:
                 self.force[location] = force
             elif self.DOF == 2:
                 self.force[location + (location//2)] = force
-        self._post_processed = 0
+        self.set_postprocess_needed_flag()
 
-    def modify_force(self, element, force):
+    def modify_force(self, element_ID, force):
         """
-        Modifying forces by each
+        Modifying specific force
+
+        :param element_ID: the ID of the element which should be mofidifed
+        :param force: new force value
+        :return: None
         """
-        self.force[element] = force
-        self._post_processed = 0
+        self.force[element_ID] = force
+        self.set_postprocess_needed_flag()
 
     def bulk_set_supports(self, constraints):
         """
         Set supports
+
+        :param constraints: matrix of constraints in the following pattern: [[location, constraint], ...]
+        :return:
         """
         for location, constraint in constraints:
             if self.DOF == 3:
                 self.constraint.append([location, constraint])
             elif self.DOF == 2:
                 self.constraint.append([location + (location // 2), constraint])
-        self._stiff_is_fresh = 0
-        self._mod_stiff_is_fresh = 0
-        self._post_processed = 0
+        self.invalidate_stiffness_matrices('all')
+
+        self.set_postprocess_needed_flag()
+        
+
 
     def bulk_set_measurement_points(self, measurement_points=['13Y']):
         """
@@ -238,7 +251,7 @@ class Truss(TrussFramework):
         """
         Stiffness matrix compilation
         """
-        self._post_processed = 0
+        self.set_postprocess_needed_flag()
 
         if self.DOF == 2:
             for dof_z in range(self.number_of_nodes):
@@ -632,6 +645,7 @@ class Truss(TrussFramework):
             #self.bulk_set_measurement_points()
             base = ['SIMULATION']
             filemode = 'r'
+            self.check_folder('Simulation')
             with open("./Simulation/" + str(self.title) + ' - Input Data.txt', filemode) as input_file:
                 new_line = "[],0.0"
                 for i in range(1000):
@@ -732,11 +746,6 @@ if __name__ == '__main__':
     TRUSS.solve()
     TRUSS.configuration.part_time("Solving")
 
-    # Update iteration
-    if TRUSS.configuration.updating:
-        TRUSS.start_model_updating(unit_modification=0.05, error_limit=1.2, modification_limit=0.7, iteration_limit=100)
-        TRUSS.configuration.part_time("Updating numerical model")
-
     # Plotting
     if TRUSS.configuration.graphics:
         # Plot settings:
@@ -752,14 +761,20 @@ if __name__ == '__main__':
         TRUSS.configuration.part_time("Plotting")
 
     # Write results to file
-    TRUSS.write_results("Structures/" + TRUSS.title + ' - Results.txt')
+    TRUSS.write_results()
     TRUSS.configuration.part_time("Wrote results to the output file : Structures/{} - Results.txt".format(TRUSS.title))
+
+    # Update iteration
+    if TRUSS.configuration.updating:
+        TRUSS.start_model_updating(unit_modification=0.05, error_limit=1.2, modification_limit=0.7, iteration_limit=100)
+        TRUSS.configuration.part_time("Updating numerical model")
+
+    # TODO: plot the updated model
 
     # Closing Arduino port
     if TRUSS.configuration.arduino:
-        TRUSS.close_serial()
+        TRUSS.configuration.disconnect()
 
     # End logging
     if TRUSS.configuration.log:
         TRUSS.end_logging()
-

@@ -7,7 +7,6 @@ Copyright MIT, Máté Szedlák 2016-2018.
 """
 import os
 import time
-import datetime
 import math
 try:
     import serial
@@ -123,6 +122,7 @@ class TrussConfiguration(object):
         if self.compatibility_mode == 2:
             os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
+
     def start_logging(self):
         self.part_time("Initialization")
 
@@ -200,6 +200,7 @@ class ModelUpdatingContainer(object):
         self.error_limit = 0
         self.modification_limit = 0
         self.iteration_limit = 0
+        self._mod_stiff_is_fresh = 0
 
 
 
@@ -258,7 +259,6 @@ class TrussFramework(object):
         self.stress = []              # Element's stresses
         self._io_origin = 0           # Array's first element number during IO. Default is 0.
         self.analysis = {}
-        self._mod_stiff_is_fresh = 0
         self.mod_displacements = []
         self.keypoint = []
         self.number_of_keypoints = 0
@@ -343,6 +343,7 @@ class TrussFramework(object):
 
 
         try:
+            self.check_folder('Structures')
             with open("./Structures/" + self.configuration.input_file, "r") as sourcefile:
                 source_line = ""
                 while source_line != "EOF":
@@ -459,6 +460,26 @@ class TrussFramework(object):
                     terminate = True
         if terminate:
             raise Exception
+
+    def set_postprocess_needed_flag(self):
+        """
+        Set portprocess required flag
+
+        :return: None
+        """
+        self._post_processed = 0
+
+    def invalidate_stiffness_matrices(self, include_modified=''):
+        """
+        Set flags for stiffness matrix recalculation(s)
+        :param include_modified: ['' | 'all'] includes the model updating related _mod_stiff_is_fresh matrix.
+        :return: None
+        """
+        self._stiff_is_fresh = 0
+        if include_modified == 'all':
+            self.updating_container._mod_stiff_is_fresh = 0
+
+        self.set_postprocess_needed_flag()
 
     def plot(self, show_original, show_result, show_supports, show_forces,
              show_reactions, scale_displacement, scale_force, scale_Z, save_plot):
@@ -659,7 +680,8 @@ class TrussFramework(object):
             return measurement
 
     def open_simulation_thread(self):
-        with open("./Simulation/" + str(self.title) + ' - Input Data.txt', r) as simulation_file:
+        self.check_folder('Simulation')
+        with open("./Simulation/" + str(self.title) + ' - Input Data.txt', 'r') as simulation_file:
             source_line = ""
             while source_line != "EOF":
                 source_line = simulation_file.readline().strip()
@@ -687,10 +709,22 @@ class TrussFramework(object):
         else:
             return self.calibrate()
 
-    def write_results(self, file_name):
+
+    def check_folder(self, directory):
+        path = str(os.path.dirname('.')) + '/' + directory.replace('/','').replace('.','') + '/'
+
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+
+    def write_results(self):
         """
         Writing results to file.
         """
+        self.check_folder('Results')
+        path ="Results/" + self.title + ' - Results.txt'
+
+
         out_element = ''
         for i in self.nodal_connections:
             out_element += str(i[0] + self._io_origin) + ', ' + str(i[1] + self._io_origin) + ' | '
@@ -718,7 +752,7 @@ class TrussFramework(object):
         # Not elegant solution
         out_specdofs = self.special_DOF_input_string
         try:
-            with open(file_name, 'w') as outfile:
+            with open(path, 'w') as outfile:
                 # Writing data
                 outfile.write('Calculation of \'' + self.title + '\':\n\n')
 
@@ -797,7 +831,8 @@ class TrussFramework(object):
             raise FileNotFoundError
 
     def write_output_stream(self, j, appendix):
-        with open("./Structures/" + self.title + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
+        self.check_folder('Results')
+        with open("./Results/" + self.title + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
             if j > 1:
                 if j <= self.updating_container.iteration_limit and self.capable():
                     self.updating_container.number_of_updates[0] += 1

@@ -91,15 +91,15 @@ class Arrow3D(FancyArrowPatch):
 
         # Giving plot names
         if show_orig == 1 and show_result == 0 and show_supports == 1 and show_reactions == 0:
-            plotname += ' - Initial structure'
+            plotname += ' - 01 Initial structure'
             if show_forces:
                 plotname += ' with forces'
         elif show_orig == 1 and show_result == 1:
-            plotname += ' - Deformation'
+            plotname += ' - 02 Deformation'
             if show_reactions == 0:
                 plotname += ' with reactions'
         elif show_orig == 0 and show_result == 1:
-            plotname += ' - Stresses'
+            plotname += ' - 03 Stresses'
             if show_reactions == 0:
                 plotname += ' with reactions'
         else:
@@ -239,7 +239,7 @@ class Arrow3D(FancyArrowPatch):
                         color=col, linewidth=4.0)
         pyplot.show()
         if save_plot:
-            fig.savefig("./Structures/" + plotname + '.png')
+            fig.savefig("./Results/" + plotname + '.png')
             print("'" + plotname + ".png' is saved.")
             print('------------------------------------')
         return
