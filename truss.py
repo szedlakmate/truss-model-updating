@@ -549,7 +549,13 @@ class Truss(TrussFramework):
             self.calculate_modified_stiffness_matrix(self.number_of_elements, 0)
             self.solve_modified_structure(self.number_of_elements)
 
-            newdelta = self.difference(self.modified_displacements[self.number_of_elements], self.measurement)
+            print(self.modified_displacements[self.number_of_elements])
+            print(self.measurement)
+            if not self.configuration.simulation:
+                measurement = self.measurement
+            else:
+                measurement = self.simulate_arduino()
+            newdelta = self.difference(self.modified_displacements[self.number_of_elements], measurement)
 
             for i, effect in enumerate(self.total_effect):
                 if effect == 0.0:
@@ -562,7 +568,7 @@ class Truss(TrussFramework):
                 ratio[modificationnumber] = abs(self.sorted_effect[0][i][0] / self.total_effect[0]) * \
                                             math.copysign(1, self.sorted_effect[0][i][2])
                 unit += abs(ratio[modificationnumber]*self.sorted_effect[0][i][0])
-
+            print(newdelta)
             scale = newdelta[0]/unit
             for i in range(self.number_of_elements):
                 modificationnumber = self.sorted_effect[0][i][1]
@@ -581,32 +587,7 @@ class Truss(TrussFramework):
             print("Optimization could not be finished successfully.")
             print("The remaining error is: " + str(error(newdelta)))
 
-        with open("./Structures/" + self.title + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
-            if j > 1:
-                if j <= self.iteration_limit and self.capable():
-                    self.number_of_updates[0] += 1
-                    outfile.write("Update state: SUCCESSFUL\n")
-                if not j <= self.iteration_limit:
-                    self.number_of_updates[1] += 1
-                    outfile.write("Update state: Run out of iteration limit\n")
-                if not self.capable() and j > 1:
-                    self.number_of_updates[2] += 1
-                    outfile.write("Update state: No more possible modification\n")
-            else:
-                outfile.write("Update state: Optimization was skipped\n")
-            outfile.write("Required iterations: " + str(j) + "\n")
-            outfile.write("Measurement: " + str(self.measurement) + "\n")
-            outfile.write("Original delta: " + str(delta) + "\n")
-            outfile.write("New delta: " + str(newdelta) + " (limit: " + str(self.error_limit) + ")\n")
-            outfile.write("Final error: " + str(error(newdelta)) + "\n")
-            outfile.write("Modifications [%]: \n")
-            outfile.write(str(self.modifications) + "\n")
-            outfile.write("Original displacements: \n")
-            outfile.write(str(self.displacement) + "\n")
-            if j > 1:
-                outfile.write("New displacements: \n")
-                outfile.write(str(self.modified_displacements[self.number_of_elements]) + "\n")
-            outfile.write("----------------------\n")
+        self.write_output_stream(j, appendix)
 
     def capable(self):
         """
@@ -662,48 +643,53 @@ class Truss(TrussFramework):
         """
         General function to manage model updating procedure.
         """
-        self.processed_data = [0.]*len(self.arduino_mapping)
+        print("HARD CODED PART")
+        self.processed_data = [0.]*1 #*len(self.arduino_mapping)
 
         if not self.configuration.simulation:
-            base = self.calibrate()
+            base = self.set_base()
             filemode = 'a'
         else:
             base = ['SIMULATION']
             try:
-                os.remove(str(self.title) + ' - UpdateResults - SIMULATED.txt')
+                #os.remove(str(self.title) + ' - UpdateResults - SIMULATED.txt')
+                print('HARD CODED PART 2')
             except Exception:
                 pass
             filemode = 'r'
 
-        with open("./Structures/" + str(self.title) + ' - Input Data.txt', filemode) as input_file:
-            # Saving input data
-            if not self.configuration.simulation:
-                input_file.write('Input data of \'' + self.title + '\':\n\n')
-                input_file.write('Start Time: ' +
-                                str(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')) + "\n")
-                input_file.write('Base: ' + str(base) + '\n')
-
-            new_line = "[],0.0"
-            for i in range(1000):
+        if not self.configuration.simulation:
+            with open("./Simulation-recording/" + str(self.title) + ' - Input Data.txt', filemode) as input_file:
+                # Saving input data
                 if not self.configuration.simulation:
-                    delta = self.readarduino(base, input_file)
-                    self.optimize(delta)
-                else:
-                    delta = None
-                    try:
-                        previous_line = new_line
-                        new_line = input_file.readline()
-                        if not new_line == '':
-                            delta = self.simulate_arduino(new_line, previous_line)
-                    except Exception:
-                        pass
-                    if delta:
+                    input_file.write('Input data of \'' + self.title + '\':\n\n')
+                    input_file.write('Start Time: ' +
+                                    str(datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')) + "\n")
+                    input_file.write('Base: ' + str(base) + '\n')
+
+                new_line = "[],0.0"
+                for i in range(1000):
+                    if not self.configuration.simulation:
+                        delta = self.readarduino(base, input_file)
                         self.optimize(delta)
+                    else:
+                        delta = None
+                        try:
+                            previous_line = new_line
+                            new_line = input_file.readline()
+                            if not new_line == '':
+                                print(previous_line)
+                                print(new_line)
+                                delta = self.simulate_arduino(new_line, previous_line)
+                        except Exception:
+                            pass
+                        if delta:
+                            self.optimize(delta)
         print("Update statistics:")
-        print("Totally updated models: " + str(TRUSS.num_of_updates[0] + TRUSS.num_of_updates[1] + TRUSS.num_of_updates[2]))
-        print("  Successfully updated models: " + str(TRUSS.num_of_updates[0]))
-        print("  Updates with running out of possibilities: " + str(TRUSS.num_of_updates[2]))
-        print("  Updates did not finished: " + str(TRUSS.num_of_updates[1]))
+        print("Totally updated models: " + str(self.updating_container.number_of_updates[0] + self.updating_container.number_of_updates[1] + self.updating_container.number_of_updates[2]))
+        print("  Successfully updated models: " + str(self.updating_container.number_of_updates[0]))
+        print("  Updates with running out of possibilities: " + str(self.updating_container.number_of_updates[2]))
+        print("  Updates did not finished: " + str(self.updating_container.number_of_updates[1]))
 
     def post_process(self):
         """
@@ -751,15 +737,24 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--title", metavar='str', type=str,
                         help="Manually label project. By default it comes from the input file's name.", default='')
-    parser.add_argument("-c", "--compatibility", metavar='int', type=int, choices=range(4), default=2,
+    parser.add_argument("-c", "--compatibility", metavar='int', type=int, choices=range(4), default=1,
                         help="0: User defined, 1: Most information (with numpy), "
                              "2: Maximum compatibility mode, 3: Android")
-    parser.add_argument("-s", "--simulation", metavar='int', type=int, choices=range(2), default=0, help="0: No|1: Yes")
-    parser.add_argument("input", metavar='str', type=str, help="Input file, stored in the ./Structure folder [*.str]")
+    parser.add_argument("-s", "--simulation", metavar='int', type=int, choices=range(2), default=1, help="0: No|1: Yes")
+    parser.add_argument("-i", "--input", metavar='str', type=str, default="", help="Input file, stored in the ./Structure folder [*.str]")
     args = parser.parse_args()
 
+    if args.input != "":
+        input = args.input
+    else:
+        input = "bridge"
+        print("DEMO MODE")
+        print("You started the program in demo mode.\nThe following example is based on the bridge.str file which "
+              "is located in the Structures folder.")
+
+
     # Define new structure
-    TRUSS = Truss(input_file=args.input, title=args.title, compatibility_mode=args.compatibility,
+    TRUSS = Truss(input_file=input, title=args.title, compatibility_mode=args.compatibility,
                   simulation=args.simulation)
 
     if TRUSS.configuration.log:
@@ -810,3 +805,4 @@ if __name__ == '__main__':
     # End logging
     if TRUSS.configuration.log:
         TRUSS.end_logging()
+

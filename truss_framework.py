@@ -36,6 +36,10 @@ class TrussConfiguration(object):
         self.previous_time = self.TIC
         self.compatibility_mode = compatibility_mode
         self.simulation = simulation
+        self.updating = {'error_limit': 0.5, 'modification_limit': 0.6,
+                          'unit_modification': 0.05, 'iteration_limit': 20}
+        # #Updates where there were no more modification option]
+        #self.updating.iteration_limit = 20
 
         if self.compatibility_mode == 0:
             ### User defined ###
@@ -110,9 +114,9 @@ class TrussConfiguration(object):
         print('Created by Máté Szedlák (https://github.com/szedlakmate/truss-model-updating)')
         print('Compatibility mode: ' + self.mode_name)
         if self.solver == 0:
-            print('- Solver is set to default')
+            print('  Solver is set to default')
         elif self.solver == 1:
-            print('- Solver is set to NumPy')
+            print('  Solver is set to NumPy')
         else:
             raise Exception("Solver settings are invalid!")
         if self.updating:
@@ -123,18 +127,22 @@ class TrussConfiguration(object):
             print('- Model updating is turned OFF')
         print('------------------------------------')
 
-    def end_logging(self, truss):
+    def end_logging(self, number_of_updates):
+        
         self.TAC = time.time()
         self.TOTAL_TIME = self.TAC - self.TIC
         if self.updating:
             print("Update statistics:")
             print("Totally updated models: " + str(
-                truss.num_of_updates[0] + truss.num_of_updates[1] + truss.num_of_updates[2]))
-            print("  Successfully updated models: " + str(truss.num_of_updates[0]))
-            print("  Updates with running out of possibilities: " + str(truss.num_of_updates[2]))
-            print("  Updates did not finished: " + str(truss.num_of_updates[1]))
-        # print('Total time: ' + str("{:10.3f}".format(self.TOTAL_TIME)))
-        print("Total time: {:10.3f}".format(self.TOTAL_TIME))
+                number_of_updates[0] + number_of_updates[1] + number_of_updates[2]))
+            print("  Successfully updated models: " + str(number_of_updates[0]))
+            print("  Updates with running out of possibilities: " + str(number_of_updates[2]))
+            print("  Updates did not finished: " + str(number_of_updates[1]))
+            # print('Total time: ' + str("{:10.3f}".format(self.TOTAL_TIME)))
+            print("Total time: {:10.3f}".format(self.TOTAL_TIME))
+
+        else:
+            print("Total time: {:10.3f}".format(self.TOTAL_TIME))
 
     def part_time(self, message):
         """
@@ -152,6 +160,19 @@ class TrussConfiguration(object):
         print('Time: ' + str("{:10.3f}".format(new_time - self.previous_time)))
         print('------------------------------------')
         self.previous_time = new_time
+
+
+class ModelUpdatingContainer(object):
+    """
+    Model updating container for isolating the upadting
+    """
+    def __init__(self):
+        self.modifications = []          # Storing modifications for model updating
+        self.read_elements = [0]*9
+        self.arduino_mapping = []
+        self.measurement = [0.]
+        self.number_of_updates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit,
+
 
 
 class TrussFramework(object):
@@ -221,16 +242,8 @@ class TrussFramework(object):
         self.threshold = 0.1
         self.effect_ratio = []
         self.processed_data = []          # To store last input line
-        self.modifications = []          # Storing modifications for model updating
-        self.read_elements = [0]*9
-        self.arduino_mapping = []
-        self.error_limit = 0.5
-        self.modification_limit = 0.6
-        self.unit_modification = 0.05
-        self.measurement = [0.]
-        self.number_of_updates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit,
-        # #Updates where there were no more modification option]
-        self.iteration_limit = 20
+        self.updating_container = ModelUpdatingContainer()
+
 
     def _open_serial(port, baudrate):
         try:
@@ -301,6 +314,7 @@ class TrussFramework(object):
         _read_element_names = ["Origin", "DOF", "Elements", "Coordinates",
                                "Cross-sections", "Materials", "Forces", "Supports", "Measured DOFs"]
 
+
         try:
             with open("./Structures/" + self.configuration.input_file, "r") as sourcefile:
                 source_line = ""
@@ -310,12 +324,12 @@ class TrussFramework(object):
                     if source_line.upper() == "_ORIGIN":
                         source_line = sourcefile.readline().strip()
                         self._io_origin = int(source_line)
-                        self.read_elements[0] = 1
+                        self.updating_container.read_elements[0] = 1
 
                     if source_line.upper() == "DOF":
                         source_line = sourcefile.readline().strip()
                         self.set_model_DOF(int(source_line))
-                        self.read_elements[1] = 1
+                        self.updating_container.read_elements[1] = 1
 
                     if source_line.upper() == "ELEMENTS":
                         source_line = sourcefile.readline().strip()
@@ -328,7 +342,7 @@ class TrussFramework(object):
                             input_string.remove([''])
                         input_number = [[int(x[0]) - self._io_origin, int(x[1]) - self._io_origin] for x in input_string]
                         self.bulk_set_elements(input_number)
-                        self.read_elements[2] = 1
+                        self.updating_container.read_elements[2] = 1
 
                     if source_line.upper() == "COORDINATES":
                         source_line = sourcefile.readline().strip()
@@ -344,7 +358,7 @@ class TrussFramework(object):
                         elif self.DOF == 2:
                             input_number = [[float(x[0]), float(x[1]), 0.] for x in input_string]
                         self.bulk_set_coordinates(input_number)
-                        self.read_elements[3] = 1
+                        self.updating_container.read_elements[3] = 1
 
                     if source_line.upper() == "CROSS-SECTIONS":
                         source_line = sourcefile.readline().strip()
@@ -357,7 +371,7 @@ class TrussFramework(object):
                             input_string.remove('')
                         input_number = [float(eval(x)) for x in input_string]
                         self.bulk_set_cross_sections(input_number)
-                        self.read_elements[4] = 1
+                        self.updating_container.read_elements[4] = 1
 
                     if source_line.upper() == "MATERIALS":
                         source_line = sourcefile.readline().strip()
@@ -370,7 +384,7 @@ class TrussFramework(object):
                             input_string.remove('')
                         input_number = [float(eval(x)) for x in input_string]
                         self.bulk_set_materials(input_number)
-                        self.read_elements[5] = 1
+                        self.updating_container.read_elements[5] = 1
 
                     if source_line.upper() == "FORCES":
                         source_line = sourcefile.readline().strip()
@@ -383,7 +397,7 @@ class TrussFramework(object):
                             input_string.remove([''])
                         input_number = [[int(x[0]) - self._io_origin, float(x[1])] for x in input_string]
                         self.bulk_set_forces(sorted(input_number))
-                        self.read_elements[6] = 1
+                        self.updating_container.read_elements[6] = 1
 
                     if source_line.upper() == "SUPPORTS":
                         source_line = sourcefile.readline().strip()
@@ -396,22 +410,22 @@ class TrussFramework(object):
                             input_string.remove([''])
                         input_number = [[int(x[0]) - self._io_origin, float(x[1])] for x in input_string]
                         self.bulk_set_supports(sorted(input_number))
-                        self.read_elements[7] = 1
+                        self.updating_container.read_elements[7] = 1
 
                     if source_line.upper() == "MEASUREMENTS":
                         source_line = sourcefile.readline().strip()
                         self.special_DOF_input_string = source_line
                         input_string = []
-                        self.arduino_mapping = source_line.split(',')
-                        self.bulk_set_measurement_points(self.arduino_mapping)
-                        self.read_elements[8] = 1
+                        self.updating_container.arduino_mapping = source_line.split(',')
+                        self.bulk_set_measurement_points(self.updating_container.arduino_mapping)
+                        self.updating_container.read_elements[8] = 1
         except IOError:
             print("The following file could not be opened: " + "./Structures/" + self.configuration.input_file)
-            print("Please make sure that the structural data is available for the program in the running directory.")
+            print("Please make sure that the structural data is available for the program in the run directory.")
             raise IOError
 
         terminate = False
-        for i, value in enumerate(self.read_elements):
+        for i, value in enumerate(self.updating_container.read_elements):
             if i > 0 and (i < 8 or self.configuration.updating):  # if i > 0:
                 if value == 0:
                     print("The following was not found: " + _read_element_names[i])
@@ -459,7 +473,7 @@ class TrussFramework(object):
 
         maxdifference = 0.8          # Maximum input difference threshold in mm
         arduinovalues = []
-        data = [0.]*len(self.arduino_mapping)
+        data = [0.]*len(self.updating_container.arduino_mapping)
         newdata = False
         bigdifference = False
         readerror = False
@@ -475,9 +489,9 @@ class TrussFramework(object):
                         del arduinovalues[len(arduinovalues)-1]
                 except IndexError:
                     print("Index Error... continuing")
-                if len(arduinovalues) == len(self.arduino_mapping):
+                if len(arduinovalues) == len(self.updating_container.arduino_mapping):
                     try:
-                        for i in range(len(self.arduino_mapping)):
+                        for i in range(len(self.updating_container.arduino_mapping)):
                             data[i] = float(arduinovalues[i]) - float(base[i][1])
 
                             if abs(data[i] - self.processed_data[i]) > maxdifference:
@@ -505,11 +519,11 @@ class TrussFramework(object):
             time.sleep(0.5)
 
         if newdata and not bigdifference and not readerror:
-            self.measurement = zip(self.arduino_mapping, data)
+            self.updating_container.measurement = zip(self.updating_container.arduino_mapping, data)
 
             save_input.write(str(data) + ', ' + str(time.time()) + "\n")
             # Calculate differences
-            delta = self.difference(self.displacement, self.measurement)
+            delta = self.difference(self.displacement, self.updating_container.measurement)
 
             print("Delta: " + str(delta))
 
@@ -527,7 +541,7 @@ class TrussFramework(object):
         Simulate data, based on previous measurement
         """
         arduinovalues = []
-        data = [0.]*len(self.arduino_mapping)
+        data = [0.]*len(self.updating_container.arduino_mapping)
 
         skip = 0
         sleeptime = 0.
@@ -550,16 +564,16 @@ class TrussFramework(object):
                 arduinoline = str(arduinoline.split(']')[0])+"]"
                 arduinovalues = eval(arduinoline)
                 try:
-                    for i in range(len(self.arduino_mapping)):
+                    for i in range(len(self.updating_container.arduino_mapping)):
                         data[i] = float(arduinovalues[i])
                     self.processed_data = data
                 except Exception:
                     print("Type error: " + str(arduinovalues) + "... continuing")
 
-                self.measurement = zip(self.arduino_mapping, data)
+                self.updating_container.measurement = zip(self.updating_container.arduino_mapping, data)
 
                 # Calculate differences
-                delta = self.difference(self.displacement, self.measurement)
+                delta = self.difference(self.displacement, self.updating_container.measurement)
                 time.sleep(sleeptime)
                 print(delta)
                 return delta
@@ -585,7 +599,10 @@ class TrussFramework(object):
         while answer_1 not in ['Y', 'N']:
             answer_1 = input('Can we start the calibration? (y/n) ').upper()
         if answer_1 == 'N':
-            self.serial_connection.close()
+            try:
+                self.serial_connection.close()
+            except AttributeError:
+                print("Connection is not captured by this thread")
             raise Exception('Calibration is terminated')
         else:
             try:
@@ -599,8 +616,8 @@ class TrussFramework(object):
                 if len(arduinoline) > 0:
                     arduinovalues = arduinoline.split(',')
                     del arduinovalues[len(arduinovalues)-1]               # if needed!!!
-                    if len(arduinovalues) == len(self.arduino_mapping):
-                        measurement = zip(self.arduino_mapping, arduinovalues)
+                    if len(arduinovalues) == len(self.updating_container.arduino_mapping):
+                        measurement = zip(self.updating_container.arduino_mapping, arduinovalues)
                         print("Calibration result:")
                         print(measurement)
                         while accept not in ['Y', 'N']:
@@ -629,6 +646,32 @@ class TrussFramework(object):
             raise Exception('Calibration is terminated')
         if accept == 'Y':
             return measurement
+
+    def open_simulation_thread(self):
+        with open("./Simulation/" + str(self.title) + ' - Input Data.txt', r) as simulation_file:
+            source_line = ""
+            while source_line != "EOF":
+                source_line = simulation_file.readline().strip()
+                print(source_line)
+
+
+                if source_line.upper() == "_ORIGIN":
+                    source_line = simulation_file.readline().strip()
+                    self._io_origin = int(source_line)
+                    self.updating_container.read_elements[0] = 1
+
+
+        return simulation_file
+
+    def set_base(self):
+
+        if self.configuration.simulation:
+            self.arduino_simulation_thread = self.open_simulation_thread()
+            self.configuration.prevline
+
+            return self.simulate_arduino()
+        else:
+            return self.calibrate()
 
     def write_results(self, file_name):
         """
@@ -739,5 +782,33 @@ class TrussFramework(object):
                   "in the root of the project")
             raise FileNotFoundError
 
+    def write_output_stream(self, j, appendix):
+        with open("./Structures/" + self.title + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
+            if j > 1:
+                if j <= self.iteration_limit and self.capable():
+                    self.updating_container.number_of_updates[0] += 1
+                    outfile.write("Update state: SUCCESSFUL\n")
+                if not j <= self.iteration_limit:
+                    self.updating_container.number_of_updates[1] += 1
+                    outfile.write("Update state: Run out of iteration limit\n")
+                if not self.capable() and j > 1:
+                    self.updating_container.number_of_updates[2] += 1
+                    outfile.write("Update state: No more possible modification\n")
+            else:
+                outfile.write("Update state: Optimization was skipped\n")
+            outfile.write("Required iterations: " + str(j) + "\n")
+            outfile.write("Measurement: " + str(self.updating_container.measurement) + "\n")
+            outfile.write("Original delta: " + str(delta) + "\n")
+            outfile.write("New delta: " + str(newdelta) + " (limit: " + str(self.configuration.updating.error_limit) + ")\n")
+            outfile.write("Final error: " + str(error(newdelta)) + "\n")
+            outfile.write("Modifications [%]: \n")
+            outfile.write(str(self.updating_container.modifications) + "\n")
+            outfile.write("Original displacements: \n")
+            outfile.write(str(self.displacement) + "\n")
+            if j > 1:
+                outfile.write("New displacements: \n")
+                outfile.write(str(self.modified_displacements[self.number_of_elements]) + "\n")
+            outfile.write("----------------------\n")
+
     def end_logging(self):
-        self.configuration.end_logging(self)
+        self.configuration.end_logging(self.updating_container.number_of_updates)
