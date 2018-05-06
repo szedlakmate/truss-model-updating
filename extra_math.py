@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 EXTERNAL SOURCE
+https://stackoverflow.com/questions/10508021/matrix-multiplication-in-python
 """
 from copy import deepcopy
 
