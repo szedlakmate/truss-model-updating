@@ -7,12 +7,28 @@ Copyright MIT, Máté Szedlák 2016-2018.
 """
 import os
 import time
+import datetime
+import math
 try:
     import serial
 except ImportError:
     print("You tried to import \'serial\' without installing \'pySerial\'.")
     print("Please first install pySerial: http://playground.arduino.cc/Interfacing/Python")
     print("Arduino input can not be used")
+
+
+def error(delta):
+    """
+    Error function using least-square method
+    :param delta: error vector
+    :return: sum of errors using least-square method
+    """
+    sum_of_errors = 0
+    for delta_element in delta:
+        sum_of_errors += delta_element**2
+        sum_of_errors = math.sqrt(sum_of_errors)
+
+    return sum_of_errors
 
 
 class TrussConfiguration(object):
@@ -797,7 +813,7 @@ class TrussFramework(object):
             outfile.write("Required iterations: " + str(j) + "\n")
             outfile.write("Measurement: " + str(self.updating_container.measurement) + "\n")
             outfile.write("Original delta: " + str(self.updating_container.original_delta) + "\n")
-            outfile.write("New delta: " + str(self.updating_container.latest_delta) + " (limit: " + str(self.configuration.updating.error_limit) + ")\n")
+            outfile.write("New delta: " + str(self.updating_container.latest_delta) + " (limit: " + str(self.updating_container.error_limit) + ")\n")
             outfile.write("Final error: " + str(error(self.updating_container.latest_delta)) + "\n")
             outfile.write("Modifications [%]: \n")
             outfile.write(str(self.updating_container.modifications) + "\n")

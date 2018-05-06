@@ -6,12 +6,12 @@ Created on April 30 18:49:40 2018
 For more information please check the README
 Copyright MIT, Máté Szedlák 2016-2018.
 """
-import os
+#import os
 import argparse
 import itertools
 import math
-import time
-import datetime
+#import time
+#import datetime
 try:
     import numpy
 except ImportError:
@@ -19,27 +19,14 @@ except ImportError:
 from copy import deepcopy
 try:
     from truss_framework import TrussFramework
+    from truss_framework import error
     from extra_math import invert
     from extra_math import mat_vec_mult as multiply_matrix_vector
     from extra_math import swap_col as swap_columns
 except ImportError:
     print("Input is missing")
-    print("Please check the truss_framework.py, truss_graphics.py and extra_math.py files.")
+    print("Please check the truss_framework.py and extra_math.py files.")
     print("Graphical libraries could not be loaded. GUI can not be used.")
-
-
-def error(delta):
-    """
-    Error function using least-square method
-    :param delta: error vector
-    :return: sum of errors using least-square method
-    """
-    sum_of_errors = 0
-    for delta_element in delta:
-        sum_of_errors += delta_element**2
-        sum_of_errors = math.sqrt(sum_of_errors)
-
-    return sum_of_errors
 
 
 class Truss(TrussFramework):
@@ -326,9 +313,9 @@ class Truss(TrussFramework):
 
         for i in range(self.number_of_elements):
             if i == index:
-                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i] + magnitude)  # E[i]/L[i]
+                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.updating_container.modifications[i] + magnitude)  # E[i]/L[i]
             else:
-                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.modifications[i])  # E[i]/L[i]
+                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.updating_container.modifications[i])  # E[i]/L[i]
 
             _mod_loc_stiff = [[y*self.cross_sectional_area_list[i]*_mod_norm_stiff for y in x] for x in self._s_loc[i]]
 
@@ -506,7 +493,6 @@ class Truss(TrussFramework):
 
             delta.append(measured - num_displ[dof])
 
-        print('delta: ' + str(delta))
         return delta
 
     def optimize(self, delta):
@@ -515,7 +501,7 @@ class Truss(TrussFramework):
         """
 
         modnum = self.number_of_elements
-        self.modifications = [0.0]*self.number_of_elements
+        self.updating_container.modifications = [0.0]*self.number_of_elements
 
         if not self.configuration.simulation:
             appendix = ""
@@ -539,13 +525,13 @@ class Truss(TrussFramework):
             ratio = [0.]*modnum
             unit = 0
 
-            prevmodifications = self.modifications
+            prevmodifications = self.updating_container.modifications
 
             for index in range(self.number_of_elements):
-                self.modifications[index] = min(abs(self.modifications[index] - self.unit_modification),
-                                                self.modification_limit) * \
-                                            math.copysign(1, self.modifications[index] - self.unit_modification)
-                self.calculate_modified_stiffness_matrix(index, self.modifications[index])
+                self.updating_container.modifications[index] = min(abs(self.updating_container.modifications[index] - self.updating_container.unit_modification),
+                                                self.updating_container.modification_limit) * \
+                                            math.copysign(1, self.updating_container.modifications[index] - self.updating_container.unit_modification)
+                self.calculate_modified_stiffness_matrix(index, self.updating_container.modifications[index])
                 self.solve_modified_structure(index)
             self.evaluate()
 
@@ -570,11 +556,11 @@ class Truss(TrussFramework):
             scale = newdelta[0]/unit
             for i in range(self.number_of_elements):
                 modificationnumber = self.updating_container.sorted_effect[0][i][1]
-                self.modifications[modificationnumber] = min(abs(prevmodifications[modificationnumber] -
-                                                                 self.unit_modification*ratio[modificationnumber]),
-                                                             self.modification_limit) \
+                self.updating_container.modifications[modificationnumber] = min(abs(prevmodifications[modificationnumber] -
+                                                                 self.updating_container.unit_modification*ratio[modificationnumber]),
+                                                             self.updating_container.modification_limit) \
                                                          * math.copysign(1, prevmodifications[modificationnumber] -
-                                                                         self.unit_modification*ratio[modificationnumber])
+                                                                         self.updating_container.unit_modification*ratio[modificationnumber])
                 # the last part is already the sign itself without the sign function
 
             print("Ratio: " + str(scale))
@@ -592,8 +578,8 @@ class Truss(TrussFramework):
         Function telling whether there are more options to modify
         """
         capable = False
-        for variable in self.modifications:
-            if 0.01 < abs(variable) <= 0.95*self.modification_limit:
+        for variable in self.updating_container.modifications:
+            if 0.01 < abs(variable) <= 0.95*self.updating_container.modification_limit:
                 capable = True
         return capable
         
