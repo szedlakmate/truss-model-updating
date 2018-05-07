@@ -72,17 +72,17 @@ class Truss(TrussFramework):
         :return: None
         """
         # Set attribute
-        self.nodal_connections = nodal_connection_list
+        self.truss.nodal_connections = nodal_connection_list
         
         # Recalculate pending variables
-        self.number_of_nodes = len(set(list(itertools.chain.from_iterable(sorted(self.nodal_connections)))))
-        self.number_of_elements = len(self.nodal_connections)
+        self.number_of_nodes = len(set(list(itertools.chain.from_iterable(sorted(self.truss.nodal_connections)))))
+        self.number_of_elements = len(self.truss.nodal_connections)
         
         # Set freshness flags after geometry modification
         self.invalidate_stiffness_matrices()
 
         # Creating mapping tool for elements
-        for node in self.nodal_connections:
+        for node in self.truss.nodal_connections:
             self.element_DOF.append([node[0]*3, node[0]*3+1, node[0]*3+2, node[1]*3, node[1]*3+1, node[1]*3+2])
 
         # Initializing defaults for all matrices
@@ -108,7 +108,7 @@ class Truss(TrussFramework):
         # Validity check
         if self.number_of_nodes > len(self.nodal_coord):
             raise Exception('More coordinates are needed')
-        elif not self.nodal_connections:
+        elif not self.truss.nodal_connections:
             raise Exception('Nodes must be set before defining elements')
         self._check_coordinates(False)
 
@@ -209,14 +209,12 @@ class Truss(TrussFramework):
         """
         for location, constraint in constraints:
             if self.DOF == 3:
-                self.constraint.append([location, constraint])
+                self.truss.constraint.append([location, constraint])
             elif self.DOF == 2:
-                self.constraint.append([location + (location // 2), constraint])
+                self.truss.constraint.append([location + (location // 2), constraint])
         self.invalidate_stiffness_matrices('all')
 
         self.set_postprocess_needed_flag()
-        
-
 
     def bulk_set_measurement_points(self, measurement_points=['13Y']):
         """
@@ -228,15 +226,15 @@ class Truss(TrussFramework):
             node = int(location[:len(location)-1])-self._io_origin
             if 'X' in location:
                 self.analysis[location] = node*3+0
-                self.keypoint.append(node*3+0)
+                self.truss.keypoints.append(node*3+0)
             if 'Y' in location:
                 self.analysis[location] = node*3+1
-                self.keypoint.append(node*3+1)
+                self.truss.keypoints.append(node*3+1)
 
             if 'Z' in location:
                 if self.DOF == 3:
                     self.analysis[location] = node*3+2
-                    self.keypoint.append(node*3+2)
+                    self.truss.keypoints.append(node*3+2)
                 else:
                     print("Z-direction is not allowed in 2D structures. "
                           "Please check the 'MEASUREMENTS' section in the input file.")
@@ -255,8 +253,8 @@ class Truss(TrussFramework):
 
         if self.DOF == 2:
             for dof_z in range(self.number_of_nodes):
-                self.constraint.append([int(dof_z*3+2), 0.])
-        self.constraint = list(k for k, _ in itertools.groupby(sorted(self.constraint)))
+                self.truss.constraint.append([int(dof_z*3+2), 0.])
+        self.truss.constraint = list(k for k, _ in itertools.groupby(sorted(self.truss.constraint)))
 
         # Setting known forces
         for location in range(3*self.number_of_nodes):
@@ -265,7 +263,7 @@ class Truss(TrussFramework):
                 self.known_f_not_zero.append(location)
 
         self.known_displacement_a = []
-        for constraint in self.constraint:
+        for constraint in self.truss.constraint:
             self._init_displacement[constraint[0]] = constraint[1]
             self.known_displacement_a.append(constraint[0])
             try:
@@ -288,12 +286,12 @@ class Truss(TrussFramework):
         for i in range(self.number_of_elements):
             elements_lengths[i] =\
                 math.sqrt(sum([(j-i)**2 for j, i
-                               in zip(self.nodal_coord[self.nodal_connections[i][1]],
-                                      self.nodal_coord[self.nodal_connections[i][0]])]))
+                               in zip(self.nodal_coord[self.truss.nodal_connections[i][1]],
+                                      self.nodal_coord[self.truss.nodal_connections[i][0]])]))
 
-            self._cx[i] = (self.nodal_coord[self.nodal_connections[i][1]][0]-self.nodal_coord[self.nodal_connections[i][0]][0])/elements_lengths[i]
-            self._cy[i] = (self.nodal_coord[self.nodal_connections[i][1]][1]-self.nodal_coord[self.nodal_connections[i][0]][1])/elements_lengths[i]
-            self._cz[i] = (self.nodal_coord[self.nodal_connections[i][1]][2]-self.nodal_coord[self.nodal_connections[i][0]][2])/elements_lengths[i]
+            self._cx[i] = (self.nodal_coord[self.truss.nodal_connections[i][1]][0]-self.nodal_coord[self.truss.nodal_connections[i][0]][0])/elements_lengths[i]
+            self._cy[i] = (self.nodal_coord[self.truss.nodal_connections[i][1]][1]-self.nodal_coord[self.truss.nodal_connections[i][0]][1])/elements_lengths[i]
+            self._cz[i] = (self.nodal_coord[self.truss.nodal_connections[i][1]][2]-self.nodal_coord[self.truss.nodal_connections[i][0]][2])/elements_lengths[i]
             self._norm_stiff[i] = self.elastic_modulo[i]/elements_lengths[i]
 
             # local stiffness matrix calculation
@@ -353,15 +351,15 @@ class Truss(TrussFramework):
                 print('Stiffness matrix is recalculated')
             self.calculate_stiffness_matrix()
 
-        self.dis_new = [0.]*(self.number_of_nodes*3-len(self.constraint))
-        self.force_new = [0.]*(self.number_of_nodes*3-len(self.constraint))
-        self.stiff_new = [[0.]*(self.number_of_nodes*3-len(self.constraint))]*(self.number_of_nodes*3-len(self.constraint))
+        self.dis_new = [0.]*(self.number_of_nodes*3-len(self.truss.constraint))
+        self.force_new = [0.]*(self.number_of_nodes*3-len(self.truss.constraint))
+        self.stiff_new = [[0.]*(self.number_of_nodes*3-len(self.truss.constraint))]*(self.number_of_nodes*3-len(self.truss.constraint))
 
         # known force array
         for i, known_f_a in enumerate(self.known_f_a):
             self.force_new[i] = self.force[known_f_a]
 
-        stiffness_increment = [0.]*(self.number_of_nodes*3-len(self.constraint))
+        stiffness_increment = [0.]*(self.number_of_nodes*3-len(self.truss.constraint))
         for i, kfai in enumerate(self.known_f_a):
             for j, kfaj in enumerate(self.known_f_a):
                 stiffness_increment[j] = self.stiffness_matrix[kfai][kfaj]
@@ -400,10 +398,10 @@ class Truss(TrussFramework):
 
         self.updating_container.modified_displacements[index] = [0.]*(self.number_of_nodes*3)
 
-        dis_new = [0.]*(self.number_of_nodes*3-len(self.constraint))
-        stiff_new = [[0.]*(self.number_of_nodes*3-len(self.constraint))]*(self.number_of_nodes*3-len(self.constraint))
+        dis_new = [0.]*(self.number_of_nodes*3-len(self.truss.constraint))
+        stiff_new = [[0.]*(self.number_of_nodes*3-len(self.truss.constraint))]*(self.number_of_nodes*3-len(self.truss.constraint))
 
-        stiffness_increment = [0.]*(self.number_of_nodes*3-len(self.constraint))
+        stiffness_increment = [0.]*(self.number_of_nodes*3-len(self.truss.constraint))
         for i, kfai in enumerate(self.known_f_a):
             for j, kfaj in enumerate(self.known_f_a):
                 stiffness_increment[j] = self.modified_stiffness_matrices[index][kfai][kfaj]
@@ -440,7 +438,7 @@ class Truss(TrussFramework):
 
         for modnum in range(self.number_of_elements):
             effect_temp[self.number_of_keypoints] = int(modnum)
-            for j, dofnum in enumerate(self.keypoint):
+            for j, dofnum in enumerate(self.truss.keypoints):
                 try:
                     effect_temp[j] = self.updating_container.modified_displacements[modnum][dofnum]
                     self.updating_container.effect[modnum] = [x for x in effect_temp]

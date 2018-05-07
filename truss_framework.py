@@ -180,22 +180,13 @@ class TrussConfiguration(object):
         print('------------------------------------')
         self.previous_time = new_time
 
-
 class ModelData(object):
     """
     Datamodel for structures
     """
     def __init__(self):
-        self.modifications = []  # Storing modifications for model updating
-        self.read_elements = [0] * 9
-
-class ModelUpdatingContainer(object):
-    """
-    Model updating container for isolating the upadting
-    """
-    def __init__(self):
         # Truss data
-        self.keypoints = 0
+        self.keypoints = []
         self.nodal_connections = []  # Element's end nodes
         self.constraint = []  # Supports
         self.force = []  # Force
@@ -208,6 +199,30 @@ class ModelUpdatingContainer(object):
         # Secondary variables
         self.displacement = []  # Relative displacements
         self.stress_color = []  # Color mapping for stresses
+
+
+class ModelUpdatingContainer(object):
+    """
+    Model updating container for isolating the upadting
+    """
+    def __init__(self):
+        self.modifications = []          # Storing modifications for model updating
+        self.read_elements = [0]*9
+        self.arduino_mapping = []
+        self.measurement = [0.]
+        self.number_of_updates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit,
+        self.modified_displacements = []
+        self.effect = []
+        self.total_effect = []
+        self.sorted_effect = []
+        self.original_delta = []
+        self.latest_delta = []
+        # Solver configuration
+        self.unit_modification = 0
+        self.error_limit = 0
+        self.modification_limit = 0
+        self.iteration_limit = 0
+        self._mod_stiff_is_fresh = 0
 
 
 class TrussFramework(object):
@@ -234,7 +249,7 @@ class TrussFramework(object):
         self.configuration = TrussConfiguration(input_file.replace('.str', '') + '.str', compatibility_mode, simulation)
 
         # Structure
-        self.truss = ModelData() # TODO: itt hagytam abba a buszon
+        self.truss = ModelData()       # TODO: itt hagytam abba a buszon
 
         # Additional truss data
         self.known_f_a = []           # Nodes without supports
@@ -256,6 +271,7 @@ class TrussFramework(object):
         self.dis_new = []
         self.force_new = []
         self.stiff_new = []
+        self.read_elements = [0.] * 9
         self.displacement = []        # Relative displacements
         self.known_displacement_a = []
         self._stiff_is_fresh = 0
@@ -284,8 +300,8 @@ class TrussFramework(object):
             connection.baudrate = baudrate
             connection.port = port
 
-            if connection.connection.is_open:
-                connection.connection.close()
+            if connection.is_open:
+                connection.close()
 
             connection.connection.open()
             return connection
@@ -358,12 +374,12 @@ class TrussFramework(object):
                     if source_line.upper() == "_ORIGIN":
                         source_line = sourcefile.readline().strip()
                         self._io_origin = int(source_line)
-                        self.updating_container.read_elements[0] = 1
+                        self.read_elements[0] = 1
 
                     if source_line.upper() == "DOF":
                         source_line = sourcefile.readline().strip()
                         self.set_model_DOF(int(source_line))
-                        self.updating_container.read_elements[1] = 1
+                        self.read_elements[1] = 1
 
                     if source_line.upper() == "ELEMENTS":
                         source_line = sourcefile.readline().strip()
@@ -376,7 +392,7 @@ class TrussFramework(object):
                             input_string.remove([''])
                         input_number = [[int(x[0]) - self._io_origin, int(x[1]) - self._io_origin] for x in input_string]
                         self.bulk_set_elements(input_number)
-                        self.updating_container.read_elements[2] = 1
+                        self.read_elements[2] = 1
 
                     if source_line.upper() == "COORDINATES":
                         source_line = sourcefile.readline().strip()
@@ -392,7 +408,7 @@ class TrussFramework(object):
                         elif self.DOF == 2:
                             input_number = [[float(x[0]), float(x[1]), 0.] for x in input_string]
                         self.bulk_set_coordinates(input_number)
-                        self.updating_container.read_elements[3] = 1
+                        self.read_elements[3] = 1
 
                     if source_line.upper() == "CROSS-SECTIONS":
                         source_line = sourcefile.readline().strip()
@@ -405,7 +421,7 @@ class TrussFramework(object):
                             input_string.remove('')
                         input_number = [float(eval(x)) for x in input_string]
                         self.bulk_set_cross_sections(input_number)
-                        self.updating_container.read_elements[4] = 1
+                        self.read_elements[4] = 1
 
                     if source_line.upper() == "MATERIALS":
                         source_line = sourcefile.readline().strip()
@@ -418,7 +434,7 @@ class TrussFramework(object):
                             input_string.remove('')
                         input_number = [float(eval(x)) for x in input_string]
                         self.bulk_set_materials(input_number)
-                        self.updating_container.read_elements[5] = 1
+                        self.read_elements[5] = 1
 
                     if source_line.upper() == "FORCES":
                         source_line = sourcefile.readline().strip()
@@ -431,7 +447,7 @@ class TrussFramework(object):
                             input_string.remove([''])
                         input_number = [[int(x[0]) - self._io_origin, float(x[1])] for x in input_string]
                         self.bulk_set_forces(sorted(input_number))
-                        self.updating_container.read_elements[6] = 1
+                        self.read_elements[6] = 1
 
                     if source_line.upper() == "SUPPORTS":
                         source_line = sourcefile.readline().strip()
@@ -444,7 +460,7 @@ class TrussFramework(object):
                             input_string.remove([''])
                         input_number = [[int(x[0]) - self._io_origin, float(x[1])] for x in input_string]
                         self.bulk_set_supports(sorted(input_number))
-                        self.updating_container.read_elements[7] = 1
+                        self.read_elements[7] = 1
 
                     if source_line.upper() == "MEASUREMENTS":
                         source_line = sourcefile.readline().strip()
@@ -452,14 +468,14 @@ class TrussFramework(object):
                         input_string = []
                         self.updating_container.arduino_mapping = source_line.split(',')
                         self.bulk_set_measurement_points(self.updating_container.arduino_mapping)
-                        self.updating_container.read_elements[8] = 1
+                        self.read_elements[8] = 1
         except IOError:
             print("The following file could not be opened: " + "./Structures/" + self.configuration.input_file)
             print("Please make sure that the structural data is available for the program in the run directory.")
             raise IOError
 
         terminate = False
-        for i, value in enumerate(self.updating_container.read_elements):
+        for i, value in enumerate(self.read_elements):
             if i > 0 and (i < 8 or self.configuration.updating):  # if i > 0:
                 if value == 0:
                     print("The following was not found: " + _read_element_names[i])
@@ -697,7 +713,7 @@ class TrussFramework(object):
                 if source_line.upper() == "_ORIGIN":
                     source_line = simulation_file.readline().strip()
                     self._io_origin = int(source_line)
-                    self.updating_container.read_elements[0] = 1
+                    self.read_elements[0] = 1
 
 
         return simulation_file
@@ -732,7 +748,7 @@ class TrussFramework(object):
 
 
         out_element = ''
-        for i in self.nodal_connections:
+        for i in self.truss.nodal_connections:
             out_element += str(i[0] + self._io_origin) + ', ' + str(i[1] + self._io_origin) + ' | '
         out_coords = ''
         for i in self.nodal_coord:
@@ -750,7 +766,7 @@ class TrussFramework(object):
             elif self.DOF == 2 and i % 3 != 2:
                 out_forces += str(forcedof - forcedof//3 + self._io_origin) + ', ' + str(self.force[forcedof]) + ' | '
         out_supports = ''
-        for i in self.constraint:
+        for i in self.truss.constraint:
             if self.DOF == 3:
                 out_supports += str(i[0] + self._io_origin) + ', ' + str(i[1]) + ' | '
             elif i[0] % 3 != 2:
@@ -834,6 +850,7 @@ class TrussFramework(object):
         except FileNotFoundError:
             print("Error: Please manually create the 'Structures' folder"
                   "in the root of the project")
+            print('Missing:\n'+ str(path))
             raise FileNotFoundError
 
     def write_output_stream(self, j, appendix):
