@@ -180,11 +180,13 @@ class TrussConfiguration(object):
         print('------------------------------------')
         self.previous_time = new_time
 
-class ModelData(object):
+class TrussModelData(object):
     """
     Datamodel for structures
     """
-    def __init__(self):
+    def __init__(self, title):
+        # Labels
+        self.title = title
         # Truss data
         self.keypoints = []
         self.nodal_connections = []  # Element's end nodes
@@ -193,12 +195,25 @@ class ModelData(object):
         self.nodal_coord = []  # Coordinates of nodes
         self.cross_sectional_area_list = []  # Cross-sectional areas
         self.elastic_modulo = []  # Material data
-
+        #Additional data
+        self.known_dis_a = []
         # Results
         self.nodal_coord_def = []  # Coordinates after deformations TODO: this should be optional
         # Secondary variables
         self.displacement = []  # Relative displacements
         self.stress_color = []  # Color mapping for stresses
+
+    def number_of_nodes(self):
+        return len(self.truss.nodal_coord)
+
+    def number_of_elements(self):
+        return len(self.nodal_connections)
+
+    def DOF(self):
+        try:
+            return len(self.truss.nodal_coord[0])
+        except IndexError:
+            return 0
 
 
 class ModelUpdatingContainer(object):
@@ -249,7 +264,7 @@ class TrussFramework(object):
         self.configuration = TrussConfiguration(input_file.replace('.str', '') + '.str', compatibility_mode, simulation)
 
         # Structure
-        self.truss = ModelData()       # TODO: itt hagytam abba a buszon
+        self.truss = TrussModelData(self.title)       # TODO: itt hagytam abba a buszon
 
         # Additional truss data
         self.known_f_a = []           # Nodes without supports
@@ -257,8 +272,6 @@ class TrussFramework(object):
         self.DOF = 3                  # Truss's degree of freedom
 
         # TODO: pending variables should be transformed into functions (also Stiffnesses???)
-        self.number_of_nodes = 0              # Number of nodes
-        self.number_of_elements = 0               # Number of elements
         self.element_DOF = []              # Mapping between DOF and node
         self.stiffness_matrix = []           # Global stiffness matrix
         self.modified_stiffness_matrices = []     # Modified stiffness matrices in a hyper-matrix
@@ -278,7 +291,7 @@ class TrussFramework(object):
         self._post_processed = 0
         self._init_displacement = []
         self.stress_color = []         # Color mapping for stresses
-        self.known_dis_a = []
+        #self.known_dis_a = []
         self.stress = []              # Element's stresses
         self._io_origin = 0           # Array's first element number during IO. Default is 0.
         self.analysis = {}
@@ -503,37 +516,6 @@ class TrussFramework(object):
 
         self.set_postprocess_needed_flag()
 
-    def plot(self, show_original, show_result, show_supports, show_forces,
-             show_reactions, scale_displacement, scale_force, scale_Z, save_plot):
-        """
-        Plot function of the Truss class
-        This method calls the more general plotstructure() method.
-
-            Plot settings:
-                O: Original D: Deformed S: Supports F: Forces R: Reactions
-                ScD: Scale displacments (Z-axis) (def:1.0) ScF: Scale forces (def:1.0)
-                ScS: Scale Support signs (Z-axis) (def:1.0)
-                Save: Save plot to file
-
-                plot(O, D, S, F, R, ScD, ScF, ScS, Save)
-        """
-        # Import is located here due to Android compatibility issues
-        from truss_graphics import Arrow3D
-
-        _showvalues = 1     # Show values of forces
-
-        if self._post_processed == 0:
-            print('Postprocess is needed before plotting structure!')
-        else:
-            if scale_displacement == 0:
-                scale_displacement = 1.0           # Scale drwaing of displacements
-            if scale_force == 0:
-                scale_force = 1.0                  # Scale force sign
-            if scale_Z == 0:
-                scale_Z = 0.3                      # Scale z-axis
-
-            Arrow3D.plotstructure(self, show_original, show_result, show_supports, show_forces, show_reactions,
-                                  scale_displacement, scale_force, scale_Z, _showvalues, save_plot, self.configuration.log)
 
     def readarduino(self, base, save_input):
         """
@@ -751,7 +733,7 @@ class TrussFramework(object):
         for i in self.truss.nodal_connections:
             out_element += str(i[0] + self._io_origin) + ', ' + str(i[1] + self._io_origin) + ' | '
         out_coords = ''
-        for i in self.nodal_coord:
+        for i in self.truss.nodal_coord:
             out_coords += str(i[0]) + ', ' + str(i[1]) + ', ' + str(i[2]) + ' | '
         out_crsect = ''
         for i in self.cross_sectional_area_list:
@@ -781,7 +763,7 @@ class TrussFramework(object):
                 outfile.write('Reactions\n')
                 # for i in range(len(self.force)//3):
                 prev = -1
-                for i in self.known_dis_a:
+                for i in self.truss.known_dis_a:
                     if self.DOF == 3 or i % 3 != 2:
                         if i//3 != prev:
                             if i < 100:
@@ -789,15 +771,15 @@ class TrussFramework(object):
                                 if i < 9:
                                     outfile.write(' ')
                             nodalforce = ''
-                            if (i//3)*3+0 in self.known_dis_a:
+                            if (i//3)*3+0 in self.truss.known_dis_a:
                                 nodalforce += "{:10.2f}".format(self.force[(i//3)*3+0]) + ', '
                             else:
                                 nodalforce += '            '
-                            if (i//3)*3+1 in self.known_dis_a:
+                            if (i//3)*3+1 in self.truss.known_dis_a:
                                 nodalforce += "{:10.2f}".format(self.force[(i//3)*3+1]) + ', '
                             else:
                                 nodalforce += '            '
-                            if self.DOF != 2 and (i//3)*3+2 in self.known_dis_a:
+                            if self.DOF != 2 and (i//3)*3+2 in self.truss.known_dis_a:
                                 nodalforce += "{:10.2f}".format(self.force[(i//3)*3+2]) + '\n'
                             else:
                                 nodalforce += '          \n'
@@ -884,3 +866,25 @@ class TrussFramework(object):
 
     def end_logging(self):
         self.configuration.end_logging(self.updating_container.number_of_updates)
+
+def plot(truss, show_original=False, show_result=False, show_supports=True, show_forces=True,
+         show_reactions=True, scale_displacement=1.0, scale_force=1.0, scale_Z=0.3, save_plot=True):
+    """
+    Plot function of the Truss class
+    This method calls the more general plotstructure() method.
+
+        Plot settings:
+            O: Original D: Deformed S: Supports F: Forces R: Reactions
+            ScD: Scale displacements (Z-axis) (def:1.0) ScF: Scale forces (def:1.0)
+            ScS: Scale Support signs (Z-axis) (def:1.0)
+            Save: Save plot to file
+
+            plot(O, D, S, F, R, ScD, ScF, ScS, Save)
+    """
+    # Import is located here due to Android compatibility issues
+    from truss_graphics import Arrow3D
+
+    _showvalues = 1     # Show values of forces
+
+    Arrow3D.plotstructure(truss, show_original, show_result, show_supports, show_forces, show_reactions,
+                          scale_displacement, scale_force, scale_Z, _showvalues, save_plot)
