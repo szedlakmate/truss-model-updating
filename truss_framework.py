@@ -8,6 +8,7 @@ Copyright MIT, Máté Szedlák 2016-2018.
 import os
 import time
 import math
+import itertools
 try:
     import serial
 except ImportError:
@@ -55,6 +56,7 @@ class TrussConfiguration(object):
         self.updating = {'error_limit': 0.5, 'modification_limit': 0.6,
                          'unit_modification': 0.05, 'iteration_limit': 20}
         # #Updates where there were no more modification option]
+        # TODO: check this weird stuff
         #self.updating.iteration_limit = 20
 
         if self.compatibility_mode == 0:
@@ -124,7 +126,6 @@ class TrussConfiguration(object):
         if self.compatibility_mode == 2:
             os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-
     def start_logging(self):
         self.part_time("Initialization")
 
@@ -147,6 +148,12 @@ class TrussConfiguration(object):
         print('------------------------------------')
 
     def end_logging(self, number_of_updates):
+        """
+        Solver log + Total time
+
+        :param number_of_updates: Update statistic array
+        :return: None
+        """
 
         self.TAC = time.time()
         self.TOTAL_TIME = self.TAC - self.TIC
@@ -157,7 +164,6 @@ class TrussConfiguration(object):
             print("  Successfully updated models: " + str(number_of_updates[0]))
             print("  Updates with running out of possibilities: " + str(number_of_updates[2]))
             print("  Updates did not finished: " + str(number_of_updates[1]))
-            # print('Total time: ' + str("{:10.3f}".format(self.TOTAL_TIME)))
             print("\nTotal time: {:10.3f}".format(self.TOTAL_TIME))
 
         else:
@@ -182,7 +188,7 @@ class TrussConfiguration(object):
 
 class TrussModelData(object):
     """
-    Datamodel for structures
+    Data model for structures
     """
     def __init__(self, title):
         # Labels
@@ -197,28 +203,34 @@ class TrussModelData(object):
         self.elastic_modulo = []  # Material data
         #Additional data
         self.known_dis_a = []
+        self.known_f_not_zero = []
         # Results
         self.nodal_coord_def = []  # Coordinates after deformations TODO: this should be optional
         # Secondary variables
         self.displacement = []  # Relative displacements
+        self.stress = []  # Element's stresses
         self.stress_color = []  # Color mapping for stresses
 
     def number_of_nodes(self):
-        return len(self.truss.nodal_coord)
+        # TODO: refactor
+        return len(set(list(itertools.chain.from_iterable(sorted(self.nodal_connections)))))
 
     def number_of_elements(self):
         return len(self.nodal_connections)
 
+    def number_of_keypoints(self):
+        return len(self.keypoints)
+
     def DOF(self):
         try:
-            return len(self.truss.nodal_coord[0])
+            return len(self.nodal_coord[0])
         except IndexError:
             return 0
 
 
 class ModelUpdatingContainer(object):
     """
-    Model updating container for isolating the upadting
+    Model updating container for isolating the updating parts
     """
     def __init__(self):
         self.modifications = []          # Storing modifications for model updating
@@ -264,11 +276,11 @@ class TrussFramework(object):
         self.configuration = TrussConfiguration(input_file.replace('.str', '') + '.str', compatibility_mode, simulation)
 
         # Structure
-        self.truss = TrussModelData(self.title)       # TODO: itt hagytam abba a buszon
+        self.truss = TrussModelData(self.title)
 
         # Additional truss data
-        self.known_f_a = []           # Nodes without supports
-        self.known_f_not_zero = []     # Nodes with loads
+        #self.known_f_a = []           # Nodes without supports
+        #self.known_f_not_zero = []     # Nodes with loads
         self.DOF = 3                  # Truss's degree of freedom
 
         # TODO: pending variables should be transformed into functions (also Stiffnesses???)
@@ -290,13 +302,11 @@ class TrussFramework(object):
         self._stiff_is_fresh = 0
         self._post_processed = 0
         self._init_displacement = []
-        self.stress_color = []         # Color mapping for stresses
         #self.known_dis_a = []
-        self.stress = []              # Element's stresses
+        # Model Updating related variables (?)
         self._io_origin = 0           # Array's first element number during IO. Default is 0.
         self.analysis = {}
         self.mod_displacements = []
-        self.number_of_keypoints = 0
         self.effect = []
         self.total_effect = []
         self.sorted_effect = []
@@ -416,9 +426,9 @@ class TrussFramework(object):
                             input_string = [x.split(';') for x in source_line.split('|')]
                         if [''] in input_string:
                             input_string.remove([''])
-                        if self.DOF == 3:
+                        if len(input_string[0]) == 3:
                             input_number = [[float(x[0]), float(x[1]), float(x[2])] for x in input_string]
-                        elif self.DOF == 2:
+                        elif len(input_string[0]) == 2:
                             input_number = [[float(x[0]), float(x[1]), 0.] for x in input_string]
                         self.bulk_set_coordinates(input_number)
                         self.read_elements[3] = 1
@@ -510,7 +520,7 @@ class TrussFramework(object):
         :param include_modified: ['' | 'all'] includes the model updating related _mod_stiff_is_fresh matrix.
         :return: None
         """
-        self._stiff_is_fresh = 0
+        self.truss._stiff_is_fresh = 0
         if include_modified == 'all':
             self.updating_container._mod_stiff_is_fresh = 0
 
@@ -736,20 +746,20 @@ class TrussFramework(object):
         for i in self.truss.nodal_coord:
             out_coords += str(i[0]) + ', ' + str(i[1]) + ', ' + str(i[2]) + ' | '
         out_crsect = ''
-        for i in self.cross_sectional_area_list:
+        for i in self.truss.cross_sectional_area_list:
             out_crsect += str(i) + ', '
         out_materials = ''
-        for i in self.elastic_modulo:
+        for i in self.truss.elastic_modulo:
             out_materials += str(i) + ', '
         out_forces = ''
-        for forcedof in self.known_f_not_zero:
-            if self.DOF == 3:
-                out_forces += str(forcedof + self._io_origin) + ', ' + str(self.force[forcedof]) + ' | '
-            elif self.DOF == 2 and i % 3 != 2:
-                out_forces += str(forcedof - forcedof//3 + self._io_origin) + ', ' + str(self.force[forcedof]) + ' | '
+        for forcedof in self.truss.known_f_not_zero:
+            if self.truss.DOF() == 3:
+                out_forces += str(forcedof + self._io_origin) + ', ' + str(self.truss.force[forcedof]) + ' | '
+            elif self.truss.DOF() == 2 and i % 3 != 2:
+                out_forces += str(forcedof - forcedof//3 + self._io_origin) + ', ' + str(self.truss.force[forcedof]) + ' | '
         out_supports = ''
         for i in self.truss.constraint:
-            if self.DOF == 3:
+            if self.truss.DOF() == 3:
                 out_supports += str(i[0] + self._io_origin) + ', ' + str(i[1]) + ' | '
             elif i[0] % 3 != 2:
                 out_supports += str(i[0] - i[0]//3 + self._io_origin) + ', ' + str(i[1]) + ' | '
@@ -764,7 +774,7 @@ class TrussFramework(object):
                 # for i in range(len(self.force)//3):
                 prev = -1
                 for i in self.truss.known_dis_a:
-                    if self.DOF == 3 or i % 3 != 2:
+                    if self.truss.DOF() == 3 or i % 3 != 2:
                         if i//3 != prev:
                             if i < 100:
                                 outfile.write(' ')
@@ -779,7 +789,7 @@ class TrussFramework(object):
                                 nodalforce += "{:10.2f}".format(self.force[(i//3)*3+1]) + ', '
                             else:
                                 nodalforce += '            '
-                            if self.DOF != 2 and (i//3)*3+2 in self.truss.known_dis_a:
+                            if self.truss.DOF() != 2 and (i//3)*3+2 in self.truss.known_dis_a:
                                 nodalforce += "{:10.2f}".format(self.force[(i//3)*3+2]) + '\n'
                             else:
                                 nodalforce += '          \n'
@@ -800,7 +810,7 @@ class TrussFramework(object):
                 outfile.write('\n')
 
                 outfile.write('Stresses\n')
-                for i, stress in enumerate(self.stress):
+                for i, stress in enumerate(self.truss.stress):
                     if i < 100:
                         outfile.write(' ')
                         if i < 9:
@@ -813,7 +823,7 @@ class TrussFramework(object):
                 outfile.write('_ORIGIN\n')
                 outfile.write(str(self._io_origin) + '\n\n')
                 outfile.write('DOF\n')
-                outfile.write(str(self.DOF) + '\n\n')
+                outfile.write(str(self.truss.DOF()) + '\n\n')
                 outfile.write('ELEMENTS\n')
                 outfile.write(out_element + '\n\n')
                 outfile.write('COORDINATES\n')
@@ -884,7 +894,7 @@ def plot(truss, show_original=False, show_result=False, show_supports=True, show
     # Import is located here due to Android compatibility issues
     from truss_graphics import Arrow3D
 
-    _showvalues = 1     # Show values of forces
+    _showvalues = True     # Show values of forces
 
     Arrow3D.plotstructure(truss, show_original, show_result, show_supports, show_forces, show_reactions,
                           scale_displacement, scale_force, scale_Z, _showvalues, save_plot)

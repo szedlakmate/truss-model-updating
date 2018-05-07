@@ -74,11 +74,7 @@ class Truss(TrussFramework):
         """
         # Set attribute
         self.truss.nodal_connections = nodal_connection_list
-        
-        # Recalculate pending variables
-        self.number_of_nodes = len(set(list(itertools.chain.from_iterable(sorted(self.truss.nodal_connections)))))
-        self.number_of_elements = len(self.truss.nodal_connections)
-        
+
         # Set freshness flags after geometry modification
         self.invalidate_stiffness_matrices()
 
@@ -87,11 +83,12 @@ class Truss(TrussFramework):
             self.element_DOF.append([node[0]*3, node[0]*3+1, node[0]*3+2, node[1]*3, node[1]*3+1, node[1]*3+2])
 
         # Initializing defaults for all matrices
-        self._init_displacement = [0.]*(3*self.number_of_nodes)
-        self.force = [0.]*(3*self.number_of_nodes)
-        self.stiffness_matrix = [0.]*(3*self.number_of_nodes)
-        self.known_f_a = []
-        self.known_f_not_zero = []
+        self._init_displacement = [0]*(3*self.truss.number_of_nodes())
+        self.truss.number_of_nodes
+        self.truss.force = [0.]*(3*self.truss.number_of_nodes())
+        self.stiffness_matrix = [0.]*(3*self.truss.number_of_nodes())
+        self.truss.known_f_a = []
+        self.truss.known_f_not_zero = []
 
     def bulk_set_coordinates(self, coordinate_list):
         """
@@ -107,14 +104,12 @@ class Truss(TrussFramework):
         self.invalidate_stiffness_matrices('all')
         
         # Validity check
-        if self.number_of_nodes > len(self.truss.nodal_coord):
-            raise Exception('More coordinates are needed')
-        elif not self.truss.nodal_connections:
-            raise Exception('Nodes must be set before defining elements')
-        self._check_coordinates(False)
-
-        # TODO: move the default save locations to the new 'Rsults' folder
-
+        # TODO: the two side comes fromthe same value. The check should reflect to toher variables
+        #if self.truss.number_of_nodes() > len(self.truss.nodal_coord):
+        #    raise Exception('More coordinates are needed')
+        #elif not self.truss.nodal_connections:
+        #    raise Exception('Nodes must be set before defining elements')
+        #self._check_coordinates(False)
 
     def modify_coordinate(self, node_ID, new_coordinate):
         """
@@ -185,9 +180,9 @@ class Truss(TrussFramework):
         # DOF dependent mapping
         for location, force in forces:
             if self.DOF == 3:
-                self.force[location] = force
+                self.truss.force[location] = force
             elif self.DOF == 2:
-                self.force[location + (location//2)] = force
+                self.truss.force[location + (location//2)] = force
         self.set_postprocess_needed_flag()
 
     def modify_force(self, element_ID, force):
@@ -198,7 +193,7 @@ class Truss(TrussFramework):
         :param force: new force value
         :return: None
         """
-        self.force[element_ID] = force
+        self.truss.force[element_ID] = force
         self.set_postprocess_needed_flag()
 
     def bulk_set_supports(self, constraints):
@@ -253,23 +248,23 @@ class Truss(TrussFramework):
         self.set_postprocess_needed_flag()
 
         if self.DOF == 2:
-            for dof_z in range(self.number_of_nodes):
+            for dof_z in range(self.truss.number_of_nodes()):
                 self.truss.constraint.append([int(dof_z*3+2), 0.])
         self.truss.constraint = list(k for k, _ in itertools.groupby(sorted(self.truss.constraint)))
 
         # Setting known forces
-        for location in range(3*self.number_of_nodes):
-            self.known_f_a.append(location)
-            if self.force[location] != 0:
-                self.known_f_not_zero.append(location)
+        for location in range(3*self.truss.number_of_nodes()):
+            self.truss.known_f_a.append(location)
+            if self.truss.force[location] != 0:
+                self.truss.known_f_not_zero.append(location)
 
         self.known_displacement_a = []
         for constraint in self.truss.constraint:
             self._init_displacement[constraint[0]] = constraint[1]
             self.known_displacement_a.append(constraint[0])
             try:
-                self.known_f_a.remove(constraint[0])
-                self.known_f_not_zero.remove(constraint[0])
+                self.truss.known_f_a.remove(constraint[0])
+                self.truss.known_f_not_zero.remove(constraint[0])
             except ValueError:
                 pass
 
@@ -280,9 +275,9 @@ class Truss(TrussFramework):
         self._cz = [0.]*self.truss.number_of_elements()
         self._s_loc = [0.]*self.truss.number_of_elements()
         local_stiffness_matrix = [0.]*self.truss.number_of_elements()
-        self.stress = [0.]*self.truss.number_of_elements()
+        self.truss.stress = [0.]*self.truss.number_of_elements()
 
-        self.stiffness_matrix = [[0.]*(self.number_of_nodes*3)]*(self.number_of_nodes*3)
+        self.stiffness_matrix = [[0.]*(self.truss.number_of_nodes()*3)]*(self.truss.number_of_nodes()*3)
 
         for i in range(self.truss.number_of_elements()):
             elements_lengths[i] =\
@@ -305,7 +300,7 @@ class Truss(TrussFramework):
             local_stiffness_matrix[i] = [[y * self.cross_sectional_area_list[i] * self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
             ele_dof_vec = self.element_DOF[i]
 
-            stiffness_increment = [0.]*(self.number_of_nodes*3)
+            stiffness_increment = [0.]*(self.truss.number_of_nodes()*3)
 
             for j in range(3*2):
                 for k in range(3*2):
@@ -321,7 +316,7 @@ class Truss(TrussFramework):
             self.modified_stiffness_matrices = [0.]*(self.truss.number_of_elements()+1)
 
         # for loopindex in range(self.truss.number_of_elements()):
-        modified_stiffness_matrices = [[0.]*(self.number_of_nodes*3)]*(self.number_of_nodes*3)
+        modified_stiffness_matrices = [[0.]*(self.truss.number_of_nodes()*3)]*(self.truss.number_of_nodes()*3)
 
         for i in range(self.truss.number_of_elements()):
             if i == index:
@@ -333,7 +328,7 @@ class Truss(TrussFramework):
 
             ele_dof_vec = self.element_DOF[i]
 
-            stiffness_increment = [0.]*(self.number_of_nodes*3)
+            stiffness_increment = [0.]*(self.truss.number_of_nodes()*3)
 
             for j in range(3*2):
                 for k in range(3*2):
@@ -352,17 +347,17 @@ class Truss(TrussFramework):
                 print('Stiffness matrix is recalculated')
             self.calculate_stiffness_matrix()
 
-        self.dis_new = [0.]*(self.number_of_nodes*3-len(self.truss.constraint))
-        self.force_new = [0.]*(self.number_of_nodes*3-len(self.truss.constraint))
-        self.stiff_new = [[0.]*(self.number_of_nodes*3-len(self.truss.constraint))]*(self.number_of_nodes*3-len(self.truss.constraint))
+        self.dis_new = [0.]*(self.truss.number_of_nodes()*3-len(self.truss.constraint))
+        self.truss.force_new = [0.]*(self.truss.number_of_nodes()*3-len(self.truss.constraint))
+        self.stiff_new = [[0.]*(self.truss.number_of_nodes()*3-len(self.truss.constraint))]*(self.truss.number_of_nodes()*3-len(self.truss.constraint))
 
         # known force array
-        for i, known_f_a in enumerate(self.known_f_a):
-            self.force_new[i] = self.force[known_f_a]
+        for i, known_f_a in enumerate(self.truss.known_f_a):
+            self.truss.force_new[i] = self.truss.force[known_f_a]
 
-        stiffness_increment = [0.]*(self.number_of_nodes*3-len(self.truss.constraint))
-        for i, kfai in enumerate(self.known_f_a):
-            for j, kfaj in enumerate(self.known_f_a):
+        stiffness_increment = [0.]*(self.truss.number_of_nodes()*3-len(self.truss.constraint))
+        for i, kfai in enumerate(self.truss.known_f_a):
+            for j, kfaj in enumerate(self.truss.known_f_a):
                 stiffness_increment[j] = self.stiffness_matrix[kfai][kfaj]
             self.stiff_new[i] = [x + y for x, y in zip(self.stiff_new[i], stiffness_increment)]
 
@@ -370,20 +365,20 @@ class Truss(TrussFramework):
         if self.configuration.solver == 0:
             if self.configuration.log:
                 print('Built-in solver')
-            self.dis_new = multiply_matrix_vector(invert(self.stiff_new), self.force_new)
+            self.dis_new = multiply_matrix_vector(invert(self.stiff_new), self.truss.force_new)
         else:
             if self.configuration.log:
                 print('NumPy solver')
-            self.dis_new = numpy.linalg.solve(numpy.array(self.stiff_new), numpy.array(self.force_new))
+            self.dis_new = numpy.linalg.solve(numpy.array(self.stiff_new), numpy.array(self.truss.force_new))
 
         self.displacement = deepcopy(self._init_displacement)
 
-        for i, known_f_a in enumerate(self.known_f_a):
+        for i, known_f_a in enumerate(self.truss.known_f_a):
             self.displacement[known_f_a] = self.dis_new[i]
 
         # Deformed shape
         self.truss.nodal_coord_def = []
-        for i in range(self.number_of_nodes):
+        for i in range(self.truss.number_of_nodes()):
             self.truss.nodal_coord_def.append([self.truss.nodal_coord[i][0] + self.displacement[i*3+0],
                                         self.truss.nodal_coord[i][1] + self.displacement[i*3+1], self.truss.nodal_coord[i][2] + self.displacement[i*3+2]])
 
@@ -397,26 +392,26 @@ class Truss(TrussFramework):
         Solver for the modified structures. 'Index' shows the actual modification number.
         """
 
-        self.updating_container.modified_displacements[index] = [0.]*(self.number_of_nodes*3)
+        self.updating_container.modified_displacements[index] = [0.]*(self.truss.number_of_nodes()*3)
 
-        dis_new = [0.]*(self.number_of_nodes*3-len(self.truss.constraint))
-        stiff_new = [[0.]*(self.number_of_nodes*3-len(self.truss.constraint))]*(self.number_of_nodes*3-len(self.truss.constraint))
+        dis_new = [0.]*(self.truss.number_of_nodes()*3-len(self.truss.constraint))
+        stiff_new = [[0.]*(self.truss.number_of_nodes()*3-len(self.truss.constraint))]*(self.truss.number_of_nodes()*3-len(self.truss.constraint))
 
-        stiffness_increment = [0.]*(self.number_of_nodes*3-len(self.truss.constraint))
-        for i, kfai in enumerate(self.known_f_a):
-            for j, kfaj in enumerate(self.known_f_a):
+        stiffness_increment = [0.]*(self.truss.number_of_nodes()*3-len(self.truss.constraint))
+        for i, kfai in enumerate(self.truss.known_f_a):
+            for j, kfaj in enumerate(self.truss.known_f_a):
                 stiffness_increment[j] = self.modified_stiffness_matrices[index][kfai][kfaj]
             stiff_new[i] = [x + y for x, y in zip(stiff_new[i], stiffness_increment)]
 
         # SOLVING THE MODIFIED STRUCTURE
         if self.configuration.solver == 0:
-            dis_new = multiply_matrix_vector(invert(stiff_new), self.force_new)
+            dis_new = multiply_matrix_vector(invert(stiff_new), self.truss.force_new)
         else:
-            dis_new = numpy.linalg.solve(numpy.array(stiff_new), numpy.array(self.force_new))
+            dis_new = numpy.linalg.solve(numpy.array(stiff_new), numpy.array(self.truss.force_new))
 
         mod_displacement_temp = deepcopy(self._init_displacement)
 
-        for i, kfa in enumerate(self.known_f_a):
+        for i, kfa in enumerate(self.truss.known_f_a):
             mod_displacement_temp[kfa] = dis_new[i] - self.dis_new[i]
 
         self.updating_container.modified_displacements[index] = [x + y for x, y in zip(self.updating_container.modified_displacements[index], mod_displacement_temp)]
@@ -685,9 +680,9 @@ class Truss(TrussFramework):
         Calculates reaction forces
         """
         for i in self.known_displacement_a:
-            self.force[i] = 0
+            self.truss.force[i] = 0
             for j, displacement in enumerate(self.displacement):
-                self.force[i] += self.stiffness_matrix[i][j]*displacement
+                self.truss.force[i] += self.stiffness_matrix[i][j]*displacement
 
 
     # TODO: should get a TrussModelData object

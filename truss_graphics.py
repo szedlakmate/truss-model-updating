@@ -63,7 +63,6 @@ class Arrow3D(FancyArrowPatch):
             _ax.w_zaxis.line.set_lw(0.)
             _ax.set_zticklabels([])
 
-        # TODO: truss input should be truss.truss
         xmin = min(list(truss.nodal_coord[x][0] for x in range(truss.number_of_nodes())))
         xmax = max(list(truss.nodal_coord[x][0] for x in range(truss.number_of_nodes())))
         ymin = min(list(truss.nodal_coord[x][1] for x in range(truss.number_of_nodes())))
@@ -77,7 +76,7 @@ class Arrow3D(FancyArrowPatch):
         xframe = max(deltax * 0.05, 2)
         yframe = max(deltay * 1.5, 2)
 
-        if truss.DOF == 3:
+        if truss.DOF() == 3:
             plot_height = plot_width * ((deltay + yframe*2)/(deltax + xframe*2)) * 0.3
         else:
             plot_height = plot_width * 0.5 * 0.5
@@ -91,17 +90,17 @@ class Arrow3D(FancyArrowPatch):
             _coloring = 0
 
         # Giving plot names
-        if show_orig == 1 and show_result == 0 and show_supports == 1 and show_reactions == 0:
+        if show_orig and (not show_result) and show_supports and (not show_reactions):
             plotname += ' - 01 Initial structure'
             if show_forces:
                 plotname += ' with forces'
-        elif show_orig == 1 and show_result == 1:
+        elif show_orig and show_result:
             plotname += ' - 02 Deformation'
-            if show_reactions == 0:
+            if not show_reactions:
                 plotname += ' with reactions'
-        elif show_orig == 0 and show_result == 1:
+        elif (not show_orig) and show_result:
             plotname += ' - 03 Stresses'
-            if show_reactions == 0:
+            if not show_reactions:
                 plotname += ' with reactions'
         else:
             plotname += ' - Unnamed'
@@ -205,7 +204,7 @@ class Arrow3D(FancyArrowPatch):
                         _ax.set_yticklabels([])
                         _ax.set_zticklabels([])
                         if not i//3 == e_previous//3:
-                            if truss.DOF == 3:
+                            if truss.DOF() == 3:
                                 _ax.text(truss.nodal_coord[i//3][0],
                                     truss.nodal_coord[i//3][1],
                                     truss.nodal_coord[i//3][2],
@@ -213,7 +212,7 @@ class Arrow3D(FancyArrowPatch):
                                     "{:10.2f}".format(truss.force[(i//3)*3+1])+'\n' +
                                     "{:10.2f}".format(truss.force[(i//3)*3+2]),
                                     fontsize=12, horizontalalignment='right')
-                            elif truss.DOF == 2:
+                            elif truss.DOF() == 2:
                                 _ax.text(truss.nodal_coord[i//3][0],
                                     truss.nodal_coord[i//3][1],
                                     truss.nodal_coord[i//3][2],
@@ -233,7 +232,7 @@ class Arrow3D(FancyArrowPatch):
                 else:
                     f_dir = [0., 0., -1.0 * scale_sup * z_correction]
                     col = 'brown'
-                if i % 3 != 2 or truss.DOF == 3:
+                if i % 3 != 2 or truss.DOF() == 3:
                     _ax.plot([truss.nodal_coord[i//3][0], truss.nodal_coord[i//3][0]+f_dir[0]],
                         [truss.nodal_coord[i//3][1], truss.nodal_coord[i//3][1]+f_dir[1]],
                         zs=[truss.nodal_coord[i//3][2], truss.nodal_coord[i//3][2]+f_dir[2]],
