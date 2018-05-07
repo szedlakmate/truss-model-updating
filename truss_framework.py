@@ -109,12 +109,14 @@ class TrussConfiguration(object):
             self.debug = static_OFF
             self.realistic_simulation = static_ON
 
+        """
         if self.OSlib:
             try:
                 if not os.path.exists("./Structures/"):
                     os.makedirs("./Structures")
             except FileNotFoundError:
                 print("Error: Please manually create the 'Structures' folder in the root of the project")
+        """
 
         if self.simulation or not self.updating:
             self.arduino = 0
@@ -179,29 +181,33 @@ class TrussConfiguration(object):
         self.previous_time = new_time
 
 
+class ModelData(object):
+    """
+    Datamodel for structures
+    """
+    def __init__(self):
+        self.modifications = []  # Storing modifications for model updating
+        self.read_elements = [0] * 9
+
 class ModelUpdatingContainer(object):
     """
     Model updating container for isolating the upadting
     """
     def __init__(self):
-        self.modifications = []          # Storing modifications for model updating
-        self.read_elements = [0]*9
-        self.arduino_mapping = []
-        self.measurement = [0.]
-        self.number_of_updates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit,
-        self.modified_displacements = []
-        self.effect = []
-        self.total_effect = []
-        self.sorted_effect = []
-        self.original_delta = []
-        self.latest_delta = []
-        # Solver configuration
-        self.unit_modification = 0
-        self.error_limit = 0
-        self.modification_limit = 0
-        self.iteration_limit = 0
-        self._mod_stiff_is_fresh = 0
+        # Truss data
+        self.keypoints = 0
+        self.nodal_connections = []  # Element's end nodes
+        self.constraint = []  # Supports
+        self.force = []  # Force
+        self.nodal_coord = []  # Coordinates of nodes
+        self.cross_sectional_area_list = []  # Cross-sectional areas
+        self.elastic_modulo = []  # Material data
 
+        # Results
+        self.nodal_coord_def = []  # Coordinates after deformations TODO: this should be optional
+        # Secondary variables
+        self.displacement = []  # Relative displacements
+        self.stress_color = []  # Color mapping for stresses
 
 
 class TrussFramework(object):
@@ -212,6 +218,7 @@ class TrussFramework(object):
     - Arduino management
     - Plot functions
     """
+
     def __init__(self, input_file, title, compatibility_mode, simulation):
         """
         Truss Updater framework object.
@@ -219,22 +226,22 @@ class TrussFramework(object):
         """
         # Serial connection
         self.serial_connection = False  # Holds serial connection
+
         # Project data
         if title == '':
             title = input_file
         self.title = title.replace('.str', '')  # Name of structure
         self.configuration = TrussConfiguration(input_file.replace('.str', '') + '.str', compatibility_mode, simulation)
-        # Truss data
+
+        # Structure
+        self.truss = ModelData() # TODO: itt hagytam abba a buszon
+
+        # Additional truss data
         self.known_f_a = []           # Nodes without supports
         self.known_f_not_zero = []     # Nodes with loads
         self.DOF = 3                  # Truss's degree of freedom
-        self.nodal_connections = []                # Element's end nodes
-        self.constraint = []          # Supports
-        self.force = []               # Force
-        self.nodal_coord = []          # Coordinates of nodes
-        self.nodal_coord_def = []      # Coordinates after deformations
-        self.cross_sectional_area_list = []                # Cross-sectional areas
-        self.elastic_modulo = []                   # Material data
+
+        # TODO: pending variables should be transformed into functions (also Stiffnesses???)
         self.number_of_nodes = 0              # Number of nodes
         self.number_of_elements = 0               # Number of elements
         self.element_DOF = []              # Mapping between DOF and node
@@ -260,7 +267,6 @@ class TrussFramework(object):
         self._io_origin = 0           # Array's first element number during IO. Default is 0.
         self.analysis = {}
         self.mod_displacements = []
-        self.keypoint = []
         self.number_of_keypoints = 0
         self.effect = []
         self.total_effect = []
