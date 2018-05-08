@@ -157,7 +157,7 @@ class Truss(TrussFramework):
         :param E: array of elastic modulos according to the elements
         :return: None
         """
-        self.elastic_modulo = E
+        self.truss.elastic_modulo = E
         self.invalidate_stiffness_matrices('all')
 
     def modify_material(self, element_ID, E):
@@ -168,7 +168,7 @@ class Truss(TrussFramework):
         :param E: {number} Elastic modulo
         :return: None
         """
-        self.elastic_modulo[element_ID] = E
+        self.truss.elastic_modulo[element_ID] = E
         self.invalidate_stiffness_matrices('all')
 
     def bulk_set_forces(self, forces):
@@ -289,7 +289,7 @@ class Truss(TrussFramework):
             self._cx[i] = (self.truss.nodal_coord[self.truss.nodal_connections[i][1]][0]-self.truss.nodal_coord[self.truss.nodal_connections[i][0]][0])/elements_lengths[i]
             self._cy[i] = (self.truss.nodal_coord[self.truss.nodal_connections[i][1]][1]-self.truss.nodal_coord[self.truss.nodal_connections[i][0]][1])/elements_lengths[i]
             self._cz[i] = (self.truss.nodal_coord[self.truss.nodal_connections[i][1]][2]-self.truss.nodal_coord[self.truss.nodal_connections[i][0]][2])/elements_lengths[i]
-            self._norm_stiff[i] = self.elastic_modulo[i]/elements_lengths[i]
+            self._norm_stiff[i] = self.truss.elastic_modulo[i]/elements_lengths[i]
 
             # local stiffness matrix calculation
             self._s_loc[i] = [[self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i], -self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i]],
@@ -706,7 +706,7 @@ class Truss(TrussFramework):
             truss.stress[element] = truss.stress[element]*truss._norm_stiff[element]
         """
             truss.stress[element] = \
-                -(truss.element_length(element, 'deformed') - truss.element_length(element, 'original')) / truss.element_length(element, 'original') * truss.elastic_modulo[element]
+                (truss.element_length(element, 'deformed') - truss.element_length(element, 'original')) / truss.element_length(element, 'original') * truss.elastic_modulo[element]
 
         s_max = max([abs(min(truss.stress)), max(truss.stress), 0.000000001])
 

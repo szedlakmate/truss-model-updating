@@ -230,9 +230,6 @@ class TrussModelData(object):
             return math.sqrt(sum([(j - i) ** 2 for j, i in zip(self.nodal_coord_def[self.nodal_connections[ID][1]],
                                                                self.nodal_coord_def[self.nodal_connections[ID][0]])]))
 
-    def compression(self, ID):
-        return
-
 
 class ModelUpdatingContainer(object):
     """
