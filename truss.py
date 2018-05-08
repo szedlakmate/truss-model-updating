@@ -705,8 +705,8 @@ class Truss(TrussFramework):
                 truss.stress[element] += local_stiffness[i]*truss.displacement[truss.element_DOF[element][i]]
             truss.stress[element] = truss.stress[element]*truss._norm_stiff[element]
         """
-         #   truss.stress[element] = \
-         #       -(truss.element_length(element, 'deformed') - truss.element_length(element, 'original')) / truss.element_length(element, 'original') * truss.elastic_modulo[element]
+            truss.stress[element] = \
+                -(truss.element_length(element, 'deformed') - truss.element_length(element, 'original')) / truss.element_length(element, 'original') * truss.elastic_modulo[element]
 
         s_max = max([abs(min(truss.stress)), max(truss.stress), 0.000000001])
 
