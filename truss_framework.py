@@ -194,6 +194,7 @@ class TrussModelData(object):
         # Labels
         self.title = title
         # Truss data
+        self.DOF = 3
         self.keypoints = []
         self.nodal_connections = []  # Element's end nodes
         self.constraint = []  # Supports
@@ -221,11 +222,16 @@ class TrussModelData(object):
     def number_of_keypoints(self):
         return len(self.keypoints)
 
-    def DOF(self):
-        try:
-            return len(self.nodal_coord[0])
-        except IndexError:
-            return 0
+    def element_length(self, ID, target='original'):
+        if str(target.lower()) == 'original':
+            return math.sqrt(sum([(j-i)**2 for j, i in zip(self.nodal_coord[self.nodal_connections[ID][1]],
+                                       self.nodal_coord[self.nodal_connections[ID][0]])]))
+        else:
+            return math.sqrt(sum([(j - i) ** 2 for j, i in zip(self.nodal_coord_def[self.nodal_connections[ID][1]],
+                                                               self.nodal_coord_def[self.nodal_connections[ID][0]])]))
+
+    def compression(self, ID):
+        return
 
 
 class ModelUpdatingContainer(object):
@@ -632,6 +638,7 @@ class TrussFramework(object):
             # pass
 
     def calibrate(self):
+        # TODO: Seriously needs refactoring
         """
         Calibration for Arduino measurement.
         All the measurements will describe the dispalecements from the claibration-state.
@@ -752,14 +759,14 @@ class TrussFramework(object):
         for i in self.truss.elastic_modulo:
             out_materials += str(i) + ', '
         out_forces = ''
-        for forcedof in self.truss.known_f_not_zero:
-            if self.truss.DOF() == 3:
+        for forcedof, i in enumerate(self.truss.known_f_not_zero):
+            if self.truss.DOF == 3:
                 out_forces += str(forcedof + self._io_origin) + ', ' + str(self.truss.force[forcedof]) + ' | '
-            elif self.truss.DOF() == 2 and i % 3 != 2:
+            elif self.truss.DOF == 2 and i % 3 != 2:
                 out_forces += str(forcedof - forcedof//3 + self._io_origin) + ', ' + str(self.truss.force[forcedof]) + ' | '
         out_supports = ''
         for i in self.truss.constraint:
-            if self.truss.DOF() == 3:
+            if self.truss.DOF == 3:
                 out_supports += str(i[0] + self._io_origin) + ', ' + str(i[1]) + ' | '
             elif i[0] % 3 != 2:
                 out_supports += str(i[0] - i[0]//3 + self._io_origin) + ', ' + str(i[1]) + ' | '
@@ -774,7 +781,7 @@ class TrussFramework(object):
                 # for i in range(len(self.force)//3):
                 prev = -1
                 for i in self.truss.known_dis_a:
-                    if self.truss.DOF() == 3 or i % 3 != 2:
+                    if self.truss.DOF == 3 or i % 3 != 2:
                         if i//3 != prev:
                             if i < 100:
                                 outfile.write(' ')
@@ -789,7 +796,7 @@ class TrussFramework(object):
                                 nodalforce += "{:10.2f}".format(self.force[(i//3)*3+1]) + ', '
                             else:
                                 nodalforce += '            '
-                            if self.truss.DOF() != 2 and (i//3)*3+2 in self.truss.known_dis_a:
+                            if self.truss.DOF != 2 and (i//3)*3+2 in self.truss.known_dis_a:
                                 nodalforce += "{:10.2f}".format(self.force[(i//3)*3+2]) + '\n'
                             else:
                                 nodalforce += '          \n'
@@ -823,7 +830,7 @@ class TrussFramework(object):
                 outfile.write('_ORIGIN\n')
                 outfile.write(str(self._io_origin) + '\n\n')
                 outfile.write('DOF\n')
-                outfile.write(str(self.truss.DOF()) + '\n\n')
+                outfile.write(str(self.truss.DOF) + '\n\n')
                 outfile.write('ELEMENTS\n')
                 outfile.write(out_element + '\n\n')
                 outfile.write('COORDINATES\n')
@@ -878,7 +885,7 @@ class TrussFramework(object):
         self.configuration.end_logging(self.updating_container.number_of_updates)
 
 def plot(truss, show_original=False, show_result=False, show_supports=True, show_forces=True,
-         show_reactions=True, scale_displacement=1.0, scale_force=1.0, scale_Z=0.3, save_plot=True):
+         show_reactions=True, scale_displacement=1.0, scale_force=1.0, scale_Z=0.3, save=True):
     """
     Plot function of the Truss class
     This method calls the more general plotstructure() method.
@@ -897,4 +904,4 @@ def plot(truss, show_original=False, show_result=False, show_supports=True, show
     _showvalues = True     # Show values of forces
 
     Arrow3D.plotstructure(truss, show_original, show_result, show_supports, show_forces, show_reactions,
-                          scale_displacement, scale_force, scale_Z, _showvalues, save_plot)
+                          scale_displacement, scale_force, scale_Z, _showvalues, save)

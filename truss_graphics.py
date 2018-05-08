@@ -58,7 +58,7 @@ class Arrow3D(FancyArrowPatch):
         fig = pyplot.figure()
         _ax = fig.add_subplot(111, projection='3d')
 
-        if truss.DOF() == 2:
+        if truss.DOF == 2:
             _ax.view_init(elev=90., azim=-90.)
             _ax.w_zaxis.line.set_lw(0.)
             _ax.set_zticklabels([])
@@ -76,7 +76,7 @@ class Arrow3D(FancyArrowPatch):
         xframe = max(deltax * 0.05, 2)
         yframe = max(deltay * 1.5, 2)
 
-        if truss.DOF() == 3:
+        if truss.DOF == 3:
             plot_height = plot_width * ((deltay + yframe*2)/(deltax + xframe*2)) * 0.3
         else:
             plot_height = plot_width * 0.5 * 0.5
@@ -204,7 +204,7 @@ class Arrow3D(FancyArrowPatch):
                         _ax.set_yticklabels([])
                         _ax.set_zticklabels([])
                         if not i//3 == e_previous//3:
-                            if truss.DOF() == 3:
+                            if truss.DOF == 3:
                                 _ax.text(truss.nodal_coord[i//3][0],
                                     truss.nodal_coord[i//3][1],
                                     truss.nodal_coord[i//3][2],
@@ -212,7 +212,7 @@ class Arrow3D(FancyArrowPatch):
                                     "{:10.2f}".format(truss.force[(i//3)*3+1])+'\n' +
                                     "{:10.2f}".format(truss.force[(i//3)*3+2]),
                                     fontsize=12, horizontalalignment='right')
-                            elif truss.DOF() == 2:
+                            elif truss.DOF == 2:
                                 _ax.text(truss.nodal_coord[i//3][0],
                                     truss.nodal_coord[i//3][1],
                                     truss.nodal_coord[i//3][2],
@@ -232,12 +232,13 @@ class Arrow3D(FancyArrowPatch):
                 else:
                     f_dir = [0., 0., -1.0 * scale_sup * z_correction]
                     col = 'brown'
-                if i % 3 != 2 or truss.DOF() == 3:
+                if i % 3 != 2 or truss.DOF == 3:
                     _ax.plot([truss.nodal_coord[i//3][0], truss.nodal_coord[i//3][0]+f_dir[0]],
                         [truss.nodal_coord[i//3][1], truss.nodal_coord[i//3][1]+f_dir[1]],
                         zs=[truss.nodal_coord[i//3][2], truss.nodal_coord[i//3][2]+f_dir[2]],
                         color=col, linewidth=4.0)
-        pyplot.show()
+
+        # pyplot.show()
         if save_plot:
             fig.savefig("./Results/" + plotname + '.png')
             print("'" + plotname + ".png' is saved.")

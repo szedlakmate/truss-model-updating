@@ -57,6 +57,7 @@ class Truss(TrussFramework):
         :return: None
         """
         self.DOF = DOF
+        self.truss.DOF = DOF
         if self.DOF not in [2, 3]:
             raise Exception('DOF must be 2 or 3.')
         
@@ -694,14 +695,19 @@ class Truss(TrussFramework):
         """
         truss.stress = [0.]*truss.number_of_elements()
         # TODO: Should be calculated based on inner data (displacements, E, A)
-        """
+
         for element in range(truss.number_of_elements()):
+
+            """
             local_stiffness = [-truss._cx[element], -truss._cy[element], -truss._cz[element],
                         truss._cx[element], truss._cy[element], truss._cz[element]]
             for i in range(3*2):
                 truss.stress[element] += local_stiffness[i]*truss.displacement[truss.element_DOF[element][i]]
             truss.stress[element] = truss.stress[element]*truss._norm_stiff[element]
         """
+         #   truss.stress[element] = \
+         #       -(truss.element_length(element, 'deformed') - truss.element_length(element, 'original')) / truss.element_length(element, 'original') * truss.elastic_modulo[element]
+
         s_max = max([abs(min(truss.stress)), max(truss.stress), 0.000000001])
 
 
@@ -761,9 +767,9 @@ if __name__ == '__main__':
         # Save: Save plot to file
 
         #     plot(O, D, S, F, R, ScD, ScF, ScS, Save)
-        plot(TRUSS.truss, 0, 1, 1, 0, 1.0, 0.0, 0.0, True)
-        plot(TRUSS.truss, 1, 1, 1, 0, 0, 1.0, 0.0, 0.0, True)
-        plot(TRUSS.truss, 0, 1, 1, 1, 1, 2.0, 0.0, 0.0, True)
+        plot(TRUSS.truss, show_original=False, show_result=True, show_supports=True, show_forces=False, show_reactions=True, scale_displacement=1.0, scale_force=0.0, scale_Z=0.0, save=True)
+        plot(TRUSS.truss, show_original=True, show_result=True, show_supports=True, show_forces=False, show_reactions=False, scale_displacement=1.0, scale_force=0.0, scale_Z=0.0, save=True)
+        plot(TRUSS.truss, show_original=False, show_result=True, show_supports=True, show_forces=True, show_reactions=True, scale_displacement=2.0, scale_force=0.0, scale_Z=0.0, save=True)
         TRUSS.configuration.part_time("Plotting")
 
     # Write results to file
