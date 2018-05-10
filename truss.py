@@ -49,68 +49,9 @@ class Truss(TrussFramework):
         else:
             return True
 
-    def set_model_DOF(self, DOF):
-        """
-        Setting problem's degree of freedom
 
-        :param DOF: [2 | 3] Model's Degree Of Freedom
-        :return: None
-        """
-        self.DOF = DOF
-        self.truss.DOF = DOF
-        if self.DOF not in [2, 3]:
-            raise Exception('DOF must be 2 or 3.')
-        
-        # Set freshness flags after geometry modification
-        self.invalidate_stiffness_matrices('all')
 
-    # TODO: This functions is probably not called although it should be part of the set_base() process
-    def bulk_set_elements(self, nodal_connection_list):
-        """
-        Setting elements (nodal connections) in bulk mode
 
-        :param nodal_connection_list: an array of arrays, where each sub-array is a pair of integers, namely [i, j].
-        i, j are the ID's of the nodes and an element is i -> j.
-        :return: None
-        """
-        # Set attribute
-        self.truss.nodal_connections = nodal_connection_list
-
-        # Set freshness flags after geometry modification
-        self.invalidate_stiffness_matrices()
-
-        # Creating mapping tool for elements
-        for node in self.truss.nodal_connections:
-            self.element_DOF.append([node[0]*3, node[0]*3+1, node[0]*3+2, node[1]*3, node[1]*3+1, node[1]*3+2])
-
-        # Initializing defaults for all matrices
-        self._init_displacement = [0]*(3*self.truss.number_of_nodes())
-        self.truss.number_of_nodes
-        self.truss.force = [0.]*(3*self.truss.number_of_nodes())
-        self.stiffness_matrix = [0.]*(3*self.truss.number_of_nodes())
-        self.truss.known_f_a = []
-        self.truss.known_f_not_zero = []
-
-    def bulk_set_coordinates(self, coordinate_list):
-        """
-        Setting coordinates in bulk mode
-
-        :param coordinate_list: An array of coordinate arrays (2/3 elements) enlisting ALL the nodal coordinates
-        :return: None
-        """
-        # Set attribute
-        self.truss.nodal_coord = coordinate_list
-        
-        # Set freshness flags after geometry modification
-        self.invalidate_stiffness_matrices('all')
-        
-        # Validity check
-        # TODO: the two side comes fromthe same value. The check should reflect to toher variables
-        #if self.truss.number_of_nodes() > len(self.truss.nodal_coord):
-        #    raise Exception('More coordinates are needed')
-        #elif not self.truss.nodal_connections:
-        #    raise Exception('Nodes must be set before defining elements')
-        #self._check_coordinates(False)
 
     def modify_coordinate(self, node_ID, new_coordinate):
         """
@@ -129,15 +70,6 @@ class Truss(TrussFramework):
         else:
             return False
 
-    def bulk_set_cross_sections(self, area_list):
-        """
-        Setting cross-sections in bulk mode
-
-        :param area_list: cross-sectional data array according to the elements
-        :return: None
-        """
-        self.cross_sectional_area_list = area_list
-        self.invalidate_stiffness_matrices('all')
 
     def modify_cross_section(self, element_ID, new_area):
         """
@@ -147,18 +79,9 @@ class Truss(TrussFramework):
         :param new_area: the new cross-sectional area
         :return: None
         """
-        self.cross_sectional_area_list[element_ID] = new_area
+        self.truss.cross_sectional_area_list[element_ID] = new_area
         self.invalidate_stiffness_matrices('all')
 
-    def bulk_set_materials(self, E):
-        """
-        Setting material data in bulk mode
-
-        :param E: array of elastic modulos according to the elements
-        :return: None
-        """
-        self.truss.elastic_modulo = E
-        self.invalidate_stiffness_matrices('all')
 
     def modify_material(self, element_ID, E):
         """
@@ -171,20 +94,6 @@ class Truss(TrussFramework):
         self.truss.elastic_modulo[element_ID] = E
         self.invalidate_stiffness_matrices('all')
 
-    def bulk_set_forces(self, forces):
-        """
-        Set forces
-
-        :param forces: matrix of forces in the following pattern: [[location, force], ...]
-        :return: None
-        """
-        # DOF dependent mapping
-        for location, force in forces:
-            if self.DOF == 3:
-                self.truss.force[location] = force
-            elif self.DOF == 2:
-                self.truss.force[location + (location//2)] = force
-        self.set_postprocess_needed_flag()
 
     def modify_force(self, element_ID, force):
         """
@@ -197,50 +106,6 @@ class Truss(TrussFramework):
         self.truss.force[element_ID] = force
         self.set_postprocess_needed_flag()
 
-    def bulk_set_supports(self, constraints):
-        """
-        Set supports
-
-        :param constraints: matrix of constraints in the following pattern: [[location, constraint], ...]
-        :return:
-        """
-        for location, constraint in constraints:
-            if self.DOF == 3:
-                self.truss.constraint.append([location, constraint])
-            elif self.DOF == 2:
-                self.truss.constraint.append([location + (location // 2), constraint])
-        self.invalidate_stiffness_matrices('all')
-
-        self.set_postprocess_needed_flag()
-
-    def bulk_set_measurement_points(self, measurement_points=['13Y']):
-        """
-        Set special nodal DOFs
-        """
-        self.analysis = {}
-
-        for location in measurement_points:
-            node = int(location[:len(location)-1])-self._io_origin
-            if 'X' in location:
-                self.analysis[location] = node*3+0
-                self.truss.keypoints.append(node*3+0)
-            if 'Y' in location:
-                self.analysis[location] = node*3+1
-                self.truss.keypoints.append(node*3+1)
-
-            if 'Z' in location:
-                if self.DOF == 3:
-                    self.analysis[location] = node*3+2
-                    self.truss.keypoints.append(node*3+2)
-                else:
-                    print("Z-direction is not allowed in 2D structures. "
-                          "Please check the 'MEASUREMENTS' section in the input file.")
-                    raise Exception
-
-        self.number_of_keypoints = len(self.analysis)
-        if self.number_of_keypoints == 0 and self.configuration.updating:
-            print("There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file.")
-            raise Exception
 
     def calculate_stiffness_matrix(self):
         """
@@ -259,10 +124,10 @@ class Truss(TrussFramework):
             if self.truss.force[location] != 0:
                 self.truss.known_f_not_zero.append(location)
 
-        self.known_displacement_a = []
+        self.truss.known_displacement_a = []
         for constraint in self.truss.constraint:
             self._init_displacement[constraint[0]] = constraint[1]
-            self.known_displacement_a.append(constraint[0])
+            self.truss.known_displacement_a.append(constraint[0])
             try:
                 self.truss.known_f_a.remove(constraint[0])
                 self.truss.known_f_not_zero.remove(constraint[0])
@@ -476,32 +341,6 @@ class Truss(TrussFramework):
             else:
                 self.updating_container.sorted_effect[i] = sorted(self.updating_container.sorted_effect[i], reverse=True)
 
-    def difference(self, num_displ, measurement):
-        """
-        Calculate the difference between the Numerical solution and Real-life measurement.
-        The Real-life measurement should be given the following format:
-
-            MEASUREMENT: [[13X, -2.154], [16Y, 5.256], ...]
-        """
-        # print(nodenumber option should be added! <XXX>)
-
-        delta = []
-
-        for measured in measurement:
-            #loc, measured = package[0], package[1]
-            loc = '13Y'
-            try:
-                dof = self.analysis[loc.upper()]
-            except KeyError:
-                print('The given measurement location cannot be matched with the input data.')
-                print('The available nodes are: {\'NAMES\': mapping addresses}')
-                print(self.analysis)
-                self.configuration.disconnect()
-                raise Exception('Watchpoint name error')
-
-            delta.append(measured - num_displ[dof])
-
-        return delta
 
     def optimize(self, delta):
         """
@@ -553,7 +392,7 @@ class Truss(TrussFramework):
 
             for i, effect in enumerate(self.updating_container.total_effect):
                 if effect == 0.0:
-                    print("None of the variables has effect on " + str(self.arduino_mapping[i]))
+                    print("None of the variables has effect on " + str(self.updating_container.arduino_mapping[i]))
                     print("Model updating has no solution.")
                     raise Exception
 
@@ -680,7 +519,7 @@ class Truss(TrussFramework):
         """
         Calculates reaction forces
         """
-        for i in self.known_displacement_a:
+        for i in self.truss.known_displacement_a:
             self.truss.force[i] = 0
             for j, displacement in enumerate(self.displacement):
                 self.truss.force[i] += self.stiffness_matrix[i][j]*displacement
@@ -760,16 +599,9 @@ if __name__ == '__main__':
 
     # Plotting
     if TRUSS.configuration.graphics:
-        # Plot settings:
-        # O: Original D: Deformed S: Supports F: Forces R: Reactions
-        # ScD: Scale displacements (Z-axis) (def:1.0) ScF: Scale forces (def:1.0)
-        # ScS: Scale Support signs (Z-axis) (def:1.0)
-        # Save: Save plot to file
-
-        #     plot(O, D, S, F, R, ScD, ScF, ScS, Save)
-        plot(TRUSS.truss, show_original=False, show_result=True, show_supports=True, show_forces=False, show_reactions=True, scale_displacement=1.0, scale_force=0.0, scale_Z=0.0, save=True)
-        plot(TRUSS.truss, show_original=True, show_result=True, show_supports=True, show_forces=False, show_reactions=False, scale_displacement=1.0, scale_force=0.0, scale_Z=0.0, save=True)
-        plot(TRUSS.truss, show_original=False, show_result=True, show_supports=True, show_forces=True, show_reactions=True, scale_displacement=2.0, scale_force=0.0, scale_Z=0.0, save=True)
+        plot(TRUSS.truss, original=True, result=False, supports=True, forces=True, reactions=False)
+        plot(TRUSS.truss, original=True, result=True, supports=True, forces=False, reactions=False)
+        plot(TRUSS.truss, original=False, result=True, supports=True, forces=True, reactions=True)
         TRUSS.configuration.part_time("Plotting")
 
     # Write results to file

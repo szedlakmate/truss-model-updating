@@ -31,8 +31,8 @@ class Arrow3D(FancyArrowPatch):
         self.set_positions((_xs[0], _ys[0]), (_xs[1], _ys[1]))
         FancyArrowPatch.draw(self, renderer)
 
-    def plotstructure(truss, show_orig, show_result, show_supports,
-            show_forces, show_reactions, scale_displacements, scale_forces, z_correction, show_values, save_plot, log=0):
+    def plotstructure(truss, original=1, result=1, supports=1,
+            forces=1, reactions=1, scale_displacements=1, scale_forces=1, z_correction=1, show_values=1, save_plot=1, log=0):
         """
         General plotting method for trusses
 
@@ -86,27 +86,27 @@ class Arrow3D(FancyArrowPatch):
         _ax.set_ylim3d(ymin - yframe, ymax + yframe)
         _ax.set_zlim3d(zmin - zframe, zmax + zframe)
 
-        if show_orig == show_result:
+        if original == result:
             _coloring = 0
 
         # Giving plot names
-        if show_orig and (not show_result) and show_supports and (not show_reactions):
+        if original and (not result) and supports and (not reactions):
             plotname += ' - 01 Initial structure'
-            if show_forces:
+            if forces:
                 plotname += ' with forces'
-        elif show_orig and show_result:
+        elif original and result:
             plotname += ' - 02 Deformation'
-            if not show_reactions:
+            if not reactions:
                 plotname += ' with reactions'
-        elif (not show_orig) and show_result:
+        elif (not original) and result:
             plotname += ' - 03 Stresses'
-            if not show_reactions:
+            if not reactions:
                 plotname += ' with reactions'
         else:
             plotname += ' - Unnamed'
 
         print(plotname + ": ")
-        if show_result:
+        if result:
             dipslay_displacement = deepcopy(truss.nodal_coord_def)
             if scale_displacements != 1.0:
                 if log:
@@ -118,12 +118,12 @@ class Arrow3D(FancyArrowPatch):
 
         for i in range(truss.number_of_elements()):
             # Plot original structure
-            if show_orig:
+            if original:
                 _ax.plot([truss.nodal_coord[truss.nodal_connections[i][1]][0], truss.nodal_coord[truss.nodal_connections[i][0]][0]],
                     [truss.nodal_coord[truss.nodal_connections[i][1]][1], truss.nodal_coord[truss.nodal_connections[i][0]][1]],
                     zs=[truss.nodal_coord[truss.nodal_connections[i][1]][2], truss.nodal_coord[truss.nodal_connections[i][0]][2]], color='b')
             # Plot deformed structure
-            if show_result:
+            if result:
                 if True: #truss._post_processed:        TODO: post_processed state should be checked in a different way
                     if truss.stress_color[i] > 0:
                         if _coloring == 1:
@@ -161,7 +161,7 @@ class Arrow3D(FancyArrowPatch):
                         zs=[dipslay_displacement[truss.nodal_connections[i][1]][2], dipslay_displacement[truss.nodal_connections[i][0]][2]],
                         color=rgb_col)
 
-        if show_forces:
+        if forces:
             for i in truss.known_f_not_zero:
                 if truss.force[i] < 0:
                     value = -1.0
@@ -179,9 +179,9 @@ class Arrow3D(FancyArrowPatch):
                                   mutation_scale=20, lw=1, arrowstyle="-|>", color="k")
                 _ax.add_artist(f_arrow)
 
-        if show_reactions:
+        if reactions:
             e_previous = -100
-            for i in truss.known_dis_a:
+            for i in truss.known_displacement_a:
                 value = 0.0             # Maybe this is useless <XXX>
                 if truss.force[i] < 0:
                     value = -1.0
@@ -221,21 +221,21 @@ class Arrow3D(FancyArrowPatch):
                                     fontsize=12, horizontalalignment='right')
                 e_previous = i
 
-        if show_supports:
-            for i in truss.known_dis_a:
-                if i % 3 == 0:
+        if supports:
+            for support_index in truss.known_displacement_a:
+                if support_index % 3 == 0:
                     f_dir = [-1.0 * scale_sup, 0., 0.]
                     col = 'g'
-                elif i % 3 == 1:
+                elif support_index % 3 == 1:
                     f_dir = [0., -1.0 * scale_sup, 0.]
                     col = 'y'
                 else:
                     f_dir = [0., 0., -1.0 * scale_sup * z_correction]
                     col = 'brown'
-                if i % 3 != 2 or truss.DOF == 3:
-                    _ax.plot([truss.nodal_coord[i//3][0], truss.nodal_coord[i//3][0]+f_dir[0]],
-                        [truss.nodal_coord[i//3][1], truss.nodal_coord[i//3][1]+f_dir[1]],
-                        zs=[truss.nodal_coord[i//3][2], truss.nodal_coord[i//3][2]+f_dir[2]],
+                if support_index % 3 != 2 or truss.DOF == 3:
+                    _ax.plot([truss.nodal_coord[support_index//3][0], truss.nodal_coord[support_index//3][0]+f_dir[0]],
+                        [truss.nodal_coord[support_index//3][1], truss.nodal_coord[support_index//3][1]+f_dir[1]],
+                        zs=[truss.nodal_coord[support_index//3][2], truss.nodal_coord[support_index//3][2]+f_dir[2]],
                         color=col, linewidth=4.0)
 
         # pyplot.show()

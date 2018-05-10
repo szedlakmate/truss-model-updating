@@ -203,8 +203,9 @@ class TrussModelData(object):
         self.cross_sectional_area_list = []  # Cross-sectional areas
         self.elastic_modulo = []  # Material data
         #Additional data
-        self.known_dis_a = []
+        self.known_displacement_a = []
         self.known_f_not_zero = []
+
         # Results
         self.nodal_coord_def = []  # Coordinates after deformations TODO: this should be optional
         # Secondary variables
@@ -225,7 +226,7 @@ class TrussModelData(object):
     def element_length(self, ID, target='original'):
         if str(target.lower()) == 'original':
             return math.sqrt(sum([(j-i)**2 for j, i in zip(self.nodal_coord[self.nodal_connections[ID][1]],
-                                       self.nodal_coord[self.nodal_connections[ID][0]])]))
+                                                           self.nodal_coord[self.nodal_connections[ID][0]])]))
         else:
             return math.sqrt(sum([(j - i) ** 2 for j, i in zip(self.nodal_coord_def[self.nodal_connections[ID][1]],
                                                                self.nodal_coord_def[self.nodal_connections[ID][0]])]))
@@ -305,7 +306,7 @@ class TrussFramework(object):
         self._stiff_is_fresh = 0
         self._post_processed = 0
         self._init_displacement = []
-        #self.known_dis_a = []
+        #self.known_displacement_a = []
         # Model Updating related variables (?)
         self._io_origin = 0           # Array's first element number during IO. Default is 0.
         self.analysis = {}
@@ -329,7 +330,7 @@ class TrussFramework(object):
             if connection.is_open:
                 connection.close()
 
-            connection.connection.open()
+            connection.open()
             return connection
         except serial.SerialException:
             print(str(port) + ' port is busy. It might be occupied by this program or another one :'
@@ -363,6 +364,155 @@ class TrussFramework(object):
         except AttributeError:
             print('Serial connection cannot be closed because it is not managed by this thread')
             return False
+
+    def set_model_DOF(self, DOF):
+        """
+        Setting problem's degree of freedom
+
+        :param DOF: [2 | 3] Model's Degree Of Freedom
+        :return: None
+        """
+        self.DOF = DOF
+        self.truss.DOF = DOF
+        if self.DOF not in [2, 3]:
+            raise Exception('DOF must be 2 or 3.')
+
+        # Set freshness flags after geometry modification
+        self.invalidate_stiffness_matrices('all')
+
+
+    def bulk_set_measurement_points(self, measurement_points):
+        """
+        Set special nodal DOFs
+        """
+        self.analysis = {}
+
+        for location in measurement_points:
+            node = int(location[:len(location)-1])-self._io_origin
+            if 'X' in location:
+                self.analysis[location] = node*3+0
+                self.truss.keypoints.append(node*3+0)
+            if 'Y' in location:
+                self.analysis[location] = node*3+1
+                self.truss.keypoints.append(node*3+1)
+
+            if 'Z' in location:
+                if self.DOF == 3:
+                    self.analysis[location] = node*3+2
+                    self.truss.keypoints.append(node*3+2)
+                else:
+                    print("Z-direction is not allowed in 2D structures. "
+                          "Please check the 'MEASUREMENTS' section in the input file.")
+                    raise Exception
+
+        self.number_of_keypoints = len(self.analysis)
+        if self.number_of_keypoints == 0 and self.configuration.updating:
+            print("There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file.")
+            raise Exception
+
+    # TODO: This functions is probably not called although it should be part of the set_base() process
+    def bulk_set_elements(self, nodal_connection_list):
+        """
+        Setting elements (nodal connections) in bulk mode
+
+        :param nodal_connection_list: an array of arrays, where each sub-array is a pair of integers, namely [i, j].
+        i, j are the ID's of the nodes and an element is i -> j.
+        :return: None
+        """
+        # Set attribute
+        self.truss.nodal_connections = nodal_connection_list
+
+        # Set freshness flags after geometry modification
+        self.invalidate_stiffness_matrices()
+
+        # Creating mapping tool for elements
+        for node in self.truss.nodal_connections:
+            self.element_DOF.append(
+                [node[0] * 3, node[0] * 3 + 1, node[0] * 3 + 2, node[1] * 3, node[1] * 3 + 1, node[1] * 3 + 2])
+
+        # Initializing defaults for all matrices
+        self._init_displacement = [0] * (3 * self.truss.number_of_nodes())
+        self.truss.force = [0.] * (3 * self.truss.number_of_nodes())
+        self.stiffness_matrix = [0.] * (3 * self.truss.number_of_nodes())
+        self.truss.known_f_a = []
+        self.truss.known_f_not_zero = []
+
+    def bulk_set_coordinates(self, coordinate_list):
+        """
+        Setting coordinates in bulk mode
+
+        :param coordinate_list: An array of coordinate arrays (2/3 elements) enlisting ALL the nodal coordinates
+        :return: None
+        """
+        # Set attribute
+        self.truss.nodal_coord = coordinate_list
+
+        # Set freshness flags after geometry modification
+        self.invalidate_stiffness_matrices('all')
+
+        # Validity check
+        # TODO: the two side comes fromthe same value. The check should reflect to toher variables
+        # if self.truss.number_of_nodes() > len(self.truss.nodal_coord):
+        #    raise Exception('More coordinates are needed')
+        # elif not self.truss.nodal_connections:
+        #    raise Exception('Nodes must be set before defining elements')
+        # self._check_coordinates(False)
+
+
+    def bulk_set_cross_sections(self, area_list):
+        """
+        Setting cross-sections in bulk mode
+
+        :param area_list: cross-sectional data array according to the elements
+        :return: None
+        """
+        self.cross_sectional_area_list = area_list
+        self.invalidate_stiffness_matrices('all')
+
+
+    def bulk_set_materials(self, E):
+        """
+        Setting material data in bulk mode
+
+        :param E: array of elastic modulos according to the elements
+        :return: None
+        """
+        self.truss.elastic_modulo = E
+        self.invalidate_stiffness_matrices('all')
+
+
+    def bulk_set_forces(self, forces):
+        """
+        Set forces
+
+        :param forces: matrix of forces in the following pattern: [[location, force], ...]
+        :return: None
+        """
+        # DOF dependent mapping
+        for location, force in forces:
+            if self.DOF == 3:
+                self.truss.force[location] = force
+            elif self.DOF == 2:
+                self.truss.force[location + (location//2)] = force
+        self.set_postprocess_needed_flag()
+
+
+    def bulk_set_supports(self, constraints):
+        """
+        Set supports
+
+        :param constraints: matrix of constraints in the following pattern: [[location, constraint], ...]
+        :return:
+        """
+        for location, constraint in constraints:
+            if self.DOF == 3:
+                self.truss.constraint.append([location, constraint])
+            elif self.DOF == 2:
+                self.truss.constraint.append([location + (location // 2), constraint])
+        self.invalidate_stiffness_matrices('all')
+
+        self.set_postprocess_needed_flag()
+
 
     def read(self):
         """
@@ -602,6 +752,35 @@ class TrussFramework(object):
         bigdifference = False
         readerror = False
 
+
+    def difference(self, num_displ, measurement):
+        """
+        Calculate the difference between the Numerical solution and Real-life measurement.
+        The Real-life measurement should be given the following format:
+
+            MEASUREMENT: [[13X, -2.154], [16Y, 5.256], ...]
+        """
+        # print(nodenumber option should be added! <XXX>)
+
+        delta = []
+
+        for measured in measurement:
+            #loc, measured = package[0], package[1]
+            loc = '13Y'
+            try:
+                dof = self.analysis[loc.upper()]
+            except KeyError:
+                print('The given measurement location cannot be matched with the input data.')
+                print('The available nodes are: {\'NAMES\': mapping addresses}')
+                print(self.analysis)
+                self.configuration.disconnect()
+                raise Exception('Watchpoint name error')
+
+            delta.append(measured - num_displ[dof])
+
+        return delta
+
+
     def mock_delta(self, arduino_line, previous_line):
         """
         Simulate data, based on previous measurement
@@ -718,7 +897,7 @@ class TrussFramework(object):
 
         if self.configuration.simulation:
             #self.arduino_simulation_thread = self.open_simulation_thread()
-            self.configuration.previous_line
+            #self.configuration.previous_line
 
             print("HARD CODED PART 3")
             self.configuration.updating.base = 27
@@ -775,9 +954,9 @@ class TrussFramework(object):
                 outfile.write('Calculation of \'' + self.title + '\':\n\n')
 
                 outfile.write('Reactions\n')
-                # for i in range(len(self.force)//3):
+                # for i in range(len(self.truss.force)//3):
                 prev = -1
-                for i in self.truss.known_dis_a:
+                for i in self.truss.known_displacement_a:
                     if self.truss.DOF == 3 or i % 3 != 2:
                         if i//3 != prev:
                             if i < 100:
@@ -785,16 +964,16 @@ class TrussFramework(object):
                                 if i < 9:
                                     outfile.write(' ')
                             nodalforce = ''
-                            if (i//3)*3+0 in self.truss.known_dis_a:
-                                nodalforce += "{:10.2f}".format(self.force[(i//3)*3+0]) + ', '
+                            if (i//3)*3+0 in self.truss.known_displacement_a:
+                                nodalforce += "{:10.2f}".format(self.truss.force[(i//3)*3+0]) + ', '
                             else:
                                 nodalforce += '            '
-                            if (i//3)*3+1 in self.truss.known_dis_a:
-                                nodalforce += "{:10.2f}".format(self.force[(i//3)*3+1]) + ', '
+                            if (i//3)*3+1 in self.truss.known_displacement_a:
+                                nodalforce += "{:10.2f}".format(self.truss.force[(i//3)*3+1]) + ', '
                             else:
                                 nodalforce += '            '
-                            if self.truss.DOF != 2 and (i//3)*3+2 in self.truss.known_dis_a:
-                                nodalforce += "{:10.2f}".format(self.force[(i//3)*3+2]) + '\n'
+                            if self.truss.DOF != 2 and (i//3)*3+2 in self.truss.known_displacement_a:
+                                nodalforce += "{:10.2f}".format(self.truss.force[(i//3)*3+2]) + '\n'
                             else:
                                 nodalforce += '          \n'
                             if nodalforce != '                                  \n':
@@ -875,14 +1054,15 @@ class TrussFramework(object):
             outfile.write(str(self.displacement) + "\n")
             if j > 1:
                 outfile.write("New displacements: \n")
-                outfile.write(str(self.updating_container.modified_displacements[self.number_of_elements]) + "\n")
+                outfile.write(str(self.updating_container.modified_displacements[self.number_of_elements()]) + "\n")
             outfile.write("----------------------\n")
 
     def end_logging(self):
         self.configuration.end_logging(self.updating_container.number_of_updates)
 
-def plot(truss, show_original=False, show_result=False, show_supports=True, show_forces=True,
-         show_reactions=True, scale_displacement=1.0, scale_force=1.0, scale_Z=0.3, save=True):
+
+def plot(truss, original=False, result=False, supports=True, forces=True,
+         reactions=True, scale_displacement=1.0, scale_forces=1.0, z_correction=0.3, save=True):
     """
     Plot function of the Truss class
     This method calls the more general plotstructure() method.
@@ -900,5 +1080,5 @@ def plot(truss, show_original=False, show_result=False, show_supports=True, show
 
     _showvalues = True     # Show values of forces
 
-    Arrow3D.plotstructure(truss, show_original, show_result, show_supports, show_forces, show_reactions,
-                          scale_displacement, scale_force, scale_Z, _showvalues, save)
+    Arrow3D.plotstructure(truss, original, result, supports, forces, reactions,
+                          scale_displacement, scale_forces, z_correction, _showvalues, save)
