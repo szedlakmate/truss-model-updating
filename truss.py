@@ -377,13 +377,15 @@ class Truss(TrussFramework):
             unit = 0
 
             previous_modifications = self.updating_container.modifications
-
+            """
             for index in range(self.truss.number_of_elements()):
                 modification = self.updating_container.modifications[index] - self.updating_container.unit_modification
                 self.updating_container.modifications[index] =\
                     min(abs(modification), self.updating_container.modification_limit) * math.copysign(1, modification)
                 self.calculate_modified_stiffness_matrix(index, self.updating_container.modifications[index])
                 self.solve_modified_structure(index)
+            """
+# TODO: ERROR: self.solve_modified_structure doubled!
             self.evaluate()
 
             self.calculate_modified_stiffness_matrix(self.truss.number_of_elements(), 0)
@@ -407,17 +409,22 @@ class Truss(TrussFramework):
             unit += abs(ratio[modified_node_ID]*self.updating_container.sorted_effect[0][i][0])
             print(new_delta)
             scale = new_delta[0]/unit
-            """
-            for i in range(self.truss.number_of_elements()):
-                modified_node_ID = self.updating_container.sorted_effect[0][i][1]
-                self.updating_container.modifications[modified_node_ID] = min(abs(previous_modifications[modified_node_ID] -
-                                                                 self.updating_container.unit_modification*ratio[modified_node_ID]),
-                                                             self.updating_container.modification_limit) \
-                                                         * math.copysign(1, previous_modifications[modified_node_ID] -
-                                                                         self.updating_container.unit_modification*ratio[modified_node_ID])
+
+            #for i in range(self.truss.number_of_elements()):
+            #modified_node_ID = self.updating_container.sorted_effect[0][i][1]
+            self.updating_container.modifications[modified_node_ID] =\
+                min(abs(previous_modifications[modified_node_ID] - self.updating_container.unit_modification*ratio[modified_node_ID]),
+                self.updating_container.modification_limit) *\
+                math.copysign(1, previous_modifications[modified_node_ID] - self.updating_container.unit_modification*ratio[modified_node_ID])
                 # the last part is already the sign itself without the sign function
-"""
+
             print("Ratio: " + str(scale))
+
+            if j >= self.updating_container.iteration_limit:
+                print("Iteration limit is reached.")
+                print("The remaining error is: " + str(error(new_delta)))
+                self.updating_container.number_of_updates[1] += 1
+                return False
 
         print("Final error: " + str(error(new_delta)))
 
@@ -426,13 +433,6 @@ class Truss(TrussFramework):
             print("The remaining error is: " + str(error(new_delta)))
             self.updating_container.number_of_updates[2] += 1
             return False
-
-        if j <= self.updating_container.iteration_limit:
-            print("Iteration limit is reached.")
-            print("The remaining error is: " + str(error(new_delta)))
-            self.updating_container.number_of_updates[1] += 1
-            return False
-
 
         self.write_output_stream(j, appendix)
         self.updating_container.number_of_updates[0] += 1
