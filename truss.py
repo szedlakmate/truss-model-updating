@@ -366,7 +366,7 @@ class Truss(TrussFramework):
         print("Step: 0/" + str(self.updating_container.iteration_limit))
 
         # Optimization loop
-        while error(new_delta) > self.updating_container.error_limit and j <= self.updating_container.iteration_limit and (self.capable() or j <= 1):
+        while error(new_delta) > self.updating_container.error_limit and (self.capable() or j <= 1):
             j += 1
 
             print("Error: " + str(error(new_delta)))
@@ -396,17 +396,18 @@ class Truss(TrussFramework):
                 if effect == 0.0:
                     print("None of the variables has effect on " + str(self.updating_container.arduino_mapping[i]))
                     print("Model updating has no solution.")
+                    self.updating_container.number_of_updates[2] += 1
                     raise Exception
 
-            for i in range(self.truss.number_of_elements()):
-                modified_node_ID = self.updating_container.sorted_effect[0][i][1]
+            #for i in range(self.truss.number_of_elements()):
+            modified_node_ID = self.updating_container.sorted_effect[0][i][1]
 
-                ratio[modified_node_ID] = min(abs(self.updating_container.total_effect[0]/self.updating_container.sorted_effect[0][i][0]),self.updating_container.modification_limit) * \
-                                            math.copysign(1, self.updating_container.sorted_effect[0][i][2])
+            ratio[modified_node_ID] = min(abs(self.updating_container.total_effect[0]/self.updating_container.sorted_effect[0][i][0]),self.updating_container.modification_limit) * math.copysign(1, self.updating_container.sorted_effect[0][i][2])
 
-                unit += abs(ratio[modified_node_ID]*self.updating_container.sorted_effect[0][i][0])
+            unit += abs(ratio[modified_node_ID]*self.updating_container.sorted_effect[0][i][0])
             print(new_delta)
             scale = new_delta[0]/unit
+            """
             for i in range(self.truss.number_of_elements()):
                 modified_node_ID = self.updating_container.sorted_effect[0][i][1]
                 self.updating_container.modifications[modified_node_ID] = min(abs(previous_modifications[modified_node_ID] -
@@ -415,7 +416,7 @@ class Truss(TrussFramework):
                                                          * math.copysign(1, previous_modifications[modified_node_ID] -
                                                                          self.updating_container.unit_modification*ratio[modified_node_ID])
                 # the last part is already the sign itself without the sign function
-
+"""
             print("Ratio: " + str(scale))
 
         print("Final error: " + str(error(new_delta)))
@@ -423,9 +424,18 @@ class Truss(TrussFramework):
         if not self.capable() and j > 1:
             print("Optimization could not be finished successfully.")
             print("The remaining error is: " + str(error(new_delta)))
+            self.updating_container.number_of_updates[2] += 1
             return False
 
+        if j <= self.updating_container.iteration_limit:
+            print("Iteration limit is reached.")
+            print("The remaining error is: " + str(error(new_delta)))
+            self.updating_container.number_of_updates[1] += 1
+            return False
+
+
         self.write_output_stream(j, appendix)
+        self.updating_container.number_of_updates[0] += 1
         return True
 
     def capable(self):
