@@ -764,16 +764,17 @@ class TrussFramework(object):
 
     def difference(self, num_displ, measurement):
         """
-        Calculate the difference between the Numerical solution and Real-life measurement.
-        The Real-life measurement should be given the following format:
+        Calculate the difference between the Real-life measurement and the Numerical solution.
 
-            MEASUREMENT: [[13X, -2.154], [16Y, 5.256], ...]
+        :param num_displ:
+        :param measurement: [[13X, -2.154], [16Y, 5.256], ...]
+        :return: [measurement - calculated] Negative means higher deflections are measured
         """
         # print(nodenumber option should be added! <XXX>)
 
         delta = []
 
-        for measured in measurement:
+        for measured_position in measurement:
             #loc, measured = package[0], package[1]
             loc = '13Y'
             try:
@@ -785,7 +786,7 @@ class TrussFramework(object):
                 self.configuration.disconnect()
                 raise Exception('Watchpoint name error')
 
-            delta.append(measured - num_displ[dof])
+            delta.append(measured_position - num_displ[dof])
 
         return delta
 

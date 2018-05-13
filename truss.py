@@ -346,8 +346,9 @@ class Truss(TrussFramework):
     def optimize(self, delta):
         """
         Model updating - core function
-        :param delta: difference between the calculated model and the latest measurement
-        :return: True - the optimization step was succeful | False - Optimization failed
+
+        :param delta: difference between the latest measurement and the calculated model 
+        :return: True - the optimization step was successful | False - Optimization failed
         """
 
         modnum = self.truss.number_of_elements()
@@ -358,29 +359,29 @@ class Truss(TrussFramework):
         else:
             appendix = " - SIMULATED"
 
-        newdelta = delta
+        new_delta = delta
         j = 0
 
         print("-----")
         print("Step: 0/" + str(self.updating_container.iteration_limit))
 
         # Optimization loop
-        while error(newdelta) > self.updating_container.error_limit and j <= self.updating_container.iteration_limit and (self.capable() or j <= 1):
+        while error(new_delta) > self.updating_container.error_limit and j <= self.updating_container.iteration_limit and (self.capable() or j <= 1):
             j += 1
 
-            print("Error: " + str(error(newdelta)))
+            print("Error: " + str(error(new_delta)))
             print("-----")
             print("Step: " + str(j) + "/" + str(self.updating_container.iteration_limit))
 
             ratio = [0.]*modnum
             unit = 0
 
-            prevmodifications = self.updating_container.modifications
+            previous_modifications = self.updating_container.modifications
 
             for index in range(self.truss.number_of_elements()):
-                self.updating_container.modifications[index] = min(abs(self.updating_container.modifications[index] - self.updating_container.unit_modification),
-                                                self.updating_container.modification_limit) * \
-                                            math.copysign(1, self.updating_container.modifications[index] - self.updating_container.unit_modification)
+                modification = self.updating_container.modifications[index] - self.updating_container.unit_modification
+                self.updating_container.modifications[index] =\
+                    min(abs(modification), self.updating_container.modification_limit) * math.copysign(1, modification)
                 self.calculate_modified_stiffness_matrix(index, self.updating_container.modifications[index])
                 self.solve_modified_structure(index)
             self.evaluate()
@@ -388,7 +389,7 @@ class Truss(TrussFramework):
             self.calculate_modified_stiffness_matrix(self.truss.number_of_elements(), 0)
             self.solve_modified_structure(self.truss.number_of_elements())
 
-            newdelta = self.difference(self.updating_container.modified_displacements[self.truss.number_of_elements()],
+            new_delta = self.difference(self.updating_container.modified_displacements[self.truss.number_of_elements()],
                                        self.updating_container.measurement)
 
             for i, effect in enumerate(self.updating_container.total_effect):
@@ -398,28 +399,30 @@ class Truss(TrussFramework):
                     raise Exception
 
             for i in range(self.truss.number_of_elements()):
-                modificationnumber = self.updating_container.sorted_effect[0][i][1]
-                ratio[modificationnumber] = abs(self.updating_container.sorted_effect[0][i][0] / self.updating_container.total_effect[0]) * \
+                modified_node_ID = self.updating_container.sorted_effect[0][i][1]
+
+                ratio[modified_node_ID] = min(abs(self.updating_container.total_effect[0]/self.updating_container.sorted_effect[0][i][0]),self.updating_container.modification_limit) * \
                                             math.copysign(1, self.updating_container.sorted_effect[0][i][2])
-                unit += abs(ratio[modificationnumber]*self.updating_container.sorted_effect[0][i][0])
-            print(newdelta)
-            scale = newdelta[0]/unit
+
+                unit += abs(ratio[modified_node_ID]*self.updating_container.sorted_effect[0][i][0])
+            print(new_delta)
+            scale = new_delta[0]/unit
             for i in range(self.truss.number_of_elements()):
-                modificationnumber = self.updating_container.sorted_effect[0][i][1]
-                self.updating_container.modifications[modificationnumber] = min(abs(prevmodifications[modificationnumber] -
-                                                                 self.updating_container.unit_modification*ratio[modificationnumber]),
+                modified_node_ID = self.updating_container.sorted_effect[0][i][1]
+                self.updating_container.modifications[modified_node_ID] = min(abs(previous_modifications[modified_node_ID] -
+                                                                 self.updating_container.unit_modification*ratio[modified_node_ID]),
                                                              self.updating_container.modification_limit) \
-                                                         * math.copysign(1, prevmodifications[modificationnumber] -
-                                                                         self.updating_container.unit_modification*ratio[modificationnumber])
+                                                         * math.copysign(1, previous_modifications[modified_node_ID] -
+                                                                         self.updating_container.unit_modification*ratio[modified_node_ID])
                 # the last part is already the sign itself without the sign function
 
             print("Ratio: " + str(scale))
 
-        print("Final error: " + str(error(newdelta)))
+        print("Final error: " + str(error(new_delta)))
 
         if not self.capable() and j > 1:
             print("Optimization could not be finished successfully.")
-            print("The remaining error is: " + str(error(newdelta)))
+            print("The remaining error is: " + str(error(new_delta)))
             return False
 
         self.write_output_stream(j, appendix)
@@ -436,7 +439,6 @@ class Truss(TrussFramework):
                 break
             else:
                 pass
-                #print('FAIL')
                 # TODO: not to reach this part of the code
         return capable
         
@@ -448,7 +450,7 @@ class Truss(TrussFramework):
         :param error_limit: Setting general stop parameter for model updating
         :param modification_limit: Setting modification limit for members (model updating)
         :param iteration_limit: Setting maximum number of iterations (model updating)
-        :return:
+        :return: None
         """
         if 0.01 <= abs(unit_modification) < 0.5:
             self.updating_container.unit_modification = unit_modification
@@ -485,6 +487,7 @@ class Truss(TrussFramework):
         if not self.configuration.simulation:
             base = self.set_base()
             filemode = 'a'
+            # TODO: complete this process
         else:
             #self.bulk_set_measurement_points()
             base = ['SIMULATION']
@@ -608,7 +611,7 @@ if __name__ == '__main__':
 
     # Write results to file
     TRUSS.write_results()
-    TRUSS.configuration.part_time("Wrote results to the output file : Structures/{} - Results.txt".format(TRUSS.title))
+    TRUSS.configuration.part_time("Wrote results to the output file : Structures/<title> - Results.txt".format(TRUSS.title))
 
     # Update iteration
     if TRUSS.configuration.updating:
