@@ -32,7 +32,7 @@ class Arrow3D(FancyArrowPatch):
         FancyArrowPatch.draw(self, renderer)
 
     def plotstructure(truss, original=1, result=1, supports=1,
-            forces=1, reactions=1, scale_displacements=1, scale_forces=1, z_correction=1, show_values=1, save_plot=1, log=0):
+                      forces=1, reactions=1, scale_displacements=1, scale_forces=1, z_correction=1, show_values=1, save_plot=1, log=0):
         """
         General plotting method for trusses
 
@@ -114,14 +114,14 @@ class Arrow3D(FancyArrowPatch):
                 for i in range(truss.number_of_nodes()):
                     for j in range(3):
                         dipslay_displacement[i][j] = (truss.nodal_coord_def[i][j] -
-                        truss.nodal_coord[i][j]) * scale_displacements + truss.nodal_coord[i][j]
+                                                      truss.nodal_coord[i][j]) * scale_displacements + truss.nodal_coord[i][j]
 
         for i in range(truss.number_of_elements()):
             # Plot original structure
             if original:
                 _ax.plot([truss.nodal_coord[truss.nodal_connections[i][1]][0], truss.nodal_coord[truss.nodal_connections[i][0]][0]],
-                    [truss.nodal_coord[truss.nodal_connections[i][1]][1], truss.nodal_coord[truss.nodal_connections[i][0]][1]],
-                    zs=[truss.nodal_coord[truss.nodal_connections[i][1]][2], truss.nodal_coord[truss.nodal_connections[i][0]][2]], color='b')
+                         [truss.nodal_coord[truss.nodal_connections[i][1]][1], truss.nodal_coord[truss.nodal_connections[i][0]][1]],
+                         zs=[truss.nodal_coord[truss.nodal_connections[i][1]][2], truss.nodal_coord[truss.nodal_connections[i][0]][2]], color='b')
             # Plot deformed structure
             if result:
                 if True: #truss._post_processed:        TODO: post_processed state should be checked in a different way
@@ -157,69 +157,75 @@ class Arrow3D(FancyArrowPatch):
                     print('Stresses are not calculated')
                     rgb_col = [1, 0, 0]
                 _ax.plot([dipslay_displacement[truss.nodal_connections[i][1]][0], dipslay_displacement[truss.nodal_connections[i][0]][0]],
-                        [dipslay_displacement[truss.nodal_connections[i][1]][1], dipslay_displacement[truss.nodal_connections[i][0]][1]],
-                        zs=[dipslay_displacement[truss.nodal_connections[i][1]][2], dipslay_displacement[truss.nodal_connections[i][0]][2]],
-                        color=rgb_col)
+                         [dipslay_displacement[truss.nodal_connections[i][1]][1], dipslay_displacement[truss.nodal_connections[i][0]][1]],
+                         zs=[dipslay_displacement[truss.nodal_connections[i][1]][2], dipslay_displacement[truss.nodal_connections[i][0]][2]],
+                         color=rgb_col)
 
         if forces:
-            for i in truss.known_f_not_zero:
-                if truss.force[i] < 0:
+            for force in truss.known_f_not_zero:
+                if truss.force[force] < 0:
                     value = -1.0
                 else:
                     value = 1.0
-                if i % 3 == 0:
+                if force % 3 == 0:
                     f_dir = [value*scale_forces, 0., 0.]
-                elif i % 3 == 1:
+                elif force % 3 == 1:
                     f_dir = [0., value*scale_forces, 0.]
                 else:
                     f_dir = [0., 0., value*scale_forces*z_correction]
-                f_arrow = Arrow3D([truss.nodal_coord[i//3][0], truss.nodal_coord[i//3][0] + f_dir[0]],
-                                  [truss.nodal_coord[i//3][1], truss.nodal_coord[i//3][1] + f_dir[1]],
-                                  [truss.nodal_coord[i//3][2], truss.nodal_coord[i//3][2] + f_dir[2]],
-                                  mutation_scale=20, lw=1, arrowstyle="-|>", color="k")
+                if original:
+                    f_arrow = Arrow3D([truss.nodal_coord[force//3][0], truss.nodal_coord[force//3][0] + f_dir[0]],
+                                      [truss.nodal_coord[force//3][1], truss.nodal_coord[force//3][1] + f_dir[1]],
+                                      [truss.nodal_coord[force//3][2], truss.nodal_coord[force//3][2] + f_dir[2]],
+                                      mutation_scale=20, lw=1, arrowstyle="-|>", color="k")
+                else:
+                    f_arrow = Arrow3D([truss.nodal_coord_def[force // 3][0], truss.nodal_coord_def[force // 3][0] + f_dir[0]],
+                                      [truss.nodal_coord_def[force // 3][1], truss.nodal_coord_def[force // 3][1] + f_dir[1]],
+                                      [truss.nodal_coord_def[force // 3][2], truss.nodal_coord_def[force // 3][2] + f_dir[2]],
+                                      mutation_scale=20, lw=1, arrowstyle="-|>", color="k")
                 _ax.add_artist(f_arrow)
 
         if reactions:
             e_previous = -100
-            for i in truss.known_displacement_a:
+            for reaction in truss.known_displacement_a:
                 value = 0.0             # Maybe this is useless <XXX>
-                if truss.force[i] < 0:
+                if truss.force[reaction] < 0:
                     value = -1.0
-                elif truss.force[i] > 0:
+                elif truss.force[reaction] > 0:
                     value = 1.0
-                if i % 3 == 0:
+                if reaction % 3 == 0:
                     f_dir = [value*scale_forces, 0., 0.]
-                elif i % 3 == 1:
+                elif reaction % 3 == 1:
                     f_dir = [0., value*scale_forces, 0.]
                 else:
                     f_dir = [0., 0., value*scale_forces*z_correction]
-                if abs(truss.force[i]) > 0:
-                    f_arrow = Arrow3D([truss.nodal_coord[i//3][0], truss.nodal_coord[i//3][0] + f_dir[0]],
-                                      [truss.nodal_coord[i//3][1], truss.nodal_coord[i//3][1] + f_dir[1]],
-                                      [truss.nodal_coord[i//3][2], truss.nodal_coord[i//3][2] + f_dir[2]],
+                if abs(truss.force[reaction]) > 0:
+                    f_arrow = Arrow3D([truss.nodal_coord[reaction//3][0], truss.nodal_coord[reaction//3][0] + f_dir[0]],
+                                      [truss.nodal_coord[reaction//3][1], truss.nodal_coord[reaction//3][1] + f_dir[1]],
+                                      [truss.nodal_coord[reaction//3][2], truss.nodal_coord[reaction//3][2] + f_dir[2]],
                                       mutation_scale=20, lw=1, arrowstyle="-|>", color="darkolivegreen")
                     _ax.add_artist(f_arrow)
                     if show_values:
                         _ax.set_xticklabels([])
                         _ax.set_yticklabels([])
                         _ax.set_zticklabels([])
-                        if not i//3 == e_previous//3:
+                        if not reaction//3 == e_previous//3:
                             if truss.DOF == 3:
-                                _ax.text(truss.nodal_coord[i//3][0],
-                                    truss.nodal_coord[i//3][1],
-                                    truss.nodal_coord[i//3][2],
-                                    "{:10.2f}".format(truss.force[(i//3)*3+0])+'\n' +
-                                    "{:10.2f}".format(truss.force[(i//3)*3+1])+'\n' +
-                                    "{:10.2f}".format(truss.force[(i//3)*3+2]),
-                                    fontsize=12, horizontalalignment='right')
+                                _ax.text(truss.nodal_coord[reaction//3][0],
+                                         truss.nodal_coord[reaction//3][1],
+                                         truss.nodal_coord[reaction//3][2],
+                                         "{:10.2f}".format(truss.force[(reaction//3)*3+0])+'\n' +
+                                         "{:10.2f}".format(truss.force[(reaction//3)*3+1])+'\n' +
+                                         "{:10.2f}".format(truss.force[(reaction//3)*3+2]),
+                                         fontsize=12, horizontalalignment='right')
                             elif truss.DOF == 2:
-                                _ax.text(truss.nodal_coord[i//3][0],
-                                    truss.nodal_coord[i//3][1],
-                                    truss.nodal_coord[i//3][2],
-                                    "{:10.2f}".format(truss.force[(i//3)*3+0])+'\n' +
-                                    "{:10.2f}".format(truss.force[(i//3)*3+1]),
-                                    fontsize=12, horizontalalignment='right')
-                e_previous = i
+                                _ax.text(truss.nodal_coord[reaction//3][0],
+                                         truss.nodal_coord[reaction//3][1],
+                                         truss.nodal_coord[reaction//3][2],
+                                         "{:10.2f}".format(truss.force[(reaction//3)*3+0])+'\n' +
+                                         "{:10.2f}".format(truss.force[(reaction//3)*3+1]),
+                                         fontsize=12, horizontalalignment='right')
+                e_previous = reaction
 
         if supports:
             for support_index in truss.known_displacement_a:
@@ -232,15 +238,25 @@ class Arrow3D(FancyArrowPatch):
                 else:
                     f_dir = [0., 0., -1.0 * scale_sup * z_correction]
                     col = 'brown'
-                if support_index % 3 != 2 or truss.DOF == 3:
-                    _ax.plot([truss.nodal_coord[support_index//3][0], truss.nodal_coord[support_index//3][0]+f_dir[0]],
-                        [truss.nodal_coord[support_index//3][1], truss.nodal_coord[support_index//3][1]+f_dir[1]],
-                        zs=[truss.nodal_coord[support_index//3][2], truss.nodal_coord[support_index//3][2]+f_dir[2]],
-                        color=col, linewidth=4.0)
+
+                #if support_index % 3 == 2 and truss.DOF == 3:
+                _ax.plot([truss.nodal_coord[support_index // 3][0], truss.nodal_coord[support_index // 3][0]+f_dir[0]],
+                         [truss.nodal_coord[support_index // 3][1], truss.nodal_coord[support_index // 3][1]+f_dir[1]],
+                         color=col, linewidth=4.0)
+                #else:
+                #    _ax.plot(
+                #        [truss.nodal_coord[support_index // 3][0], truss.nodal_coord[support_index // 3][0] + f_dir[0]],
+                #        [truss.nodal_coord[support_index // 3][1], truss.nodal_coord[support_index // 3][1] + f_dir[1]],
+                #        color=col, linewidth=4.0)
+
+        path = None
 
         # pyplot.show()
         if save_plot:
-            fig.savefig("./Results/" + plotname + '.png')
+            path = './Results/' + plotname + '.png'
+            fig.savefig(path)
             print("'" + plotname + ".png' is saved.")
             print('------------------------------------')
-        return
+
+        return path
+

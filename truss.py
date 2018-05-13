@@ -18,6 +18,7 @@ try:
     from truss_framework import TrussFramework
     from truss_framework import error
     from truss_framework import plot
+    from truss_framework import animate
     from extra_math import invert
     from extra_math import mat_vec_mult as multiply_matrix_vector
     from extra_math import swap_col as swap_columns
@@ -599,9 +600,10 @@ if __name__ == '__main__':
 
     # Plotting
     if TRUSS.configuration.graphics:
-        plot(TRUSS.truss, original=True, result=False, supports=True, forces=True, reactions=False)
+        plot(TRUSS.truss, original=True, result=False, supports=True, forces=True, reactions=False, label_classes='load')
         plot(TRUSS.truss, original=True, result=True, supports=True, forces=False, reactions=False)
-        plot(TRUSS.truss, original=False, result=True, supports=True, forces=True, reactions=True)
+        plot(TRUSS.truss, original=False, result=True, supports=True, forces=True, reactions=True, label_classes='load')
+        animate(TRUSS.truss, 'load')
         TRUSS.configuration.part_time("Plotting")
 
     # Write results to file

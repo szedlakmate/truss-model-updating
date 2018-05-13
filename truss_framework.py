@@ -31,6 +31,12 @@ def error(delta):
     return sum_of_errors
 
 
+class PlotConfiguration(object):
+    def __init__(self):
+        self.labels = []
+        self.paths = []
+
+
 class TrussConfiguration(object):
     """
     Truss configuration file
@@ -55,6 +61,7 @@ class TrussConfiguration(object):
         self.simulation = simulation
         self.updating = {'error_limit': 0.5, 'modification_limit': 0.6,
                          'unit_modification': 0.05, 'iteration_limit': 20}
+
         # #Updates where there were no more modification option]
         # TODO: check this weird stuff
         #self.updating.iteration_limit = 20
@@ -205,13 +212,15 @@ class TrussModelData(object):
         #Additional data
         self.known_displacement_a = []
         self.known_f_not_zero = []
-
         # Results
         self.nodal_coord_def = []  # Coordinates after deformations TODO: this should be optional
         # Secondary variables
         self.displacement = []  # Relative displacements
         self.stress = []  # Element's stresses
         self.stress_color = []  # Color mapping for stresses
+        # Plot data
+        self.plot_data = PlotConfiguration()
+
 
     def number_of_nodes(self):
         # TODO: refactor
@@ -1062,23 +1071,55 @@ class TrussFramework(object):
 
 
 def plot(truss, original=False, result=False, supports=True, forces=True,
-         reactions=True, scale_displacement=1.0, scale_forces=1.0, z_correction=0.3, save=True):
+         reactions=True, scale_displacement=1.0, scale_forces=1.0, z_correction=0.3, save=True, label_classes=''):
     """
     Plot function of the Truss class
     This method calls the more general plotstructure() method.
 
-        Plot settings:
-            O: Original D: Deformed S: Supports F: Forces R: Reactions
-            ScD: Scale displacements (Z-axis) (def:1.0) ScF: Scale forces (def:1.0)
-            ScS: Scale Support signs (Z-axis) (def:1.0)
-            Save: Save plot to file
-
-            plot(O, D, S, F, R, ScD, ScF, ScS, Save)
+    :param truss: Truss object to be plotted
+    :param original: Print original structure?
+    :param result: Print calculated structure?
+    :param supports: Print supports?
+    :param forces: Print forces?
+    :param reactions: Print reactions?
+    :param scale_displacement: Sign graphical scalign
+    :param scale_forces: Sign graphical scalign
+    :param z_correction: Scale everything along the Z-axis
+    :param save: Save the plot into a file?
+    :param label_classes: HTML styled class definition
+    :return: None
     """
     # Import is located here due to Android compatibility issues
     from truss_graphics import Arrow3D
 
-    _showvalues = True     # Show values of forces
+    force_values = True     # Show values of forces
 
-    Arrow3D.plotstructure(truss, original, result, supports, forces, reactions,
-                          scale_displacement, scale_forces, z_correction, _showvalues, save)
+    file_path = Arrow3D.plotstructure(truss, original, result, supports, forces, reactions,
+                                      scale_displacement, scale_forces, z_correction, force_values, save)
+
+    # Add labels of plots for optional GIF creating
+    path_array = label_classes.split(' ')
+    for label in path_array:
+        truss.plot_data.paths += [file_path]
+        truss.plot_data.labels += [label]
+
+def animate(truss, label_selector):
+    """
+    GIF creator
+
+    :param file_paths: Array, pointing to the source files
+    :param gif_name: name of the resulted gif. It will be created in the Results folder.
+    :return: None
+    """
+    import imageio
+
+    file_paths = []
+
+    for (path, applied_label) in zip(truss.plot_data.paths, truss.plot_data.labels):
+        if applied_label == label_selector:
+            file_paths += [path]
+
+    images = []
+    for filename in file_paths:
+        images.append(imageio.imread(filename))
+    imageio.mimsave('./Results/' + truss.title + ' - ' + label_selector + ' animation.gif', images, duration=0.33*len(file_paths))
