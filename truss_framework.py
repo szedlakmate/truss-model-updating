@@ -9,6 +9,18 @@ import os
 import time
 import math
 import itertools
+from copy import deepcopy
+try:
+    import numpy
+except ImportError:
+    print("NumPy could not be loaded")
+try:
+    from extra_math import invert
+    from extra_math import mat_vec_mult as multiply_matrix_vector
+    from extra_math import swap_col as swap_columns
+except ImportError:
+    print("Input is missing")
+    print("Please check the extra_math.py file.")
 try:
     import serial
 except ImportError:
@@ -61,10 +73,6 @@ class TrussConfiguration(object):
         self.simulation = simulation
         self.updating = {'error_limit': 0.5, 'modification_limit': 0.6,
                          'unit_modification': 0.05, 'iteration_limit': 20}
-
-        # #Updates where there were no more modification option]
-        # TODO: check this weird stuff
-        #self.updating.iteration_limit = 20
 
         if self.compatibility_mode == 0:
             ### User defined ###
@@ -210,17 +218,32 @@ class TrussModelData(object):
         self.cross_sectional_area_list = []  # Cross-sectional areas
         self.elastic_modulo = []  # Material data
         #Additional data
+        self.known_f_a = []  # Nodes without supports
+        self.known_f_not_zero = []  # Nodes with loads
         self.known_displacement_a = []
         self.known_f_not_zero = []
+        self.stiffness_matrix = []  # Global stiffness matrix
+        #self.element_length = []  # Length of the elements
+        self.element_DOF = []
+        self._norm_stiff = []                  # E/L
+        self._cx = []
+        self._cy = []
+        self._cz = []
+        self._s_loc = []
+        self.dis_new = []
+        self.force_new = []
+        self.stiff_new = []
+        self._stiff_is_fresh = 0
+        self._post_processed = 0
+        self._init_displacement = []
         # Results
-        self.nodal_coord_def = []  # Coordinates after deformations TODO: this should be optional
+        self.nodal_coord_def = []  # Coordinates after deformations
         # Secondary variables
         self.displacement = []  # Relative displacements
         self.stress = []  # Element's stresses
         self.stress_color = []  # Color mapping for stresses
         # Plot data
         self.plot_data = PlotConfiguration()
-
 
     def number_of_nodes(self):
         # TODO: refactor
@@ -240,6 +263,178 @@ class TrussModelData(object):
             return math.sqrt(sum([(j - i) ** 2 for j, i in zip(self.nodal_coord_def[self.nodal_connections[ID][1]],
                                                                self.nodal_coord_def[self.nodal_connections[ID][0]])]))
 
+    def set_postprocess_needed_flag(self):
+        """
+        Set portprocess required flag
+
+        :return: None
+        """
+        self._post_processed = 0
+
+    def invalidate_stiffness_matrices(self):  #, include_modified=''):
+        """
+        Set flags for stiffness matrix recalculation(s)
+
+        :param include_modified: ['' | 'all'] includes the model updating related _mod_stiff_is_fresh matrix.
+        :return: None
+        """
+        self._stiff_is_fresh = 0
+        #if include_modified == 'all':
+        #    self.updating_container._mod_stiff_is_fresh = 0
+
+        self.set_postprocess_needed_flag()
+
+    def calculate_stiffness_matrix(self):
+        """
+        Stiffness matrix compilation
+        """
+        self.set_postprocess_needed_flag()
+
+        if self.DOF == 2:
+            for dof_z in range(self.number_of_nodes()):
+                self.constraint.append([int(dof_z*3+2), 0.])
+        self.constraint = list(k for k, _ in itertools.groupby(sorted(self.constraint)))
+
+        # Setting known forces
+        for location in range(3*self.number_of_nodes()):
+            self.known_f_a.append(location)
+            if self.force[location] != 0:
+                self.known_f_not_zero.append(location)
+
+        self.known_displacement_a = []
+        for constraint in self.constraint:
+            self._init_displacement[constraint[0]] = constraint[1]
+            self.known_displacement_a.append(constraint[0])
+            try:
+                self.known_f_a.remove(constraint[0])
+                self.known_f_not_zero.remove(constraint[0])
+            except ValueError:
+                pass
+
+        elements_lengths = [0.]*self.number_of_elements()
+        self._norm_stiff = [0.]*self.number_of_elements()
+        self._cx = [0.]*self.number_of_elements()
+        self._cy = [0.]*self.number_of_elements()
+        self._cz = [0.]*self.number_of_elements()
+        self._s_loc = [0.]*self.number_of_elements()
+        local_stiffness_matrix = [0.]*self.number_of_elements()
+        self.stress = [0.]*self.number_of_elements()
+
+        self.stiffness_matrix = [[0.]*(self.number_of_nodes()*3)]*(self.number_of_nodes()*3)
+
+        for i in range(self.number_of_elements()):
+            elements_lengths[i] = \
+                math.sqrt(sum([(j-i)**2 for j, i
+                               in zip(self.nodal_coord[self.nodal_connections[i][1]],
+                                      self.nodal_coord[self.nodal_connections[i][0]])]))
+
+            self._cx[i] = (self.nodal_coord[self.nodal_connections[i][1]][0]-self.nodal_coord[self.nodal_connections[i][0]][0])/elements_lengths[i]
+            self._cy[i] = (self.nodal_coord[self.nodal_connections[i][1]][1]-self.nodal_coord[self.nodal_connections[i][0]][1])/elements_lengths[i]
+            self._cz[i] = (self.nodal_coord[self.nodal_connections[i][1]][2]-self.nodal_coord[self.nodal_connections[i][0]][2])/elements_lengths[i]
+            self._norm_stiff[i] = self.elastic_modulo[i]/elements_lengths[i]
+
+            # local stiffness matrix calculation
+            self._s_loc[i] = [[self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i], -self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i]],
+                              [self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i], -self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i]],
+                              [self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2, -self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2],
+                              [-self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i], self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i]],
+                              [-self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i], self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i]],
+                              [-self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2, self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2]]
+            local_stiffness_matrix[i] = [[y * self.cross_sectional_area_list[i] * self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
+            ele_dof_vec = self.element_DOF[i]
+
+            stiffness_increment = [0.]*(self.number_of_nodes()*3)
+
+            for j in range(3*2):
+                for k in range(3*2):
+                    stiffness_increment[ele_dof_vec[k]] = local_stiffness_matrix[i][j][k]
+                self.stiffness_matrix[ele_dof_vec[j]] = [x + y for x, y in zip(self.stiffness_matrix[ele_dof_vec[j]], stiffness_increment)]
+        self._stiff_is_fresh = 1
+
+    def solve(self, configuration):
+        """
+        Main solver of the code
+        """
+        if self._stiff_is_fresh == 0:
+            if configuration.log:
+                print('Stiffness matrix is recalculated')
+            self.calculate_stiffness_matrix()
+
+        self.dis_new = [0.]*(self.number_of_nodes()*3-len(self.constraint))
+        self.force_new = [0.]*(self.number_of_nodes()*3-len(self.constraint))
+        self.stiff_new = [[0.]*(self.number_of_nodes()*3-len(self.constraint))]*(self.number_of_nodes()*3-len(self.constraint))
+
+        # known force array
+        for i, DOF in enumerate(self.known_f_a):
+            self.force_new[i] = self.force[DOF]
+
+        stiffness_increment = [0.]*(self.number_of_nodes()*3-len(self.constraint))
+        for i, kfai in enumerate(self.known_f_a):
+            for j, kfaj in enumerate(self.known_f_a):
+                stiffness_increment[j] = self.stiffness_matrix[kfai][kfaj]
+            self.stiff_new[i] = [x + y for x, y in zip(self.stiff_new[i], stiffness_increment)]
+
+        # SOLVING THE STRUCTURE
+        if configuration.solver == 0:
+            if configuration.log:
+                print('Built-in solver')
+            self.dis_new = multiply_matrix_vector(invert(self.stiff_new), self.force_new)
+        else:
+            if configuration.log:
+                print('NumPy solver')
+            self.dis_new = numpy.linalg.solve(numpy.array(self.stiff_new), numpy.array(self.force_new))
+
+        self.displacement = deepcopy(self._init_displacement)
+
+        for i, known_f_a in enumerate(self.known_f_a):
+            self.displacement[known_f_a] = self.dis_new[i]
+
+        # Deformed shape
+        self.nodal_coord_def = []
+        for i in range(self.number_of_nodes()):
+            self.nodal_coord_def.append([self.nodal_coord[i][0] + self.displacement[i*3+0],
+                                               self.nodal_coord[i][1] + self.displacement[i*3+1], self.nodal_coord[i][2] + self.displacement[i*3+2]])
+
+        # Postrpocesses
+        self.post_process()
+
+    def post_process(self):
+        """
+        Calculates reaction forces and stresses
+
+        :return None
+        """
+        self.calculate_reactions()
+        self.calculate_stresses()
+        self._post_processed = 1
+
+    def calculate_reactions(self):
+        """
+        Calculates reaction forces
+        """
+        for i in self.known_displacement_a:
+            self.force[i] = 0
+            for j, displacement in enumerate(self.displacement):
+                self.force[i] += self.stiffness_matrix[i][j]*displacement
+
+
+    def calculate_stresses(self):
+        """
+        Calculates stress in elements
+
+        Last part: Coloring elements for graphical output
+        """
+        self.stress = [0.]*self.number_of_elements()
+
+        for element in range(self.number_of_elements()):
+            self.stress[element] = \
+                (self.element_length(element, 'deformed') - self.element_length(element, 'original')) / self.element_length(element, 'original') * self.elastic_modulo[element]
+
+        s_max = max([abs(min(self.stress)), max(self.stress), 0.000000001])
+
+        # TODO: Should be written out using a function
+        self.stress_color = [float(x)/float(s_max) for x in self.stress]
+
 
 class ModelUpdatingContainer(object):
     """
@@ -251,7 +446,7 @@ class ModelUpdatingContainer(object):
         self.arduino_mapping = []
         self.measurement = [0.]
         self.number_of_updates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit,
-        self.modified_displacements = []
+        #self.modified_displacements = []
         self.effect = []
         self.total_effect = []
         self.sorted_effect = []
@@ -262,7 +457,8 @@ class ModelUpdatingContainer(object):
         self.error_limit = 0
         self.modification_limit = 0
         self.iteration_limit = 0
-        self._mod_stiff_is_fresh = 0
+        #self._mod_stiff_is_fresh = 0
+        self.trusses = []
 
 
 class TrussFramework(object):
@@ -292,43 +488,11 @@ class TrussFramework(object):
         self.truss = TrussModelData(self.title)
 
         # Additional truss data
-        #self.known_f_a = []           # Nodes without supports
-        #self.known_f_not_zero = []     # Nodes with loads
-        self.DOF = 3                  # Truss's degree of freedom
-
-        # TODO: pending variables should be transformed into functions (also Stiffnesses???)
-        self.element_DOF = []              # Mapping between DOF and node
-        self.stiffness_matrix = []           # Global stiffness matrix
-        self.modified_stiffness_matrices = []     # Modified stiffness matrices in a hyper-matrix
-        self.element_length = []                   # Length of the elements
-        self._norm_stiff = []                  # E/L
-        self._cx = []
-        self._cy = []
-        self._cz = []
-        self._s_loc = []
-        self.dis_new = []
-        self.force_new = []
-        self.stiff_new = []
         self.read_elements = [0.] * 9
-        self.displacement = []        # Relative displacements
-        self.known_displacement_a = []
-        self._stiff_is_fresh = 0
-        self._post_processed = 0
-        self._init_displacement = []
-        #self.known_displacement_a = []
         # Model Updating related variables (?)
         self._io_origin = 0           # Array's first element number during IO. Default is 0.
         self.analysis = {}
-        self.mod_displacements = []
-        self.effect = []
-        self.total_effect = []
-        self.sorted_effect = []
-        self.special_DOF_input_string = ''
-        self.threshold = 0.1
-        self.effect_ratio = []
-        self.processed_data = []          # To store last input line
         self.updating_container = ModelUpdatingContainer()
-
 
     def _open_serial(port, baudrate):
         try:
@@ -344,7 +508,7 @@ class TrussFramework(object):
         except serial.SerialException:
             print(str(port) + ' port is busy. It might be occupied by this program or another one :'
                               '/ Be careful or try resetting this program')
-            return False
+            return None
 
     def connect(self, port='', baudrate=9600):
         self.serial_connection = False
@@ -387,7 +551,7 @@ class TrussFramework(object):
             raise Exception('DOF must be 2 or 3.')
 
         # Set freshness flags after geometry modification
-        self.invalidate_stiffness_matrices('all')
+        self.truss.invalidate_stiffness_matrices()
 
 
     def bulk_set_measurement_points(self, measurement_points):
@@ -432,15 +596,15 @@ class TrussFramework(object):
         self.truss.nodal_connections = nodal_connection_list
 
         # Set freshness flags after geometry modification
-        self.invalidate_stiffness_matrices()
+        self.truss.invalidate_stiffness_matrices()
 
         # Creating mapping tool for elements
         for node in self.truss.nodal_connections:
-            self.element_DOF.append(
+            self.truss.element_DOF.append(
                 [node[0] * 3, node[0] * 3 + 1, node[0] * 3 + 2, node[1] * 3, node[1] * 3 + 1, node[1] * 3 + 2])
 
         # Initializing defaults for all matrices
-        self._init_displacement = [0] * (3 * self.truss.number_of_nodes())
+        self.truss._init_displacement = [0] * (3 * self.truss.number_of_nodes())
         self.truss.force = [0.] * (3 * self.truss.number_of_nodes())
         self.stiffness_matrix = [0.] * (3 * self.truss.number_of_nodes())
         self.truss.known_f_a = []
@@ -457,10 +621,10 @@ class TrussFramework(object):
         self.truss.nodal_coord = coordinate_list
 
         # Set freshness flags after geometry modification
-        self.invalidate_stiffness_matrices('all')
+        self.truss.invalidate_stiffness_matrices()
 
         # Validity check
-        # TODO: the two side comes fromthe same value. The check should reflect to toher variables
+        # TODO: the two side comes from the same value. The check should reflect to to the variables
         # if self.truss.number_of_nodes() > len(self.truss.nodal_coord):
         #    raise Exception('More coordinates are needed')
         # elif not self.truss.nodal_connections:
@@ -475,8 +639,8 @@ class TrussFramework(object):
         :param area_list: cross-sectional data array according to the elements
         :return: None
         """
-        self.cross_sectional_area_list = area_list
-        self.invalidate_stiffness_matrices('all')
+        self.truss.cross_sectional_area_list = area_list
+        self.truss.invalidate_stiffness_matrices()
 
 
     def bulk_set_materials(self, E):
@@ -487,7 +651,7 @@ class TrussFramework(object):
         :return: None
         """
         self.truss.elastic_modulo = E
-        self.invalidate_stiffness_matrices('all')
+        self.truss.invalidate_stiffness_matrices()
 
 
     def bulk_set_forces(self, forces):
@@ -503,7 +667,7 @@ class TrussFramework(object):
                 self.truss.force[location] = force
             elif self.DOF == 2:
                 self.truss.force[location + (location//2)] = force
-        self.set_postprocess_needed_flag()
+        self.truss.set_postprocess_needed_flag()
 
 
     def bulk_set_supports(self, constraints):
@@ -518,9 +682,9 @@ class TrussFramework(object):
                 self.truss.constraint.append([location, constraint])
             elif self.DOF == 2:
                 self.truss.constraint.append([location + (location // 2), constraint])
-        self.invalidate_stiffness_matrices('all')
+        self.truss.invalidate_stiffness_matrices()
 
-        self.set_postprocess_needed_flag()
+        self.truss.set_postprocess_needed_flag()
 
 
     def read(self):
@@ -668,27 +832,6 @@ class TrussFramework(object):
         if terminate:
             raise Exception
 
-    def set_postprocess_needed_flag(self):
-        """
-        Set portprocess required flag
-
-        :return: None
-        """
-        self._post_processed = 0
-
-    def invalidate_stiffness_matrices(self, include_modified=''):
-        """
-        Set flags for stiffness matrix recalculation(s)
-        :param include_modified: ['' | 'all'] includes the model updating related _mod_stiff_is_fresh matrix.
-        :return: None
-        """
-        self.truss._stiff_is_fresh = 0
-        if include_modified == 'all':
-            self.updating_container._mod_stiff_is_fresh = 0
-
-        self.set_postprocess_needed_flag()
-
-
     def readarduino(self, base, save_input):
         """
         Read data from Arduino
@@ -748,7 +891,7 @@ class TrussFramework(object):
 
             save_input.write(str(data) + ', ' + str(time.time()) + "\n")
             # Calculate differences
-            delta = self.difference(self.displacement, self.updating_container.measurement)
+            delta = self.difference(self.truss.displacement, self.updating_container.measurement)
 
             print("Delta: " + str(delta))
 
@@ -813,7 +956,7 @@ class TrussFramework(object):
             self.updating_container.measurement = data
 
             # Calculate differences
-            delta = self.difference(self.displacement, self.updating_container.measurement)
+            delta = self.difference(self.truss.displacement, self.updating_container.measurement)
             return delta
 
         except IndexError:
@@ -992,14 +1135,14 @@ class TrussFramework(object):
                 outfile.write('\n')
 
                 outfile.write('Displacements\n')
-                for i in range(len(self.displacement)//3):
+                for i in range(len(self.truss.displacement)//3):
                     if i < 100:
                         outfile.write(' ')
                         if i < 9:
                             outfile.write(' ')
-                    outfile.write(str(i + self._io_origin) + ', ' + "{:10.3f}".format(self.displacement[i*3 + 0]) +
-                                  ', ' + "{:10.3f}".format(self.displacement[i*3 + 1]) +
-                                  ', ' + "{:10.3f}".format(self.displacement[i*3 + 2]) + ', ' + '\n')
+                    outfile.write(str(i + self._io_origin) + ', ' + "{:10.3f}".format(self.truss.displacement[i*3 + 0]) +
+                                  ', ' + "{:10.3f}".format(self.truss.displacement[i*3 + 1]) +
+                                  ', ' + "{:10.3f}".format(self.truss.displacement[i*3 + 2]) + ', ' + '\n')
                 outfile.write('\n')
 
                 outfile.write('Stresses\n')
@@ -1061,7 +1204,7 @@ class TrussFramework(object):
             outfile.write("Modifications [%]: \n")
             outfile.write(str(self.updating_container.modifications) + "\n")
             outfile.write("Original displacements: \n")
-            outfile.write(str(self.displacement) + "\n")
+            outfile.write(str(self.truss.displacement) + "\n")
             if j > 1:
                 outfile.write("New displacements: \n")
                 outfile.write(str(self.updating_container.modified_displacements[self.number_of_elements()]) + "\n")
