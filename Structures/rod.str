@@ -1,0 +1,47 @@
+# Input file for TRUSS.py program
+# All commands must be written with uppercase characters
+# *** The values MUST be written in the exact following line of a command
+# Only lines with the command and nothing more counts. Everything else will be neglected. Even hashtags are useless :)
+# The order of the commands is indifferent.
+#
+# Commands and their format (example):
+# DOF - Degree of freedom: 3
+# ELEMENTS - Elements given by end-nodes: 0, 1 | 0, 2 ...
+# COORDINATES - Nodal coordinates: 0., 0., 0., | 0., 3., 0. ...
+# CROSS-SECTIONS - This data will be evaluated in Python: 36, 5.0*(10**(-4)) ...
+# MATERIALS - This data will be evaluated in Python: 1800, 100.0*(10**9) ...
+# FORCES - Selected DOF + Force: 11, +1000000.0 | 12, +1000000.0 ...
+# SUPPORTS - Selected DOF + Prescribed displacement: 0, 0.0 | 1, 0.0 ...
+# MEASUREMENTS - Selected node's DOF will be analyzed during Model Updating: 4X, 4Y, 10Z, ...
+# EOF - For compatibility reasons EOF should be placed after the commands
+#
+# Optional:
+#_ORIGIN - Defines the number of the first element during reading input. The default is 0.
+#  Should be placed at the TOP OF THE FILE!
+
+
+DOF
+2
+
+ELEMENTS
+0, 1
+
+COORDINATES
+0., 0. | 0., 1.
+
+CROSS-SECTIONS
+300.0*(10**(-4))
+
+MATERIALS
+2.1*(10**7)
+
+FORCES
+2, +1000000.0 | 3, +1000000.0
+
+SUPPORTS
+0, 0.0 | 1, 0.0 | 2, 0.0
+
+MEASUREMENTS
+1Y
+
+EOF

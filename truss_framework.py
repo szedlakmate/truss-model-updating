@@ -79,7 +79,7 @@ class TrussConfiguration(object):
             # Modify as needed #
             self.mode_name = "User defined"
             self.log = 1  # Logging time
-            self.graphics = 0  # Graphical features
+            self.graphics = 1  # Graphical features
             self.solver = 1  # 0: Basic solver, 1: NumPy solver
             self.OSlib = 1  # Basic OS file features (e.g. file size)
             self.updating = 1  # Model Updating: On/ Off
@@ -301,7 +301,7 @@ class TrussModelData(object):
         Set special nodal DOFs
         """
         for location in measurement_points:
-            node = int(location[:len(location)-1])-io_origin
+            node = int(location[0:len(location)-1])-io_origin
             if 'X' in location:
                 self.analysis[location] = node*3+0
                 self.keypoints.append(node*3+0)
@@ -321,6 +321,105 @@ class TrussModelData(object):
         if self.number_of_keypoints == 0:
             print("There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file.")
 
+    # TODO: This functions is probably not called although it should be part of the set_base() process
+    def bulk_set_elements(self, nodal_connection_list):
+        """
+        Setting elements (nodal connections) in bulk mode
+
+        :param nodal_connection_list: an array of arrays, where each sub-array is a pair of integers, namely [i, j].
+        i, j are the ID's of the nodes and an element is i -> j.
+        :return: None
+        """
+        # Set attribute
+        self.nodal_connections = nodal_connection_list
+
+        # Set freshness flags after geometry modification
+        self.invalidate_stiffness_matrices()
+
+        # Creating mapping tool for elements
+        for node in self.nodal_connections:
+            self.element_DOF.append(
+                [node[0] * 3, node[0] * 3 + 1, node[0] * 3 + 2, node[1] * 3, node[1] * 3 + 1, node[1] * 3 + 2])
+
+        # Initializing defaults for all matrices
+        self._init_displacement = [0] * (3 * self.number_of_nodes())
+        self.force = [0.] * (3 * self.number_of_nodes())
+        self.stiffness_matrix = [0.] * (3 * self.number_of_nodes())
+        self.known_f_a = []
+        self.known_f_not_zero = []
+
+    def bulk_set_coordinates(self, coordinate_list):
+        """
+        Setting coordinates in bulk mode
+
+        :param coordinate_list: An array of coordinate arrays (2/3 elements) enlisting ALL the nodal coordinates
+        :return: None
+        """
+        # Set attribute
+        self.nodal_coord = coordinate_list
+
+        # Set freshness flags after geometry modification
+        self.invalidate_stiffness_matrices()
+
+        # Validity check
+        # TODO: the two side comes fromthe same value. The check should reflect to toher variables
+        # if self.number_of_nodes() > len(self.nodal_coord):
+        #    raise Exception('More coordinates are needed')
+        # elif not self.nodal_connections:
+        #    raise Exception('Nodes must be set before defining elements')
+        # self._check_coordinates(False)
+
+    def bulk_set_cross_sections(self, area_list):
+        """
+        Setting cross-sections in bulk mode
+
+        :param area_list: cross-sectional data array according to the elements
+        :return: None
+        """
+        self.cross_sectional_area_list = area_list
+        self.invalidate_stiffness_matrices()
+
+    def bulk_set_materials(self, E):
+        """
+        Setting material data in bulk mode
+
+        :param E: array of elastic modulos according to the elements
+        :return: None
+        """
+        self.elastic_modulo = E
+        self.invalidate_stiffness_matrices()
+
+    def bulk_set_forces(self, forces):
+        """
+        Set forces
+
+        :param forces: matrix of forces in the following pattern: [[location, force], ...]
+        :return: None
+        """
+        # DOF dependent mapping
+        for location, force in forces:
+            if self.DOF == 3:
+                self.force[location] = force
+            elif self.DOF == 2:
+                self.force[location + (location // 2)] = force
+        self.set_postprocess_needed_flag()
+
+    def bulk_set_supports(self, constraints):
+        """
+        Set supports
+
+        :param constraints: matrix of constraints in the following pattern: [[location, constraint], ...]
+        :return:
+        """
+        for location, constraint in constraints:
+            if self.DOF == 3:
+                self.constraint.append([location, constraint])
+            elif self.DOF == 2:
+                self.constraint.append([location + (location // 2), constraint])
+        self.invalidate_stiffness_matrices()
+
+        self.set_postprocess_needed_flag()
+
     def calculate_stiffness_matrix(self):
         """
         Stiffness matrix compilation
@@ -333,20 +432,27 @@ class TrussModelData(object):
         self.constraint = list(k for k, _ in itertools.groupby(sorted(self.constraint)))
 
         # Setting known forces
+        known_f_a = []
+        known_f_not_zero = []
+        known_displacement_a = []
         for location in range(3*self.number_of_nodes()):
-            self.known_f_a.append(location)
+            known_f_a.append(location)
             if self.force[location] != 0:
-                self.known_f_not_zero.append(location)
+                known_f_not_zero.append(location)
 
-        self.known_displacement_a = []
+
         for constraint in self.constraint:
             self._init_displacement[constraint[0]] = constraint[1]
-            self.known_displacement_a.append(constraint[0])
+            known_displacement_a.append(constraint[0])
             try:
-                self.known_f_a.remove(constraint[0])
-                self.known_f_not_zero.remove(constraint[0])
+                known_f_a.remove(constraint[0])
+                known_f_not_zero.remove(constraint[0])
             except ValueError:
                 pass
+
+        self.known_f_a = known_f_a
+        self.known_displacement_a = known_displacement_a
+        self.known_f_not_zero = known_f_not_zero
 
         elements_lengths = [0.]*self.number_of_elements()
         self._norm_stiff = [0.]*self.number_of_elements()
@@ -433,7 +539,7 @@ class TrussModelData(object):
         self.nodal_coord_def = []
         for i in range(self.number_of_nodes()):
             self.nodal_coord_def.append([self.nodal_coord[i][0] + self.displacement[i*3+0],
-                                               self.nodal_coord[i][1] + self.displacement[i*3+1], self.nodal_coord[i][2] + self.displacement[i*3+2]])
+                                         self.nodal_coord[i][1] + self.displacement[i*3+1], self.nodal_coord[i][2] + self.displacement[i*3+2]])
 
         # Postrpocesses
         self.post_process()
@@ -488,6 +594,7 @@ class ModelUpdatingContainer(object):
         self.number_of_updates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit,
         #self.modified_displacements = []
         self.effect = []
+        self.effect_ratio = []
         self.total_effect = []
         self.sorted_effect = []
         self.original_delta = []
@@ -530,8 +637,6 @@ class TrussFramework(object):
         # Additional truss data
         self.read_elements = [0.] * 9
         # Model Updating related variables (?)
-
-        self.analysis = {}
         self.updating_container = ModelUpdatingContainer()
 
     def _open_serial(port, baudrate):
@@ -812,14 +917,14 @@ class TrussFramework(object):
 
         for measured_position in measurement:
             #loc, measured = package[0], package[1]
-            loc = '13Y'
+            loc = '1Y'
             try:
-                dof = self.analysis[loc.upper()]
+                dof = self.truss.analysis[loc.upper()]
             except KeyError:
                 print('The given measurement location cannot be matched with the input data.')
                 print('The available nodes are: {\'NAMES\': mapping addresses}')
-                print(self.analysis)
-                self.configuration.disconnect()
+                print(self.truss.analysis)
+                #self.configuration.disconnect()
                 raise Exception('Watchpoint name error')
 
             delta.append(measured_position - num_displ[dof])

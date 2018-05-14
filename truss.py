@@ -108,13 +108,10 @@ class Truss(TrussFramework):
         self.truss.force[element_ID] = force
         self.set_postprocess_needed_flag()
 
-
-
-
+    """
+   
     def calculate_modified_stiffness_matrix(self, index, magnitude):
-        """
-        Convergence step in stiffness matrix modification
-        """
+      
         if not self.updating_container.trusses:
             self.updating_container.trusses = [0.]*(self.truss.number_of_elements()+1)
 
@@ -124,10 +121,10 @@ class Truss(TrussFramework):
         for i in range(self.truss.number_of_elements()):
             if i == index:
                 _mod_norm_stiff = self.truss._norm_stiff[i] * (1.0 + self.updating_container.modifications[i] + magnitude)  # E[i]/L[i]
-            else:
-                _mod_norm_stiff = self._norm_stiff[i] * (1.0 + self.updating_container.modifications[i])  # E[i]/L[i]
+            else: 
+                _mod_norm_stiff = self.truss._norm_stiff[i] * (1.0 + self.updating_container.modifications[i])  # E[i]/L[i]
 
-            _mod_loc_stiff = [[y*self.cross_sectional_area_list[i]*_mod_norm_stiff for y in x] for x in self._s_loc[i]]
+            _mod_loc_stiff = [[y*self.truss.cross_sectional_area_list[i]*_mod_norm_stiff for y in x] for x in self._s_loc[i]]
 
             ele_dof_vec = self.truss.element_DOF[i]
 
@@ -140,12 +137,13 @@ class Truss(TrussFramework):
                                                                zip(modified_stiffness_matrices[ele_dof_vec[j]], stiffness_increment)]
 
         self.updating_container.trusses[index] = modified_stiffness_matrices
-
-
+       Convergence step in stiffness matrix modification
+          """
+    """
     def solve_modified_structure(self, index):
-        """
+        
         Solver for the modified structures. 'Index' shows the actual modification number.
-        """
+        
 
         self.updating_container.modified_displacements[index] = [0.]*(self.truss.number_of_nodes()*3)
 
@@ -170,7 +168,7 @@ class Truss(TrussFramework):
             mod_displacement_temp[kfa] = dis_new[i] - self.dis_new[i]
 
         self.updating_container.modified_displacements[index] = [x + y for x, y in zip(self.updating_container.modified_displacements[index], mod_displacement_temp)]
-
+"""
     def evaluate_updates(self):
         """
         Calculates the relative displacement of each individual available unit-modification
@@ -181,17 +179,20 @@ class Truss(TrussFramework):
         return effect: [effect on 1. point, effect on 2. point, ..., modification number]
                        where each line number shows the corresponding modification number
         """
-        self.updating_container.effect = [[0.]*(self.number_of_keypoints + 2)]*self.truss.number_of_elements()
-        self.updating_container.total_effect = [0.]*self.number_of_keypoints
-        self.updating_container.sorted_effect = [[[0.]*(self.number_of_keypoints + 2)]*self.truss.number_of_elements()]*self.number_of_keypoints
+        number_of_keypoints = self.truss.number_of_keypoints()
+        number_of_elements = self.truss.number_of_elements()
+        
+        self.updating_container.effect = [[0.]*(number_of_keypoints + 2)]*number_of_elements
+        self.updating_container.total_effect = [0.]*number_of_keypoints
+        self.updating_container.sorted_effect = [[[0.]*(number_of_keypoints + 2)]*number_of_elements]*number_of_keypoints
 
-        effect_temp = [0.]*(self.number_of_keypoints + 2)
+        effect_temp = [0.]*(number_of_keypoints + 2)
 
-        for element_ID in range(self.truss.number_of_elements()):
-            effect_temp[self.number_of_keypoints] = int(element_ID)
+        for element_ID in range(number_of_elements):
+            effect_temp[number_of_keypoints] = int(element_ID)
             for j, dofnum in enumerate(self.truss.keypoints):
                 try:
-                    effect_temp[j] = self.updating_container.modified_displacements[element_ID][dofnum]
+                    effect_temp[j] = self.updating_container[element_ID].displacement[dofnum]
                     self.updating_container.effect[element_ID] = [x for x in effect_temp]
                     self.updating_container.total_effect[j] += abs(self.updating_container.effect[element_ID][j])
                 except IndexError:
@@ -199,30 +200,30 @@ class Truss(TrussFramework):
                     print("Please check the \'arduino_mapping.txt\' input whether the given DOFs are correct or not.")
                     raise IndexError
 
-        self.effect_ratio = deepcopy(self.updating_container.effect)
-        for i in range(self.truss.number_of_elements()):
-            for j in range(self.number_of_keypoints):
+        self.updating_container.effect_ratio = deepcopy(self.updating_container.effect)
+        for i in range(number_of_elements):
+            for j in range(number_of_keypoints):
                 if self.updating_container.total_effect[j] > 0:
-                    self.effect_ratio[i][j] = abs(self.effect_ratio[i][j]/self.updating_container.total_effect[j])
+                    self.updating_container.effect_ratio[i][j] = abs(self.updating_container.effect_ratio[i][j]/self.updating_container.total_effect[j])
                 else:
-                    self.effect_ratio[i][j] = 0
+                    self.updating_container.effect_ratio[i][j] = 0
 
         # print("   \'effectratio\' is not used yet")
 
         # Sort by effectiveness
-        for i in range(self.number_of_keypoints):
+        for i in range(number_of_keypoints):
             self.updating_container.sorted_effect[i] = deepcopy(self.updating_container.effect)
 
             # Check sign of the effect
-            for ktemp in range(self.truss.number_of_elements()):
+            for ktemp in range(number_of_elements):
                 if self.updating_container.sorted_effect[i][ktemp][i] < 0:
-                    for jtemp in range(self.number_of_keypoints):
+                    for jtemp in range(number_of_keypoints):
                         self.updating_container.sorted_effect[i][ktemp][jtemp] = abs(self.updating_container.sorted_effect[i][ktemp][jtemp])
-                        self.updating_container.sorted_effect[i][ktemp][self.number_of_keypoints + 1] = -1
+                        self.updating_container.sorted_effect[i][ktemp][number_of_keypoints + 1] = -1
                 else:
-                    self.updating_container.sorted_effect[i][ktemp][self.number_of_keypoints + 1] = +1
+                    self.updating_container.sorted_effect[i][ktemp][number_of_keypoints + 1] = +1
 
-            for j in range(self.number_of_keypoints):
+            for j in range(number_of_keypoints):
                 if i != j and j != 0:
                     self.updating_container.sorted_effect[i] = swap_columns(sorted(swap_columns(self.updating_container.sorted_effect[i], 0, j), reverse=True), 0, j)
             if i != 0:
