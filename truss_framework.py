@@ -207,6 +207,7 @@ class TrussModelData(object):
     """
     def __init__(self, title):
         # Labels
+        self.analysis = {}
         self.title = title
         # Truss data
         self.DOF = 3
@@ -271,18 +272,54 @@ class TrussModelData(object):
         """
         self._post_processed = 0
 
-    def invalidate_stiffness_matrices(self):  #, include_modified=''):
+    def invalidate_stiffness_matrices(self):
         """
-        Set flags for stiffness matrix recalculation(s)
+        Set flags for stiffness matrix recalculation
 
-        :param include_modified: ['' | 'all'] includes the model updating related _mod_stiff_is_fresh matrix.
         :return: None
         """
         self._stiff_is_fresh = 0
-        #if include_modified == 'all':
-        #    self.updating_container._mod_stiff_is_fresh = 0
-
         self.set_postprocess_needed_flag()
+
+    def set_model_DOF(self, DOF):
+        """
+        Setting problem's degree of freedom
+
+        :param DOF: [2 | 3] Model's Degree Of Freedom
+        :return: None
+        """
+        self.DOF = DOF
+        if self.DOF not in [2, 3]:
+            raise Exception('DOF must be 2 or 3.')
+
+        # Set freshness flags after geometry modification
+        self.invalidate_stiffness_matrices()
+
+
+    def bulk_set_measurement_points(self, measurement_points, io_origin):
+        """
+        Set special nodal DOFs
+        """
+        for location in measurement_points:
+            node = int(location[:len(location)-1])-io_origin
+            if 'X' in location:
+                self.analysis[location] = node*3+0
+                self.keypoints.append(node*3+0)
+            if 'Y' in location:
+                self.analysis[location] = node*3+1
+                self.keypoints.append(node*3+1)
+
+            if 'Z' in location:
+                if self.DOF == 3:
+                    self.analysis[location] = node*3+2
+                    self.keypoints.append(node*3+2)
+                else:
+                    print("Z-direction is not allowed in 2D structures. "
+                          "Please check the 'MEASUREMENTS' section in the input file.")
+                    raise Exception
+
+        if self.number_of_keypoints == 0:
+            print("There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file.")
 
     def calculate_stiffness_matrix(self):
         """
@@ -366,7 +403,10 @@ class TrussModelData(object):
 
         # known force array
         for i, DOF in enumerate(self.known_f_a):
-            self.force_new[i] = self.force[DOF]
+            try:
+                self.force_new[i] = self.force[DOF]
+            except Exception:
+                pass
 
         stiffness_increment = [0.]*(self.number_of_nodes()*3-len(self.constraint))
         for i, kfai in enumerate(self.known_f_a):
@@ -490,7 +530,7 @@ class TrussFramework(object):
         # Additional truss data
         self.read_elements = [0.] * 9
         # Model Updating related variables (?)
-        self._io_origin = 0           # Array's first element number during IO. Default is 0.
+
         self.analysis = {}
         self.updating_container = ModelUpdatingContainer()
 
@@ -538,154 +578,7 @@ class TrussFramework(object):
             print('Serial connection cannot be closed because it is not managed by this thread')
             return False
 
-    def set_model_DOF(self, DOF):
-        """
-        Setting problem's degree of freedom
-
-        :param DOF: [2 | 3] Model's Degree Of Freedom
-        :return: None
-        """
-        self.DOF = DOF
-        self.truss.DOF = DOF
-        if self.DOF not in [2, 3]:
-            raise Exception('DOF must be 2 or 3.')
-
-        # Set freshness flags after geometry modification
-        self.truss.invalidate_stiffness_matrices()
-
-
-    def bulk_set_measurement_points(self, measurement_points):
-        """
-        Set special nodal DOFs
-        """
-        self.analysis = {}
-
-        for location in measurement_points:
-            node = int(location[:len(location)-1])-self._io_origin
-            if 'X' in location:
-                self.analysis[location] = node*3+0
-                self.truss.keypoints.append(node*3+0)
-            if 'Y' in location:
-                self.analysis[location] = node*3+1
-                self.truss.keypoints.append(node*3+1)
-
-            if 'Z' in location:
-                if self.DOF == 3:
-                    self.analysis[location] = node*3+2
-                    self.truss.keypoints.append(node*3+2)
-                else:
-                    print("Z-direction is not allowed in 2D structures. "
-                          "Please check the 'MEASUREMENTS' section in the input file.")
-                    raise Exception
-
-        self.number_of_keypoints = len(self.analysis)
-        if self.number_of_keypoints == 0 and self.configuration.updating:
-            print("There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file.")
-            raise Exception
-
     # TODO: This functions is probably not called although it should be part of the set_base() process
-    def bulk_set_elements(self, nodal_connection_list):
-        """
-        Setting elements (nodal connections) in bulk mode
-
-        :param nodal_connection_list: an array of arrays, where each sub-array is a pair of integers, namely [i, j].
-        i, j are the ID's of the nodes and an element is i -> j.
-        :return: None
-        """
-        # Set attribute
-        self.truss.nodal_connections = nodal_connection_list
-
-        # Set freshness flags after geometry modification
-        self.truss.invalidate_stiffness_matrices()
-
-        # Creating mapping tool for elements
-        for node in self.truss.nodal_connections:
-            self.truss.element_DOF.append(
-                [node[0] * 3, node[0] * 3 + 1, node[0] * 3 + 2, node[1] * 3, node[1] * 3 + 1, node[1] * 3 + 2])
-
-        # Initializing defaults for all matrices
-        self.truss._init_displacement = [0] * (3 * self.truss.number_of_nodes())
-        self.truss.force = [0.] * (3 * self.truss.number_of_nodes())
-        self.stiffness_matrix = [0.] * (3 * self.truss.number_of_nodes())
-        self.truss.known_f_a = []
-        self.truss.known_f_not_zero = []
-
-    def bulk_set_coordinates(self, coordinate_list):
-        """
-        Setting coordinates in bulk mode
-
-        :param coordinate_list: An array of coordinate arrays (2/3 elements) enlisting ALL the nodal coordinates
-        :return: None
-        """
-        # Set attribute
-        self.truss.nodal_coord = coordinate_list
-
-        # Set freshness flags after geometry modification
-        self.truss.invalidate_stiffness_matrices()
-
-        # Validity check
-        # TODO: the two side comes from the same value. The check should reflect to to the variables
-        # if self.truss.number_of_nodes() > len(self.truss.nodal_coord):
-        #    raise Exception('More coordinates are needed')
-        # elif not self.truss.nodal_connections:
-        #    raise Exception('Nodes must be set before defining elements')
-        # self._check_coordinates(False)
-
-
-    def bulk_set_cross_sections(self, area_list):
-        """
-        Setting cross-sections in bulk mode
-
-        :param area_list: cross-sectional data array according to the elements
-        :return: None
-        """
-        self.truss.cross_sectional_area_list = area_list
-        self.truss.invalidate_stiffness_matrices()
-
-
-    def bulk_set_materials(self, E):
-        """
-        Setting material data in bulk mode
-
-        :param E: array of elastic modulos according to the elements
-        :return: None
-        """
-        self.truss.elastic_modulo = E
-        self.truss.invalidate_stiffness_matrices()
-
-
-    def bulk_set_forces(self, forces):
-        """
-        Set forces
-
-        :param forces: matrix of forces in the following pattern: [[location, force], ...]
-        :return: None
-        """
-        # DOF dependent mapping
-        for location, force in forces:
-            if self.DOF == 3:
-                self.truss.force[location] = force
-            elif self.DOF == 2:
-                self.truss.force[location + (location//2)] = force
-        self.truss.set_postprocess_needed_flag()
-
-
-    def bulk_set_supports(self, constraints):
-        """
-        Set supports
-
-        :param constraints: matrix of constraints in the following pattern: [[location, constraint], ...]
-        :return:
-        """
-        for location, constraint in constraints:
-            if self.DOF == 3:
-                self.truss.constraint.append([location, constraint])
-            elif self.DOF == 2:
-                self.truss.constraint.append([location + (location // 2), constraint])
-        self.truss.invalidate_stiffness_matrices()
-
-        self.truss.set_postprocess_needed_flag()
-
 
     def read(self):
         """
@@ -727,7 +620,7 @@ class TrussFramework(object):
 
                     if source_line.upper() == "DOF":
                         source_line = sourcefile.readline().strip()
-                        self.set_model_DOF(int(source_line))
+                        self.truss.set_model_DOF(int(source_line))
                         self.read_elements[1] = 1
 
                     if source_line.upper() == "ELEMENTS":
@@ -740,7 +633,7 @@ class TrussFramework(object):
                         if [''] in input_string:
                             input_string.remove([''])
                         input_number = [[int(x[0]) - self._io_origin, int(x[1]) - self._io_origin] for x in input_string]
-                        self.bulk_set_elements(input_number)
+                        self.truss.bulk_set_elements(input_number)
                         self.read_elements[2] = 1
 
                     if source_line.upper() == "COORDINATES":
@@ -756,7 +649,7 @@ class TrussFramework(object):
                             input_number = [[float(x[0]), float(x[1]), float(x[2])] for x in input_string]
                         elif len(input_string[0]) == 2:
                             input_number = [[float(x[0]), float(x[1]), 0.] for x in input_string]
-                        self.bulk_set_coordinates(input_number)
+                        self.truss.bulk_set_coordinates(input_number)
                         self.read_elements[3] = 1
 
                     if source_line.upper() == "CROSS-SECTIONS":
@@ -769,7 +662,7 @@ class TrussFramework(object):
                         if '' in input_string:
                             input_string.remove('')
                         input_number = [float(eval(x)) for x in input_string]
-                        self.bulk_set_cross_sections(input_number)
+                        self.truss.bulk_set_cross_sections(input_number)
                         self.read_elements[4] = 1
 
                     if source_line.upper() == "MATERIALS":
@@ -782,7 +675,7 @@ class TrussFramework(object):
                         if '' in input_string:
                             input_string.remove('')
                         input_number = [float(eval(x)) for x in input_string]
-                        self.bulk_set_materials(input_number)
+                        self.truss.bulk_set_materials(input_number)
                         self.read_elements[5] = 1
 
                     if source_line.upper() == "FORCES":
@@ -795,7 +688,7 @@ class TrussFramework(object):
                         if [''] in input_string:
                             input_string.remove([''])
                         input_number = [[int(x[0]) - self._io_origin, float(x[1])] for x in input_string]
-                        self.bulk_set_forces(sorted(input_number))
+                        self.truss.bulk_set_forces(sorted(input_number))
                         self.read_elements[6] = 1
 
                     if source_line.upper() == "SUPPORTS":
@@ -808,7 +701,7 @@ class TrussFramework(object):
                         if [''] in input_string:
                             input_string.remove([''])
                         input_number = [[int(x[0]) - self._io_origin, float(x[1])] for x in input_string]
-                        self.bulk_set_supports(sorted(input_number))
+                        self.truss.bulk_set_supports(sorted(input_number))
                         self.read_elements[7] = 1
 
                     if source_line.upper() == "MEASUREMENTS":
@@ -816,7 +709,7 @@ class TrussFramework(object):
                         self.special_DOF_input_string = source_line
                         input_string = []
                         self.updating_container.arduino_mapping = source_line.split(',')
-                        self.bulk_set_measurement_points(self.updating_container.arduino_mapping)
+                        self.truss.bulk_set_measurement_points(self.updating_container.arduino_mapping, self._io_origin)
                         self.read_elements[8] = 1
         except IOError:
             print("The following file could not be opened: " + "./Structures/" + self.configuration.input_file)
