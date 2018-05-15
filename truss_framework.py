@@ -240,7 +240,7 @@ class TrussModelData(object):
         # Results
         self.nodal_coord_def = []  # Coordinates after deformations
         # Secondary variables
-        self.displacement = []  # Relative displacements
+        self.displacements = []  # Relative displacements
         self.stress = []  # Element's stresses
         self.stress_color = []  # Color mapping for stresses
         # Plot data
@@ -530,16 +530,16 @@ class TrussModelData(object):
                 print('NumPy solver')
             self.dis_new = numpy.linalg.solve(numpy.array(self.stiff_new), numpy.array(self.force_new))
 
-        self.displacement = deepcopy(self._init_displacement)
+        self.displacements = deepcopy(self._init_displacement)
 
         for i, known_f_a in enumerate(self.known_f_a):
-            self.displacement[known_f_a] = self.dis_new[i]
+            self.displacements[known_f_a] = self.dis_new[i]
 
         # Deformed shape
         self.nodal_coord_def = []
         for i in range(self.number_of_nodes()):
-            self.nodal_coord_def.append([self.nodal_coord[i][0] + self.displacement[i*3+0],
-                                         self.nodal_coord[i][1] + self.displacement[i*3+1], self.nodal_coord[i][2] + self.displacement[i*3+2]])
+            self.nodal_coord_def.append([self.nodal_coord[i][0] + self.displacements[i * 3 + 0],
+                                         self.nodal_coord[i][1] + self.displacements[i * 3 + 1], self.nodal_coord[i][2] + self.displacements[i * 3 + 2]])
 
         # Postrpocesses
         self.post_process()
@@ -560,7 +560,7 @@ class TrussModelData(object):
         """
         for i in self.known_displacement_a:
             self.force[i] = 0
-            for j, displacement in enumerate(self.displacement):
+            for j, displacement in enumerate(self.displacements):
                 self.force[i] += self.stiffness_matrix[i][j]*displacement
 
 
@@ -701,7 +701,7 @@ class TrussFramework(object):
             CROSS-SECTIONS - This data will be evaluated in Python: 3.0*(10**(-4)), 5.0*(10**(-4)) ...
             MATERIALS - This data will be evaluated in Python: 70.0*(10**9), 100.0*(10**9) ...
             FORCES - Selected DOF + Force: 11, +1000000.0 | 12, +1000000.0 ...
-            SUPPORTS - Selected DOF + Prescribed displacement: 0, 0.0 | 1, 0.0 ...
+            SUPPORTS - Selected DOF + Prescribed displacements: 0, 0.0 | 1, 0.0 ...
             SPECDOF - Selected node's DOF will be analysed during Model Updating: 1, xyz | 3 y | 10 xz ...
 
             EOF - For compatibility reasons EOF should be placed after the commands
@@ -889,7 +889,7 @@ class TrussFramework(object):
 
             save_input.write(str(data) + ', ' + str(time.time()) + "\n")
             # Calculate differences
-            delta = self.difference(self.truss.displacement, self.updating_container.measurement)
+            delta = self.difference(self.truss.displacements, self.updating_container.measurement)
 
             print("Delta: " + str(delta))
 
@@ -912,7 +912,6 @@ class TrussFramework(object):
         :return: [measurement - calculated] Negative means higher deflections are measured
         """
         # print(nodenumber option should be added! <XXX>)
-
         delta = []
 
         for measured_position in measurement:
@@ -926,8 +925,11 @@ class TrussFramework(object):
                 print(self.truss.analysis)
                 #self.configuration.disconnect()
                 raise Exception('Watchpoint name error')
-
-            delta.append(measured_position - num_displ[dof])
+            delta_appendix = float(measured_position) - float(num_displ[dof])
+            try:
+                delta.append(delta_appendix)
+            except Exception:
+                pass
 
         return delta
 
@@ -954,7 +956,7 @@ class TrussFramework(object):
             self.updating_container.measurement = data
 
             # Calculate differences
-            delta = self.difference(self.truss.displacement, self.updating_container.measurement)
+            delta = self.difference(self.truss.displacements, self.updating_container.measurement)
             return delta
 
         except IndexError:
@@ -1133,14 +1135,14 @@ class TrussFramework(object):
                 outfile.write('\n')
 
                 outfile.write('Displacements\n')
-                for i in range(len(self.truss.displacement)//3):
+                for i in range(len(self.truss.displacements) // 3):
                     if i < 100:
                         outfile.write(' ')
                         if i < 9:
                             outfile.write(' ')
-                    outfile.write(str(i + self._io_origin) + ', ' + "{:10.3f}".format(self.truss.displacement[i*3 + 0]) +
-                                  ', ' + "{:10.3f}".format(self.truss.displacement[i*3 + 1]) +
-                                  ', ' + "{:10.3f}".format(self.truss.displacement[i*3 + 2]) + ', ' + '\n')
+                    outfile.write(str(i + self._io_origin) + ', ' + "{:10.3f}".format(self.truss.displacements[i * 3 + 0]) +
+                                  ', ' + "{:10.3f}".format(self.truss.displacements[i * 3 + 1]) +
+                                  ', ' + "{:10.3f}".format(self.truss.displacements[i * 3 + 2]) + ', ' + '\n')
                 outfile.write('\n')
 
                 outfile.write('Stresses\n')
@@ -1202,7 +1204,7 @@ class TrussFramework(object):
             outfile.write("Modifications [%]: \n")
             outfile.write(str(self.updating_container.modifications) + "\n")
             outfile.write("Original displacements: \n")
-            outfile.write(str(self.truss.displacement) + "\n")
+            outfile.write(str(self.truss.displacements) + "\n")
             if j > 1:
                 outfile.write("New displacements: \n")
                 outfile.write(str(self.updating_container.modified_displacements[self.number_of_elements()]) + "\n")

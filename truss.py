@@ -162,16 +162,16 @@ class Truss(TrussFramework):
         else:
             dis_new = numpy.linalg.solve(numpy.array(stiff_new), numpy.array(self.truss.force_new))
 
-        mod_displacement_temp = deepcopy(self.truss._init_displacement)
+        mod_displacements_temp = deepcopy(self.truss._init_displacements)
 
         for i, kfa in enumerate(self.truss.known_f_a):
-            mod_displacement_temp[kfa] = dis_new[i] - self.dis_new[i]
+            mod_displacements_temp[kfa] = dis_new[i] - self.dis_new[i]
 
-        self.updating_container.modified_displacements[index] = [x + y for x, y in zip(self.updating_container.modified_displacements[index], mod_displacement_temp)]
+        self.updating_container.modified_displacements[index] = [x + y for x, y in zip(self.updating_container.modified_displacements[index], mod_displacements_temp)]
 """
     def evaluate_updates(self):
         """
-        Calculates the relative displacement of each individual available unit-modification
+        Calculates the relative displacements of each individual available unit-modification
         compared to the measured differences (delta).
 
         delta: [DOF number, difference]
@@ -192,7 +192,7 @@ class Truss(TrussFramework):
             effect_temp[number_of_keypoints] = int(element_ID)
             for j, dofnum in enumerate(self.truss.keypoints):
                 try:
-                    effect_temp[j] = self.updating_container[element_ID].displacement[dofnum]
+                    effect_temp[j] = self.updating_container.trusses[element_ID].displacements[dofnum]
                     self.updating_container.effect[element_ID] = [x for x in effect_temp]
                     self.updating_container.total_effect[j] += abs(self.updating_container.effect[element_ID][j])
                 except IndexError:
@@ -280,10 +280,13 @@ class Truss(TrussFramework):
             # TODO: ERROR: self.solve_modified_structure doubled!
             self.evaluate_updates()
 
-            self.calculate_modified_stiffness_matrix(self.truss.number_of_elements(), 0)
-            self.solve_modified_structure(self.truss.number_of_elements())
+            # TODO: Apply modifications:
+            # self.
+            # TODO: the following functions should be called on the truss specimen and not self.updating_container!!!
+            self.updating_container.trusses[self.truss.number_of_elements()].calculate_stiffness_matrix()
+            self.updating_container.trusses[self.truss.number_of_elements()].solve(self.configuration)
 
-            new_delta = self.difference(self.updating_container.modified_displacements[self.truss.number_of_elements()],
+            new_delta = self.difference(self.updating_container.trusses[self.truss.number_of_elements()].displacements[self.truss.number_of_elements()],
                                         self.updating_container.measurement)
 
             for i, effect in enumerate(self.updating_container.total_effect):
@@ -354,7 +357,7 @@ class Truss(TrussFramework):
         :param iteration_limit: Setting maximum number of iterations (model updating)
         :return: None
         """
-        self.updating_container.trusses = [self.truss] * self.truss.number_of_elements()
+        self.updating_container.trusses = [self.truss] * (self.truss.number_of_elements() + 1)
 
         if 0.01 <= abs(unit_modification) < 0.5:
             self.updating_container.unit_modification = unit_modification
@@ -401,7 +404,7 @@ class Truss(TrussFramework):
             with open("./Simulation/" + str(self.title) + ' - Input Data.txt', filemode) as input_file:
                 new_line = "[],0.0"
                 for i in range(1000):
-                    delta = None
+                    delta = []
                     previous_line = new_line
                     new_line = input_file.readline()
                     if not new_line == '':
@@ -410,8 +413,7 @@ class Truss(TrussFramework):
                         if self.updating_container.original_delta == []:
                             self.updating_container.original_delta = delta
                             self.updating_container.latest_delta = delta
-                        if not self.optimize(delta):
-                            break
+                            self.optimize(delta)
 
 
 ##################################
