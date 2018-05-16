@@ -439,8 +439,6 @@ class TrussModelData(object):
             known_f_a.append(location)
             if self.force[location] != 0:
                 known_f_not_zero.append(location)
-
-
         for constraint in self.constraint:
             self._init_displacement[constraint[0]] = constraint[1]
             known_displacement_a.append(constraint[0])
@@ -449,7 +447,6 @@ class TrussModelData(object):
                 known_f_not_zero.remove(constraint[0])
             except ValueError:
                 pass
-
         self.known_f_a = known_f_a
         self.known_displacement_a = known_displacement_a
         self.known_f_not_zero = known_f_not_zero
@@ -462,7 +459,6 @@ class TrussModelData(object):
         self._s_loc = [0.]*self.number_of_elements()
         local_stiffness_matrix = [0.]*self.number_of_elements()
         self.stress = [0.]*self.number_of_elements()
-
         self.stiffness_matrix = [[0.]*(self.number_of_nodes()*3)]*(self.number_of_nodes()*3)
 
         for i in range(self.number_of_elements()):
@@ -683,7 +679,16 @@ class TrussFramework(object):
             print('Serial connection cannot be closed because it is not managed by this thread')
             return False
 
-    # TODO: This functions is probably not called although it should be part of the set_base() process
+    def apply_update(self, modification, index):
+        """
+        Apply a modification on the index-th structure's index-th parameter
+        considering one modifiable parameter on each element
+
+        :param modification: ratio with sign, eg: -0.05 means -0.05% = *(0.95)
+        :param index: --> self.updating_container.trusses[index].elastic_modulo[index] *= (1 + modification)
+        :return: None
+        """
+        self.updating_container.trusses[index].elastic_modulo[index] *= (1 + modification)
 
     def read(self):
         """

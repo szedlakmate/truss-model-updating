@@ -67,11 +67,10 @@ class Truss(TrussFramework):
         """
         if self._check_coordinates(True):
             self.truss.nodal_coord[node_ID] = new_coordinate
-            self.invalidate_stiffness_matrices('all')
+            self.truss.invalidate_stiffness_matrices()
             return True
         else:
             return False
-
 
     def modify_cross_section(self, element_ID, new_area):
         """
@@ -82,8 +81,7 @@ class Truss(TrussFramework):
         :return: None
         """
         self.truss.cross_sectional_area_list[element_ID] = new_area
-        self.invalidate_stiffness_matrices('all')
-
+        self.truss.invalidate_stiffness_matrices()
 
     def modify_material(self, element_ID, E):
         """
@@ -94,8 +92,7 @@ class Truss(TrussFramework):
         :return: None
         """
         self.truss.elastic_modulo[element_ID] = E
-        self.invalidate_stiffness_matrices('all')
-
+        self.truss.invalidate_stiffness_matrices()
 
     def modify_force(self, element_ID, force):
         """
@@ -106,69 +103,8 @@ class Truss(TrussFramework):
         :return: None
         """
         self.truss.force[element_ID] = force
-        self.set_postprocess_needed_flag()
+        self.truss.set_postprocess_needed_flag()
 
-    """
-   
-    def calculate_modified_stiffness_matrix(self, index, magnitude):
-      
-        if not self.updating_container.trusses:
-            self.updating_container.trusses = [0.]*(self.truss.number_of_elements()+1)
-
-        # for loopindex in range(self.truss.number_of_elements()):
-        modified_stiffness_matrices = [[0.]*(self.truss.number_of_nodes()*3)]*(self.truss.number_of_nodes()*3)
-
-        for i in range(self.truss.number_of_elements()):
-            if i == index:
-                _mod_norm_stiff = self.truss._norm_stiff[i] * (1.0 + self.updating_container.modifications[i] + magnitude)  # E[i]/L[i]
-            else: 
-                _mod_norm_stiff = self.truss._norm_stiff[i] * (1.0 + self.updating_container.modifications[i])  # E[i]/L[i]
-
-            _mod_loc_stiff = [[y*self.truss.cross_sectional_area_list[i]*_mod_norm_stiff for y in x] for x in self._s_loc[i]]
-
-            ele_dof_vec = self.truss.element_DOF[i]
-
-            stiffness_increment = [0.]*(self.truss.number_of_nodes()*3)
-
-            for j in range(3*2):
-                for k in range(3*2):
-                    stiffness_increment[ele_dof_vec[k]] = _mod_loc_stiff[j][k]
-                modified_stiffness_matrices[ele_dof_vec[j]] = [x + y for x, y in
-                                                               zip(modified_stiffness_matrices[ele_dof_vec[j]], stiffness_increment)]
-
-        self.updating_container.trusses[index] = modified_stiffness_matrices
-       Convergence step in stiffness matrix modification
-          """
-    """
-    def solve_modified_structure(self, index):
-        
-        Solver for the modified structures. 'Index' shows the actual modification number.
-        
-
-        self.updating_container.modified_displacements[index] = [0.]*(self.truss.number_of_nodes()*3)
-
-        dis_new = [0.]*(self.truss.number_of_nodes()*3-len(self.truss.constraint))
-        stiff_new = [[0.]*(self.truss.number_of_nodes()*3-len(self.truss.constraint))]*(self.truss.number_of_nodes()*3-len(self.truss.constraint))
-
-        stiffness_increment = [0.]*(self.truss.number_of_nodes()*3-len(self.truss.constraint))
-        for i, kfai in enumerate(self.truss.known_f_a):
-            for j, kfaj in enumerate(self.truss.known_f_a):
-                stiffness_increment[j] = self.updating_container.trusses[index].stiffness_matrix[kfai][kfaj]
-            stiff_new[i] = [x + y for x, y in zip(stiff_new[i], stiffness_increment)]
-
-        # SOLVING THE MODIFIED STRUCTURE
-        if self.configuration.solver == 0:
-            dis_new = multiply_matrix_vector(invert(stiff_new), self.truss.force_new)
-        else:
-            dis_new = numpy.linalg.solve(numpy.array(stiff_new), numpy.array(self.truss.force_new))
-
-        mod_displacements_temp = deepcopy(self.truss._init_displacements)
-
-        for i, kfa in enumerate(self.truss.known_f_a):
-            mod_displacements_temp[kfa] = dis_new[i] - self.dis_new[i]
-
-        self.updating_container.modified_displacements[index] = [x + y for x, y in zip(self.updating_container.modified_displacements[index], mod_displacements_temp)]
-"""
     def evaluate_updates(self):
         """
         Calculates the relative displacements of each individual available unit-modification
@@ -178,25 +114,40 @@ class Truss(TrussFramework):
 
         return effect: [effect on 1. point, effect on 2. point, ..., modification number]
                        where each line number shows the corresponding modification number
+
+        :return: None
         """
         number_of_keypoints = self.truss.number_of_keypoints()
         number_of_elements = self.truss.number_of_elements()
-        
-        self.updating_container.effect = [[0.]*(number_of_keypoints + 2)]*number_of_elements
-        self.updating_container.total_effect = [0.]*number_of_keypoints
-        self.updating_container.sorted_effect = [[[0.]*(number_of_keypoints + 2)]*number_of_elements]*number_of_keypoints
+
+        # effect = [[statistic at index], [statistic at index], ...]
+        self.updating_container.effect = [[0.] * (number_of_keypoints + 2)] * number_of_elements
+
+        # sum of effects
+        self.updating_container.total_effect = [0.] * number_of_keypoints
+
+        self.updating_container.sorted_effect = \
+            [[[0.] * (number_of_keypoints + 2)] * number_of_elements]*number_of_keypoints
 
         effect_temp = [0.]*(number_of_keypoints + 2)
 
+        # Determine the effects of each modification
         for element_ID in range(number_of_elements):
+            # Some kind of config variable or limit
             effect_temp[number_of_keypoints] = int(element_ID)
-            for j, dofnum in enumerate(self.truss.keypoints):
+            for keypoint_count, dofnum in enumerate(self.truss.keypoints):
                 try:
-                    effect_temp[j] = self.updating_container.trusses[element_ID].displacements[dofnum]
+                    # Pick displacement at the measurement point.
+                    effect_temp[keypoint_count] = self.updating_container.trusses[element_ID].displacements[dofnum]
+
+                    # Copy value in a tricky way
                     self.updating_container.effect[element_ID] = [x for x in effect_temp]
-                    self.updating_container.total_effect[j] += abs(self.updating_container.effect[element_ID][j])
+
+                    # Add effect of index-th modification
+                    self.updating_container.total_effect[keypoint_count] += \
+                        abs(self.updating_container.effect[element_ID][keypoint_count])
                 except IndexError:
-                    print("Maybe the mapping data is invalid.")
+                    print("The mapping data is probably invalid.")
                     print("Please check the \'arduino_mapping.txt\' input whether the given DOFs are correct or not.")
                     raise IndexError
 
@@ -204,7 +155,8 @@ class Truss(TrussFramework):
         for i in range(number_of_elements):
             for j in range(number_of_keypoints):
                 if self.updating_container.total_effect[j] > 0:
-                    self.updating_container.effect_ratio[i][j] = abs(self.updating_container.effect_ratio[i][j]/self.updating_container.total_effect[j])
+                    self.updating_container.effect_ratio[i][j] =\
+                        abs(self.updating_container.effect_ratio[i][j] / self.updating_container.total_effect[j])
                 else:
                     self.updating_container.effect_ratio[i][j] = 0
 
@@ -231,7 +183,6 @@ class Truss(TrussFramework):
             else:
                 self.updating_container.sorted_effect[i] = sorted(self.updating_container.sorted_effect[i], reverse=True)
 
-
     def optimize(self, delta):
         """
         Model updating - core function
@@ -241,7 +192,7 @@ class Truss(TrussFramework):
         """
 
         element_ID = self.truss.number_of_elements()
-        self.updating_container.modifications = [0.0]*self.truss.number_of_elements()
+        self.updating_container.modifications = [0.0] * self.truss.number_of_elements()
 
         if not self.configuration.simulation:
             appendix = ""
@@ -266,25 +217,31 @@ class Truss(TrussFramework):
             unit = 0
 
             previous_modifications = self.updating_container.modifications
-            # TODO: apply Truss classes!!!!!!!
+
+            # Loop though the possible modifications
             for index in range(self.truss.number_of_elements()):
                 modification = self.updating_container.modifications[index] - self.updating_container.unit_modification
 
+                # Define a modification
                 self.updating_container.modifications[index] = \
                     min(abs(modification), self.updating_container.modification_limit) * math.copysign(1, modification)
 
-                #self.calculate_modified_stiffness_matrix(index, self.updating_container.modifications[index])
+                # Apply modification
+                """
+                Apply a modification on the index-th structure's index-th parameter
+                considering one modifiable parameter on each element
+                """
+                self.apply_update(self.updating_container.modifications[index], index)
+
+                # Calculate the modified stiffness matrix
                 self.updating_container.trusses[index].calculate_stiffness_matrix()
+
+                # Solve the modified structure
                 self.updating_container.trusses[index].solve(self.configuration)
 
-            # TODO: ERROR: self.solve_modified_structure doubled!
+            # Evaluate all the modifications
             self.evaluate_updates()
 
-            # TODO: Apply modifications:
-            # self.
-            # TODO: the following functions should be called on the truss specimen and not self.updating_container!!!
-            self.updating_container.trusses[self.truss.number_of_elements()].calculate_stiffness_matrix()
-            self.updating_container.trusses[self.truss.number_of_elements()].solve(self.configuration)
 
             new_delta = self.difference(self.updating_container.trusses[self.truss.number_of_elements()].displacements[self.truss.number_of_elements()],
                                         self.updating_container.measurement)
@@ -357,7 +314,7 @@ class Truss(TrussFramework):
         :param iteration_limit: Setting maximum number of iterations (model updating)
         :return: None
         """
-        self.updating_container.trusses = [self.truss] * (self.truss.number_of_elements() + 1)
+        self.updating_container.trusses = [self.truss] * self.truss.number_of_elements()
 
         if 0.01 <= abs(unit_modification) < 0.5:
             self.updating_container.unit_modification = unit_modification
@@ -382,7 +339,6 @@ class Truss(TrussFramework):
             print("The iteration limit must be between 2 and 10.000\nGiven: %s" % iteration_limit)
             raise Exception
 
-            # TODO: This call starts the optimization loop in a very unlucky way. This should be refactored!
         self.update_model()
 
     def update_model(self):
@@ -390,7 +346,6 @@ class Truss(TrussFramework):
         General function to manage model updating procedure.
         """
         self.processed_data = [0.]*1 #*len(self.arduino_mapping)
-        #self.updating_container.trusses = [T] * self.truss.number_of_elements()
 
         if not self.configuration.simulation:
             base = self.set_base()
