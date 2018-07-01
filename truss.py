@@ -38,30 +38,26 @@ class Truss(TrussFramework):
         """
         Checking coordinates for repeated elements during input file reading.
 
-        :param ignorable: [True|False] If the warning is ignorable, only message appears and the input is neglected.
+        :param ignorable: {Boolean} If the warning is ignorable, only message appears and the input is neglected.
                 If the warning is not ignorable, exceptions will be raised.
-        :return: [True|False] True if no error found, otherwise False.
+        :return: {Boolean} True if no error found, otherwise False.
         """
         if len(self.truss.nodal_coord) != len(list(k for k, _ in itertools.groupby(sorted(self.truss.nodal_coord)))):
-            if ignorable == 0:
-                raise Exception('Coordinate list has repeating items. Calculation is terminated')
+            if ignorable is False:
+                raise Exception('Coordinate list has recurring items. Calculation is terminated')
             else:
                 print("This node already exists. Input is ignored.")
             return False
         else:
             return True
 
-
-
-
-
     def modify_coordinate(self, node_ID, new_coordinate):
         """
         Modify one node's coordinates
 
-        :param node_ID: the ID of the changeable node
-        :param new_coordinate: new coordinates wrapped by an array
-        :return: Bool - True uf the modification was applied, False otherwise.
+        :param node_ID: {number} the ID of the changeable node
+        :param new_coordinate: {Array<number>} new coordinates wrapped by an array
+        :return: {Boolean} True uf the modification was applied, False otherwise.
 
         @example: self.modify_coordinate(5, [1.2, 3.6])  # 2D
         """
@@ -76,8 +72,8 @@ class Truss(TrussFramework):
         """
         Modifying cross-sections by elements
 
-        :param element_ID: the ID of the changeable element
-        :param new_area: the new cross-sectional area
+        :param element_ID: {number} the ID of the changeable element
+        :param new_area: {number} the new cross-sectional area
         :return: None
         """
         self.truss.cross_sectional_area_list[element_ID] = new_area
@@ -87,7 +83,7 @@ class Truss(TrussFramework):
         """
         Modifying material data by elements
 
-        :param element_ID: ID of the element ehich should be modified
+        :param element_ID: {number} ID of the element which should be modified
         :param E: {number} Elastic modulo
         :return: None
         """
@@ -98,8 +94,8 @@ class Truss(TrussFramework):
         """
         Modifying specific force
 
-        :param element_ID: the ID of the element which should be mofidifed
-        :param force: new force value
+        :param element_ID: {number} the ID of the element which should be modified
+        :param force: {number} new force value
         :return: None
         """
         self.truss.force[element_ID] = force
@@ -134,11 +130,12 @@ class Truss(TrussFramework):
         # Determine the effects of each modification
         for element_ID in range(number_of_elements):
             # Some kind of config variable or limit
-            effect_temp[number_of_keypoints] = int(element_ID)
-            for keypoint_count, dofnum in enumerate(self.truss.keypoints):
+            effect_temp[number_of_keypoints] = element_ID
+
+            for keypoint_count, dof_ID in enumerate(self.truss.keypoints):
                 try:
-                    # Pick displacement at the measurement point.
-                    effect_temp[keypoint_count] = self.updating_container.trusses[element_ID].displacements[dofnum]
+                    # Pick displacement at the measurement point
+                    effect_temp[keypoint_count] = self.updating_container.trusses[element_ID].displacements[dof_ID]
 
                     # Copy value in a tricky way
                     self.updating_container.effect[element_ID] = [x for x in effect_temp]
@@ -160,7 +157,7 @@ class Truss(TrussFramework):
                 else:
                     self.updating_container.effect_ratio[i][j] = 0
 
-        # print("   \'effectratio\' is not used yet")
+        # print("   \'effect-ratio\' is not used yet")
 
         # Sort by effectiveness
         for i in range(number_of_keypoints):
@@ -170,16 +167,20 @@ class Truss(TrussFramework):
             for ktemp in range(number_of_elements):
                 if self.updating_container.sorted_effect[i][ktemp][i] < 0:
                     for jtemp in range(number_of_keypoints):
-                        self.updating_container.sorted_effect[i][ktemp][jtemp] = abs(self.updating_container.sorted_effect[i][ktemp][jtemp])
+                        self.updating_container.sorted_effect[i][ktemp][jtemp] =\
+                            abs(self.updating_container.sorted_effect[i][ktemp][jtemp])
+
                         self.updating_container.sorted_effect[i][ktemp][number_of_keypoints + 1] = -1
                 else:
                     self.updating_container.sorted_effect[i][ktemp][number_of_keypoints + 1] = +1
 
             for j in range(number_of_keypoints):
                 if i != j and j != 0:
-                    self.updating_container.sorted_effect[i] = swap_columns(sorted(swap_columns(self.updating_container.sorted_effect[i], 0, j), reverse=True), 0, j)
+                    self.updating_container.sorted_effect[i] =\
+                        swap_columns(sorted(swap_columns(self.updating_container.sorted_effect[i], 0, j), reverse=True), 0, j)
             if i != 0:
-                self.updating_container.sorted_effect[i] = swap_columns(sorted(swap_columns(self.updating_container.sorted_effect[i], 0, i), reverse=True), 0, i)
+                self.updating_container.sorted_effect[i] = \
+                    swap_columns(sorted(swap_columns(self.updating_container.sorted_effect[i], 0, i), reverse=True), 0, i)
             else:
                 self.updating_container.sorted_effect[i] = sorted(self.updating_container.sorted_effect[i], reverse=True)
 
@@ -188,7 +189,7 @@ class Truss(TrussFramework):
         Model updating - core function
 
         :param delta: difference between the latest measurement and the calculated model 
-        :return: True - the optimization step was successful | False - Optimization failed
+        :return: {Boolean} Shows whether the optimization step successful
         """
 
         element_ID = self.truss.number_of_elements()
@@ -242,7 +243,6 @@ class Truss(TrussFramework):
             # Evaluate all the modifications
             self.evaluate_updates()
 
-
             new_delta = self.difference(self.updating_container.trusses[self.truss.number_of_elements()].displacements[self.truss.number_of_elements()],
                                         self.updating_container.measurement)
 
@@ -253,21 +253,21 @@ class Truss(TrussFramework):
                     self.updating_container.number_of_updates[2] += 1
                     raise Exception
 
-            #for i in range(self.truss.number_of_elements()):
-            modified_node_ID = self.updating_container.sorted_effect[0][i][1]
+            for i in range(self.truss.number_of_elements()):
+                modified_node_ID = self.updating_container.sorted_effect[0][i][1]
 
-            ratio[modified_node_ID] = min(abs(self.updating_container.total_effect[0]/self.updating_container.sorted_effect[0][i][0]),self.updating_container.modification_limit) * math.copysign(1, self.updating_container.sorted_effect[0][i][2])
+                ratio[modified_node_ID] = min(abs(self.updating_container.total_effect[0]/self.updating_container.sorted_effect[0][i][0]), self.updating_container.modification_limit) * math.copysign(1, self.updating_container.sorted_effect[0][i][2])
 
-            unit += abs(ratio[modified_node_ID]*self.updating_container.sorted_effect[0][i][0])
+                unit += abs(ratio[modified_node_ID]*self.updating_container.sorted_effect[0][i][0])
             print(new_delta)
             scale = new_delta[0]/unit
 
-            #for i in range(self.truss.number_of_elements()):
-            #modified_node_ID = self.updating_container.sorted_effect[0][i][1]
-            self.updating_container.modifications[modified_node_ID] = \
-                min(abs(previous_modifications[modified_node_ID] - self.updating_container.unit_modification*ratio[modified_node_ID]),
-                    self.updating_container.modification_limit) * \
-                math.copysign(1, previous_modifications[modified_node_ID] - self.updating_container.unit_modification*ratio[modified_node_ID])
+            for i in range(self.truss.number_of_elements()):
+                modified_node_ID = self.updating_container.sorted_effect[0][i][1]
+                self.updating_container.modifications[modified_node_ID] = \
+                    min(abs(previous_modifications[modified_node_ID] - self.updating_container.unit_modification*ratio[modified_node_ID]),
+                        self.updating_container.modification_limit) * \
+                    math.copysign(1, previous_modifications[modified_node_ID] - self.updating_container.unit_modification*ratio[modified_node_ID])
             # the last part is already the sign itself without the sign function
 
             print("Ratio: " + str(scale))
@@ -290,20 +290,6 @@ class Truss(TrussFramework):
         self.updating_container.number_of_updates[0] += 1
         return True
 
-    def capable(self):
-        """
-        Function telling whether there are more options to modify
-        """
-        capable = False
-        for variable in self.updating_container.modifications:
-            if abs(variable) <= 0.95 * self.updating_container.modification_limit:
-                capable = True
-                break
-            else:
-                pass
-                # TODO: not to reach this part of the code
-        return capable
-
     def start_model_updating(self, unit_modification=0.05, error_limit=1.2, modification_limit=0.7, iteration_limit=100):
         """
         Configuring the solver. If the iterations do not converge, settings shall be tuned here
@@ -319,7 +305,8 @@ class Truss(TrussFramework):
         if 0.01 <= abs(unit_modification) < 0.5:
             self.updating_container.unit_modification = unit_modification
         else:
-            print("The absolute value of the unit modification must be minimum 0.01 and maximum 0.5\nGiven: %s" % unit_modification)
+            print("The absolute value of the unit modification must be minimum 0.01 and maximum 0.5\nGiven: %s"
+                  % unit_modification)
             raise Exception
         if error_limit > 0.0:
             self.updating_container.error_limit = error_limit
@@ -345,7 +332,7 @@ class Truss(TrussFramework):
         """
         General function to manage model updating procedure.
         """
-        self.processed_data = [0.]*1 #*len(self.arduino_mapping)
+        self.processed_data = [0.]*1  # *len(self.arduino_mapping)
 
         if not self.configuration.simulation:
             base = self.set_base()
@@ -384,20 +371,20 @@ if __name__ == '__main__':
                         help="0: User defined, 1: Most information (with numpy), "
                              "2: Maximum compatibility mode, 3: Android")
     parser.add_argument("-s", "--simulation", metavar='int', type=int, choices=range(2), default=1, help="0: No|1: Yes")
-    parser.add_argument("-i", "--input", metavar='str', type=str, default="", help="Input file, stored in the ./Structure folder [*.str]")
+    parser.add_argument("-i", "--input", metavar='str', type=str, default="",
+                        help="Input file, stored in the ./Structure folder [*.str]")
     args = parser.parse_args()
 
     if args.input != "":
-        input = args.input
+        input_file = args.input
     else:
-        input = "bridge"
+        input_file = "bridge"
         print("DEMO MODE")
         print("You started the program in demo mode.\nThe following example is based on the bridge.str file which "
               "is located in the Structures folder.")
 
-
     # Define new structure
-    TRUSS = Truss(input_file=input, title=args.title, compatibility_mode=args.compatibility,
+    TRUSS = Truss(input_file=input_file, title=args.title, compatibility_mode=args.compatibility,
                   simulation=args.simulation)
 
     if TRUSS.configuration.log:
@@ -416,7 +403,8 @@ if __name__ == '__main__':
 
     # Plotting
     if TRUSS.configuration.graphics:
-        plot(TRUSS.truss, original=True, result=False, supports=True, forces=True, reactions=False, label_classes='load')
+        plot(TRUSS.truss, original=True, result=False, supports=True, forces=True, reactions=False,
+             label_classes='load')
         plot(TRUSS.truss, original=True, result=True, supports=True, forces=False, reactions=False)
         plot(TRUSS.truss, original=False, result=True, supports=True, forces=True, reactions=True, label_classes='load')
         animate(TRUSS.truss, 'load')
@@ -424,7 +412,8 @@ if __name__ == '__main__':
 
     # Write results to file
     TRUSS.write_results()
-    TRUSS.configuration.part_time("Wrote results to the output file : Structures/<title> - Results.txt".format(TRUSS.title))
+    TRUSS.configuration.part_time("Wrote results to the output file : Structures/<title> - Results.txt"
+                                  .format(TRUSS.title))
 
     # Update iteration
     if TRUSS.configuration.updating:

@@ -112,7 +112,7 @@ Mode | Mode's name | Logging | Graphics | Numpy solver | OSlib | Updating | Ardu
 **0** | User defined* | ✔ | ✔ | ✔ | ✔ |   |   | ✔ |   
 **1** | Informative | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |   | ✔ 
 **2** | Maximum compatibility |  |  |  |  |  |  |  | ✔
-**3** | Android mode** | ✔ |  |  | ✔ |  |  |  | ✔  
+**3** | Android mode** | ✔ |  |  | ✔ | ✔ |  |  | ✔  
 
 *User defined settings may vary according to the local configurations.
 

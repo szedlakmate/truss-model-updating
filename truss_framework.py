@@ -61,8 +61,8 @@ class TrussConfiguration(object):
         2: Maximum compatibility mode, 3: Android
         :param simulation: 0: False, 1: True
         """
-        static_ON = 1
-        static_OFF = 0
+        turned_on = 1
+        turned_off = 0
 
         self.input_file = input_file
         self.TIC = time.time()
@@ -75,7 +75,7 @@ class TrussConfiguration(object):
                          'unit_modification': 0.05, 'iteration_limit': 20}
 
         if self.compatibility_mode == 0:
-            ### User defined ###
+            # # User defined # #
             # Modify as needed #
             self.mode_name = "User defined"
             self.log = 1  # Logging time
@@ -88,52 +88,43 @@ class TrussConfiguration(object):
             self.realistic_simulation = 0  # Wait as long as it was originally. Only valid with _SIMULATION = 1
 
         elif self.compatibility_mode == 1:
-            ### Informative ###
+            # # Informative # #
             # DO NOT MODIFY
             self.mode_name = "Informative mode"
-            self.log = static_ON
-            self.graphics = static_ON
-            self.solver = static_ON
-            self.OSlib = static_ON
-            self.updating = static_ON
-            self.arduino = static_ON
-            self.debug = static_OFF
-            self.realistic_simulation = static_ON
+            self.log = turned_on
+            self.graphics = turned_on
+            self.solver = turned_on
+            self.OSlib = turned_on
+            self.updating = turned_on
+            self.arduino = turned_on
+            self.debug = turned_off
+            self.realistic_simulation = turned_on
 
         elif self.compatibility_mode == 2:
-            ### Maximum compatibility mode ###
+            # # Maximum compatibility mode # #
             # DO NOT MODIFY
             self.mode_name = "Maximum compatibility mode"
-            self.log = static_OFF
-            self.graphics = static_OFF
-            self.solver = static_OFF
-            self.OSlib = static_OFF
-            self.updating = static_OFF
-            self.arduino = static_OFF
-            self.debug = static_OFF
-            self.realistic_simulation = static_ON
+            self.log = turned_off
+            self.graphics = turned_off
+            self.solver = turned_off
+            self.OSlib = turned_off
+            self.updating = turned_off
+            self.arduino = turned_off
+            self.debug = turned_off
+            self.realistic_simulation = turned_on
 
         elif self.compatibility_mode == 3:
-            ### Android mode ###
+            # # Android mode # #
             # DO NOT MODIFY
             self.mode_name = "Android"
-            self.log = static_ON
-            self.graphics = static_OFF
-            self.solver = static_OFF
-            self.OSlib = static_ON
-            self.updating = static_OFF
-            self.arduino = static_OFF
-            self.debug = static_OFF
-            self.realistic_simulation = static_ON
-
-        """
-        if self.OSlib:
-            try:
-                if not os.path.exists("./Structures/"):
-                    os.makedirs("./Structures")
-            except FileNotFoundError:
-                print("Error: Please manually create the 'Structures' folder in the root of the project")
-        """
+            self.log = turned_on
+            self.graphics = turned_off
+            self.solver = turned_off
+            self.OSlib = turned_on
+            self.updating = turned_off
+            self.arduino = turned_off
+            self.debug = turned_off
+            self.realistic_simulation = turned_on
 
         if self.simulation or not self.updating:
             self.arduino = 0
@@ -201,6 +192,7 @@ class TrussConfiguration(object):
         print('------------------------------------')
         self.previous_time = new_time
 
+
 class TrussModelData(object):
     """
     Data model for structures
@@ -218,13 +210,13 @@ class TrussModelData(object):
         self.nodal_coord = []  # Coordinates of nodes
         self.cross_sectional_area_list = []  # Cross-sectional areas
         self.elastic_modulo = []  # Material data
-        #Additional data
+        # Additional data
         self.known_f_a = []  # Nodes without supports
         self.known_f_not_zero = []  # Nodes with loads
         self.known_displacement_a = []
         self.known_f_not_zero = []
         self.stiffness_matrix = []  # Global stiffness matrix
-        #self.element_length = []  # Length of the elements
+        # self.element_length = []  # Length of the elements
         self.element_DOF = []
         self._norm_stiff = []                  # E/L
         self._cx = []
@@ -631,9 +623,10 @@ class TrussFramework(object):
         self.truss = TrussModelData(self.title)
 
         # Additional truss data
-        self.read_elements = [0.] * 9
+        self.read_elements = [0] * 9
         # Model Updating related variables (?)
         self.updating_container = ModelUpdatingContainer()
+        self.processed_data = [0]
 
     def _open_serial(port, baudrate):
         try:
@@ -1071,14 +1064,12 @@ class TrussFramework(object):
         if not os.path.exists(path):
             os.makedirs(path)
 
-
     def write_results(self):
         """
         Writing results to file.
         """
         self.check_folder('Results')
-        path ="Results/" + self.title + ' - Results.txt'
-
+        path = "Results/" + self.title + ' - Results.txt'
 
         out_element = ''
         for i in self.truss.nodal_connections:
@@ -1097,7 +1088,8 @@ class TrussFramework(object):
             if self.truss.DOF == 3:
                 out_forces += str(forcedof + self._io_origin) + ', ' + str(self.truss.force[forcedof]) + ' | '
             elif self.truss.DOF == 2 and i % 3 != 2:
-                out_forces += str(forcedof - forcedof//3 + self._io_origin) + ', ' + str(self.truss.force[forcedof]) + ' | '
+                out_forces += str(forcedof - forcedof//3 + self._io_origin) + ', '\
+                              + str(self.truss.force[forcedof]) + ' | '
         out_supports = ''
         for i in self.truss.constraint:
             if self.truss.DOF == 3:
@@ -1186,6 +1178,20 @@ class TrussFramework(object):
             print('Missing:\n'+ str(path))
             raise FileNotFoundError
 
+    def capable(self):
+        """
+        Function telling whether there are more options to modify
+        """
+        capable = False
+        for variable in self.updating_container.modifications:
+            if abs(variable) <= 0.95 * self.updating_container.modification_limit:
+                capable = True
+                break
+            else:
+                pass
+                # TODO: not to reach this part of the code
+        return capable
+
     def write_output_stream(self, j, appendix):
         self.check_folder('Results')
         with open("./Results/" + self.title + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
@@ -1212,7 +1218,7 @@ class TrussFramework(object):
             outfile.write(str(self.truss.displacements) + "\n")
             if j > 1:
                 outfile.write("New displacements: \n")
-                outfile.write(str(self.updating_container.modified_displacements[self.number_of_elements()]) + "\n")
+                outfile.write(str(self.updating_container.modified_displacements[self.truss.number_of_elements()]) + "\n")
             outfile.write("----------------------\n")
 
     def end_logging(self):
