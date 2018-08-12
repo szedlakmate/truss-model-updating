@@ -1,5 +1,0 @@
-
-Input data of 'lab600A-5-10_1':
-
-Start Time: 2016-12-12 17:18:12
-Base: None
