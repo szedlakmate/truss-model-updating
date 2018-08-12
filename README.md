@@ -41,7 +41,7 @@ This part of the code tries to minimize the error vector by iterating. The resul
 
 ## Quick Start
 
-#### Demo
+### Demo
 
 In demo mode, the program performs the following tasks:
 
@@ -61,7 +61,7 @@ The program can be run the following way:
     python3 truss.py [project_title] [compatibility_mode] [simulation] [input_file.str]
     python3 truss.py -t example -c 1 -s 0 -i truss.str  
 
-#### Simplest run
+### Simplest run
 
 *[defaults: t=<input_file's name> c=2 s=0]*
 
@@ -69,7 +69,7 @@ The program can be run the following way:
     
 The ".str" ending is optional at the arguments.
     
-#### Model updating example
+### Model updating example
 
 * with Arduino serial input:
 
@@ -79,7 +79,7 @@ The ".str" ending is optional at the arguments.
 
         python3 truss.py -c 1 -s 1 -i bridge.str
         
-#### Help
+### Help
 
     python3 truss.py -h
 
@@ -112,7 +112,7 @@ Mode | Mode's name | Logging | Graphics | Numpy solver | OSlib | Updating | Ardu
 **0** | User defined* | ✔ | ✔ | ✔ | ✔ |   |   | ✔ |   
 **1** | Informative | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |   | ✔ 
 **2** | Maximum compatibility |  |  |  |  |  |  |  | ✔
-**3** | Android mode** | ✔ |  |  | ✔ |  |  |  | ✔  
+**3** | Android mode** | ✔ |  |  | ✔ | ✔ |  |  | ✔  
 
 *User defined settings may vary according to the local configurations.
 

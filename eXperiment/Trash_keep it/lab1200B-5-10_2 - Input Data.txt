@@ -1,5 +1,0 @@
-
-Input data of 'lab1200B-5-10_2':
-
-Start Time: 2016-12-12 18:37:45
-Base: None
