@@ -594,6 +594,7 @@ class ModelUpdatingContainer(object):
         self.iteration_limit = 0
         #self._mod_stiff_is_fresh = 0
         self.trusses = []
+        self.reference = []
 
 
 class TrussFramework(object):
@@ -870,9 +871,9 @@ class TrussFramework(object):
                         self.serial_connection.flushInput()
                         time.sleep(0.5)
                     except Exception:
-                        print("Type error: " + str(arduino_values) + "... continuing")
+                        #print("Type error: " + str(arduino_values) + "... continuing")
                         self.serial_connection.flushInput()
-                        time.sleep(0.5)
+                        time.sleep(0.1)
 
             self.serial_connection.flushInput()
 
@@ -903,7 +904,7 @@ class TrussFramework(object):
 
     def difference(self, num_displ, measurement):
         """
-        Calculate the difference between the Real-life measurement and the Numerical solution.
+        Calculate the difference between the numerical solution and the real-life measurement.
 
         :param num_displ:
         :param measurement: [[13X, -2.154], [16Y, 5.256], ...]
@@ -923,6 +924,7 @@ class TrussFramework(object):
                 print(self.truss.analysis)
                 #self.configuration.disconnect()
                 raise Exception('Watchpoint name error')
+
             delta_appendix = float(measured_position) - float(num_displ[dof])
             try:
                 delta.append(delta_appendix)
@@ -949,7 +951,8 @@ class TrussFramework(object):
                     data[i] = float(arduino_values[i])
                 self.processed_data = data
             except Exception:
-                print("Type error: " + str(arduino_values) + "... continuing")
+                #print("Type error: " + str(arduino_values) + "... continuing")
+                pass
 
             self.updating_container.measurement = data
 

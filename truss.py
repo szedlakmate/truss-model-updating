@@ -184,6 +184,8 @@ class Truss(TrussFramework):
             else:
                 self.updating_container.sorted_effect[i] = sorted(self.updating_container.sorted_effect[i], reverse=True)
 
+        print('updating_container.modified_ctructure should be defined here (a.k.a.  .reference)')
+
     def optimize(self, delta):
         """
         Model updating - core function
@@ -243,7 +245,8 @@ class Truss(TrussFramework):
             # Evaluate all the modifications
             self.evaluate_updates()
 
-            new_delta = self.difference(self.updating_container.trusses[self.truss.number_of_elements()].displacements[self.truss.number_of_elements()],
+            print('trusses[0] is static!!')
+            new_delta = self.difference(self.updating_container.trusses[0].displacements,
                                         self.updating_container.measurement)
 
             for i, effect in enumerate(self.updating_container.total_effect):
