@@ -585,6 +585,7 @@ class ModelUpdatingContainer(object):
         self.effect_ratio = []
         self.total_effect = []
         self.sorted_effect = []
+        self.sorted_effect_sign = []
         self.original_delta = []
         self.latest_delta = []
         # Solver configuration
@@ -945,14 +946,15 @@ class TrussFramework(object):
             try:
                 arduino_values = eval(arduino_line)
             except SyntaxError:
-                print('Error: "' + str(arduino_line) + '"')
+                # print('Error: "' + str(arduino_line) + '"')
+                return False
             try:
                 for i in range(len(self.updating_container.arduino_mapping)):
                     data[i] = float(arduino_values[i])
                 self.processed_data = data
             except Exception:
                 #print("Type error: " + str(arduino_values) + "... continuing")
-                pass
+                return False
 
             self.updating_container.measurement = data
 
@@ -1221,7 +1223,7 @@ class TrussFramework(object):
             outfile.write(str(self.truss.displacements) + "\n")
             if j > 1:
                 outfile.write("New displacements: \n")
-                outfile.write(str(self.updating_container.modified_displacements[self.truss.number_of_elements()]) + "\n")
+                outfile.write(str(self.updating_container.latest_delta) + "\n")
             outfile.write("----------------------\n")
 
     def end_logging(self):
