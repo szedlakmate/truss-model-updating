@@ -353,14 +353,6 @@ class TrussModelData(object):
         # Set freshness flags after geometry modification
         self.invalidate_stiffness_matrices()
 
-        # Validity check
-        # TODO: the two side comes fromthe same value. The check should reflect to toher variables
-        # if self.number_of_nodes() > len(self.nodal_coord):
-        #    raise Exception('More coordinates are needed')
-        # elif not self.nodal_connections:
-        #    raise Exception('Nodes must be set before defining elements')
-        # self._check_coordinates(False)
-
     def bulk_set_cross_sections(self, area_list):
         """
         Setting cross-sections in bulk mode
@@ -459,18 +451,29 @@ class TrussModelData(object):
                                in zip(self.nodal_coord[self.nodal_connections[i][1]],
                                       self.nodal_coord[self.nodal_connections[i][0]])]))
 
-            self._cx[i] = (self.nodal_coord[self.nodal_connections[i][1]][0]-self.nodal_coord[self.nodal_connections[i][0]][0])/elements_lengths[i]
-            self._cy[i] = (self.nodal_coord[self.nodal_connections[i][1]][1]-self.nodal_coord[self.nodal_connections[i][0]][1])/elements_lengths[i]
-            self._cz[i] = (self.nodal_coord[self.nodal_connections[i][1]][2]-self.nodal_coord[self.nodal_connections[i][0]][2])/elements_lengths[i]
+            self._cx[i] = (self.nodal_coord[self.nodal_connections[i][1]][0]
+                           - self.nodal_coord[self.nodal_connections[i][0]][0])/elements_lengths[i]
+            self._cy[i] = (self.nodal_coord[self.nodal_connections[i][1]][1]
+                           - self.nodal_coord[self.nodal_connections[i][0]][1])/elements_lengths[i]
+            self._cz[i] = (self.nodal_coord[self.nodal_connections[i][1]][2]
+                           - self.nodal_coord[self.nodal_connections[i][0]][2])/elements_lengths[i]
             self._norm_stiff[i] = self.elastic_modulo[i]/elements_lengths[i]
 
             # local stiffness matrix calculation
-            self._s_loc[i] = [[self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i], -self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i]],
-                              [self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i], -self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i]],
-                              [self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2, -self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2],
-                              [-self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i], self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i]],
-                              [-self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i], self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i]],
-                              [-self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2, self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2]]
+            self._s_loc[i] = [
+                [self._cx[i]**2, self._cx[i]*self._cy[i], self._cx[i]*self._cz[i], -self._cx[i]**2,
+                 -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i]],
+                [self._cx[i]*self._cy[i], self._cy[i]**2, self._cy[i]*self._cz[i], -self._cx[i]*self._cy[i],
+                 -self._cy[i]**2, -self._cy[i]*self._cz[i]],
+                [self._cx[i]*self._cz[i], self._cy[i]*self._cz[i], self._cz[i]**2, -self._cx[i]*self._cz[i],
+                 -self._cy[i]*self._cz[i], -self._cz[i]**2],
+                [-self._cx[i]**2, -self._cx[i]*self._cy[i], -self._cx[i]*self._cz[i], self._cx[i]**2,
+                 self._cx[i]*self._cy[i], self._cx[i]*self._cz[i]],
+                [-self._cx[i]*self._cy[i], -self._cy[i]**2, -self._cy[i]*self._cz[i], self._cx[i]*self._cy[i],
+                 self._cy[i]**2, self._cy[i]*self._cz[i]],
+                [-self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2, self._cx[i]*self._cz[i],
+                 self._cy[i]*self._cz[i], self._cz[i]**2]]
+
             local_stiffness_matrix[i] = [[y * self.cross_sectional_area_list[i] * self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
             ele_dof_vec = self.element_DOF[i]
 
@@ -479,7 +482,8 @@ class TrussModelData(object):
             for j in range(3*2):
                 for k in range(3*2):
                     stiffness_increment[ele_dof_vec[k]] = local_stiffness_matrix[i][j][k]
-                self.stiffness_matrix[ele_dof_vec[j]] = [x + y for x, y in zip(self.stiffness_matrix[ele_dof_vec[j]], stiffness_increment)]
+                self.stiffness_matrix[ele_dof_vec[j]] =\
+                    [x + y for x, y in zip(self.stiffness_matrix[ele_dof_vec[j]], stiffness_increment)]
         self._stiff_is_fresh = 1
 
     def solve(self, configuration):
@@ -526,8 +530,10 @@ class TrussModelData(object):
         # Deformed shape
         self.nodal_coord_def = []
         for i in range(self.number_of_nodes()):
-            self.nodal_coord_def.append([self.nodal_coord[i][0] + self.displacements[i * 3 + 0],
-                                         self.nodal_coord[i][1] + self.displacements[i * 3 + 1], self.nodal_coord[i][2] + self.displacements[i * 3 + 2]])
+            self.nodal_coord_def.append(
+                [self.nodal_coord[i][0] + self.displacements[i * 3 + 0],
+                 self.nodal_coord[i][1] + self.displacements[i * 3 + 1],
+                 self.nodal_coord[i][2] + self.displacements[i * 3 + 2]])
 
         # Postrpocesses
         self.post_process()
@@ -551,7 +557,6 @@ class TrussModelData(object):
             for j, displacement in enumerate(self.displacements):
                 self.force[i] += self.stiffness_matrix[i][j]*displacement
 
-
     def calculate_stresses(self):
         """
         Calculates stress in elements
@@ -562,7 +567,8 @@ class TrussModelData(object):
 
         for element in range(self.number_of_elements()):
             self.stress[element] = \
-                (self.element_length(element, 'deformed') - self.element_length(element, 'original')) / self.element_length(element, 'original') * self.elastic_modulo[element]
+                (self.element_length(element, 'deformed') - self.element_length(element, 'original')) /\
+                self.element_length(element, 'original') * self.elastic_modulo[element]
 
         s_max = max([abs(min(self.stress)), max(self.stress), 0.000000001])
 
@@ -580,7 +586,6 @@ class ModelUpdatingContainer(object):
         self.arduino_mapping = []
         self.measurement = [0.]
         self.number_of_updates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit,
-        #self.modified_displacements = []
         self.effect = []
         self.effect_ratio = []
         self.total_effect = []
@@ -593,7 +598,6 @@ class ModelUpdatingContainer(object):
         self.error_limit = 0
         self.modification_limit = 0
         self.iteration_limit = 0
-        #self._mod_stiff_is_fresh = 0
         self.trusses = []
         self.reference = []
 
@@ -710,7 +714,6 @@ class TrussFramework(object):
         _read_element_names = ["Origin", "DOF", "Elements", "Coordinates",
                                "Cross-sections", "Materials", "Forces", "Supports", "Measured DOFs"]
 
-
         try:
             self.check_folder('Structures')
             with open("./Structures/" + self.configuration.input_file, "r") as sourcefile:
@@ -730,8 +733,6 @@ class TrussFramework(object):
 
                     if source_line.upper() == "ELEMENTS":
                         source_line = sourcefile.readline().strip()
-                        input_string = []
-                        input_number = []
                         input_string = [x.split(',') for x in source_line.split('|')]
                         if len(input_string[0]) == 1:
                             input_string = [x.split(';') for x in source_line.split('|')]
@@ -743,7 +744,6 @@ class TrussFramework(object):
 
                     if source_line.upper() == "COORDINATES":
                         source_line = sourcefile.readline().strip()
-                        input_string = []
                         input_number = []
                         input_string = [x.split(',') for x in source_line.split('|')]
                         if len(input_string[0]) == 1:
@@ -759,8 +759,6 @@ class TrussFramework(object):
 
                     if source_line.upper() == "CROSS-SECTIONS":
                         source_line = sourcefile.readline().strip()
-                        input_string = []
-                        input_number = []
                         input_string = source_line.split(',')
                         if len(input_string) == 1:
                             input_string = source_line.split(';')
@@ -772,8 +770,6 @@ class TrussFramework(object):
 
                     if source_line.upper() == "MATERIALS":
                         source_line = sourcefile.readline().strip()
-                        input_string = []
-                        input_number = []
                         input_string = source_line.split(',')
                         if len(input_string) == 1:
                             input_string = source_line.split(';')
@@ -785,8 +781,6 @@ class TrussFramework(object):
 
                     if source_line.upper() == "FORCES":
                         source_line = sourcefile.readline().strip()
-                        input_string = []
-                        input_number = []
                         input_string = [x.split(',') for x in source_line.split('|')]
                         if len(input_string[0]) == 1:
                             input_string = [x.split(';') for x in source_line.split('|')]
@@ -798,8 +792,6 @@ class TrussFramework(object):
 
                     if source_line.upper() == "SUPPORTS":
                         source_line = sourcefile.readline().strip()
-                        input_string = []
-                        input_number = []
                         input_string = [x.split(',') for x in source_line.split('|')]
                         if len(input_string[0]) == 1:
                             input_string = [x.split(';') for x in source_line.split('|')]
@@ -812,7 +804,6 @@ class TrussFramework(object):
                     if source_line.upper() == "MEASUREMENTS":
                         source_line = sourcefile.readline().strip()
                         self.special_DOF_input_string = source_line
-                        input_string = []
                         self.updating_container.arduino_mapping = source_line.split(',')
                         self.truss.bulk_set_measurement_points(self.updating_container.arduino_mapping, self._io_origin)
                         self.read_elements[8] = 1
@@ -837,7 +828,6 @@ class TrussFramework(object):
         # Read data from Arduino
 
         maxdifference = 0.8          # Maximum input difference threshold in mm
-        arduino_values = []
         data = [0.]*len(self.updating_container.arduino_mapping)
         newdata = False
         bigdifference = False
@@ -872,7 +862,7 @@ class TrussFramework(object):
                         self.serial_connection.flushInput()
                         time.sleep(0.5)
                     except Exception:
-                        #print("Type error: " + str(arduino_values) + "... continuing")
+                        # print("Type error: " + str(arduino_values) + "... continuing")
                         self.serial_connection.flushInput()
                         time.sleep(0.1)
 
@@ -893,15 +883,7 @@ class TrussFramework(object):
 
             print("Delta: " + str(delta))
 
-            newdata = False
-            bigdifference = False
-            readerror = False
             return delta
-
-        newdata = False
-        bigdifference = False
-        readerror = False
-
 
     def difference(self, num_displ, measurement):
         """
@@ -915,7 +897,7 @@ class TrussFramework(object):
         delta = []
 
         for measured_position in measurement:
-            #loc, measured = package[0], package[1]
+            # loc, measured = package[0], package[1]
             loc = '1Y'
             try:
                 dof = self.truss.analysis[loc.upper()]
@@ -923,7 +905,7 @@ class TrussFramework(object):
                 print('The given measurement location cannot be matched with the input data.')
                 print('The available nodes are: {\'NAMES\': mapping addresses}')
                 print(self.truss.analysis)
-                #self.configuration.disconnect()
+                # self.configuration.disconnect()
                 raise Exception('Watchpoint name error')
 
             delta_appendix = float(measured_position) - float(num_displ[dof])
@@ -939,7 +921,6 @@ class TrussFramework(object):
         """
         Simulate data, based on previous measurement
         """
-        arduino_values = []
         data = [0.]*1 #*len(self.updating_container.arduino_mapping)
         try:
             arduino_line = str(arduino_line.split(']')[0])+"]"
@@ -963,9 +944,6 @@ class TrussFramework(object):
             return delta
 
         except IndexError:
-            print("IndexError")
-            # pass
-        except IndexError:
             print("Exception in simulation data")
             # pass
 
@@ -978,9 +956,9 @@ class TrussFramework(object):
         answer_1 = '0'
         restart = '0'
         accept = '0'
-        arduino_values = []
         print("Before starting the model updating, the measuring tools must be calibrated.")
         print("The calibration should be done in load-free state.")
+
         while answer_1 not in ['Y', 'N']:
             answer_1 = input('Can we start the calibration? (y/n) ').upper()
         if answer_1 == 'N':
@@ -1040,12 +1018,10 @@ class TrussFramework(object):
                 source_line = simulation_file.readline().strip()
                 print(source_line)
 
-
                 if source_line.upper() == "_ORIGIN":
                     source_line = simulation_file.readline().strip()
                     self._io_origin = int(source_line)
                     self.read_elements[0] = 1
-
 
         return simulation_file
 
