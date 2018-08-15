@@ -58,7 +58,7 @@ class Arrow3D(FancyArrowPatch):
         fig = pyplot.figure()
         _ax = fig.add_subplot(111, projection='3d')
 
-        if truss.DOF == 2:
+        if truss.dof == 2:
             _ax.view_init(elev=90., azim=-90.)
             _ax.w_zaxis.line.set_lw(0.)
             _ax.set_zticklabels([])
@@ -77,7 +77,7 @@ class Arrow3D(FancyArrowPatch):
         yframe = yframe | max(deltay * 1.5, 2)
         zframe = zframe | max(deltay * 1.5, 2)
 
-        if truss.DOF == 3:
+        if truss.dof == 3:
             plot_height = plot_width * ((deltay + yframe*2)/(deltax + xframe*2)) * 0.3
         else:
             plot_height = plot_width * 0.5 * 0.5
@@ -169,11 +169,11 @@ class Arrow3D(FancyArrowPatch):
                 else:
                     value = 1.0
                 if force % 3 == 0:
-                    f_dir = [value*scale_forces, 0., 0.]
+                    f_dir = [value*scale_forces, 0, 0]
                 elif force % 3 == 1:
-                    f_dir = [0., value*scale_forces, 0.]
+                    f_dir = [0, value*scale_forces, 0]
                 else:
-                    f_dir = [0., 0., value*scale_forces*z_correction]
+                    f_dir = [0, 0, value*scale_forces*z_correction]
                 if original:
                     f_arrow = Arrow3D([truss.nodal_coord[force//3][0], truss.nodal_coord[force//3][0] + f_dir[0]],
                                       [truss.nodal_coord[force//3][1], truss.nodal_coord[force//3][1] + f_dir[1]],
@@ -195,11 +195,11 @@ class Arrow3D(FancyArrowPatch):
                 elif truss.force[reaction] > 0:
                     value = 1.0
                 if reaction % 3 == 0:
-                    f_dir = [value*scale_forces, 0., 0.]
+                    f_dir = [value*scale_forces, 0, 0]
                 elif reaction % 3 == 1:
-                    f_dir = [0., value*scale_forces, 0.]
+                    f_dir = [0, value*scale_forces, 0]
                 else:
-                    f_dir = [0., 0., value*scale_forces*z_correction]
+                    f_dir = [0, 0, value*scale_forces*z_correction]
                 if abs(truss.force[reaction]) > 0:
                     f_arrow = Arrow3D([truss.nodal_coord[reaction//3][0], truss.nodal_coord[reaction//3][0] + f_dir[0]],
                                       [truss.nodal_coord[reaction//3][1], truss.nodal_coord[reaction//3][1] + f_dir[1]],
@@ -211,7 +211,7 @@ class Arrow3D(FancyArrowPatch):
                         _ax.set_yticklabels([])
                         _ax.set_zticklabels([])
                         if not reaction//3 == e_previous//3:
-                            if truss.DOF == 3:
+                            if truss.dof == 3:
                                 _ax.text(truss.nodal_coord[reaction//3][0],
                                          truss.nodal_coord[reaction//3][1],
                                          truss.nodal_coord[reaction//3][2],
@@ -219,7 +219,7 @@ class Arrow3D(FancyArrowPatch):
                                          "{:10.2f}".format(truss.force[(reaction//3)*3+1])+'\n' +
                                          "{:10.2f}".format(truss.force[(reaction//3)*3+2]),
                                          fontsize=12, horizontalalignment='right')
-                            elif truss.DOF == 2:
+                            elif truss.dof == 2:
                                 _ax.text(truss.nodal_coord[reaction//3][0],
                                          truss.nodal_coord[reaction//3][1],
                                          truss.nodal_coord[reaction//3][2],
@@ -231,16 +231,16 @@ class Arrow3D(FancyArrowPatch):
         if supports:
             for support_index in truss.known_displacement_a:
                 if support_index % 3 == 0:
-                    f_dir = [-1.0 * scale_sup, 0., 0.]
+                    f_dir = [-1.0 * scale_sup, 0, 0]
                     col = 'g'
                 elif support_index % 3 == 1:
-                    f_dir = [0., -1.0 * scale_sup, 0.]
+                    f_dir = [0, -1.0 * scale_sup, 0]
                     col = 'y'
                 else:
-                    f_dir = [0., 0., -1.0 * scale_sup * z_correction]
+                    f_dir = [0, 0, -1.0 * scale_sup * z_correction]
                     col = 'brown'
 
-                #if support_index % 3 == 2 and truss.DOF == 3:
+                #if support_index % 3 == 2 and truss.dof == 3:
                 _ax.plot([truss.nodal_coord[support_index // 3][0], truss.nodal_coord[support_index // 3][0]+f_dir[0]],
                          [truss.nodal_coord[support_index // 3][1], truss.nodal_coord[support_index // 3][1]+f_dir[1]],
                          color=col, linewidth=4.0)

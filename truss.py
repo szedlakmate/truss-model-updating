@@ -14,19 +14,11 @@ try:
 except ImportError:
     print("NumPy could not be loaded")
 from copy import deepcopy
-try:
-    from truss_framework import TrussFramework
-    from truss_framework import ModelUpdatingContainer
-    from truss_framework import error
-    from truss_framework import plot
-    from truss_framework import animate
-    from extra_math import invert
-    from extra_math import mat_vec_mult as multiply_matrix_vector
-    from extra_math import swap_col as swap_columns
-except ImportError:
-    print("Input is missing")
-    print("Please check the truss_framework.py and extra_math.py files.")
-    print("Graphical libraries could not be loaded. GUI can not be used.")
+from truss_framework import TrussFramework
+from truss_framework import error
+from truss_framework import plot
+from truss_framework import animate
+from extra_math import swap_col as swap_columns
 
 
 class Truss(TrussFramework):
@@ -51,54 +43,54 @@ class Truss(TrussFramework):
         else:
             return True
 
-    def modify_coordinate(self, node_ID, new_coordinate):
+    def modify_coordinate(self, node_Id, new_coordinate):
         """
         Modify one node's coordinates
 
-        :param node_ID: {number} the ID of the changeable node
+        :param node_Id: {number} the Id of the changeable node
         :param new_coordinate: {Array<number>} new coordinates wrapped by an array
         :return: {Boolean} True uf the modification was applied, False otherwise.
 
         @example: self.modify_coordinate(5, [1.2, 3.6])  # 2D
         """
         if self._check_coordinates(True):
-            self.truss.nodal_coord[node_ID] = new_coordinate
+            self.truss.nodal_coord[node_Id] = new_coordinate
             self.truss.invalidate_stiffness_matrices()
             return True
         else:
             return False
 
-    def modify_cross_section(self, element_ID, new_area):
+    def modify_cross_section(self, element_Id, new_area):
         """
         Modifying cross-sections by elements
 
-        :param element_ID: {number} the ID of the changeable element
+        :param element_Id: {number} the Id of the changeable element
         :param new_area: {number} the new cross-sectional area
         :return: None
         """
-        self.truss.cross_sectional_area_list[element_ID] = new_area
+        self.truss.cross_sectional_area_list[element_Id] = new_area
         self.truss.invalidate_stiffness_matrices()
 
-    def modify_material(self, element_ID, E):
+    def modify_material(self, element_Id, E):
         """
         Modifying material data by elements
 
-        :param element_ID: {number} ID of the element which should be modified
+        :param element_Id: {number} Id of the element which should be modified
         :param E: {number} Elastic modulo
         :return: None
         """
-        self.truss.elastic_modulo[element_ID] = E
+        self.truss.elastic_modulo[element_Id] = E
         self.truss.invalidate_stiffness_matrices()
 
-    def modify_force(self, element_ID, force):
+    def modify_force(self, element_Id, force):
         """
         Modifying specific force
 
-        :param element_ID: {number} the ID of the element which should be modified
+        :param element_Id: {number} the Id of the element which should be modified
         :param force: {number} new force value
         :return: None
         """
-        self.truss.force[element_ID] = force
+        self.truss.force[element_Id] = force
         self.truss.set_postprocess_needed_flag()
 
     def evaluate_updates(self):
@@ -106,7 +98,7 @@ class Truss(TrussFramework):
         Calculates the relative displacements of each individual available unit-modification
         compared to the measured differences (delta).
 
-        delta: [DOF number, difference]
+        delta: [dof number, difference]
 
         return effect: [effect on 1. point, effect on 2. point, ..., modification number]
                        where each line number shows the corresponding modification number
@@ -117,39 +109,39 @@ class Truss(TrussFramework):
         number_of_elements = self.truss.number_of_elements()
 
         # effect = [[statistic at index], [statistic at index], ...]
-        self.updating_container.effect = [[0.] * (number_of_keypoints)] * number_of_elements
+        self.updating_container.effect = [[0] * number_of_keypoints] * number_of_elements
 
         # sum of effects
-        self.updating_container.total_effect = [0.] * number_of_keypoints
+        self.updating_container.total_effect = [0] * number_of_keypoints
 
         self.updating_container.sorted_effect = \
-            [[[0.] * (number_of_keypoints)] * number_of_elements]*number_of_keypoints
+            [[[0] * number_of_keypoints] * number_of_elements]*number_of_keypoints
 
-        effect_temp = [0.]*(number_of_keypoints+1)
+        effect_temp = [0] * (number_of_keypoints + 1)
 
         # Determine the effects of each modification
-        for element_ID in range(number_of_elements):
+        for element_Id in range(number_of_elements):
 
-            # Modified element's ID
-            effect_temp[number_of_keypoints] = element_ID
+            # Modified element's Id
+            effect_temp[number_of_keypoints] = element_Id
 
             # Determine displacement vector corresponding to a modification
-            for keypoint_count, dof_ID in enumerate(self.truss.keypoints):
+            for keypoint_count, dof_Id in enumerate(self.truss.keypoints):
                 try:
                     # Pick displacement vector at the measurement point
-                    effect_temp[keypoint_count] = self.updating_container.trusses[element_ID].displacements[dof_ID]
+                    effect_temp[keypoint_count] = self.updating_container.trusses[element_Id].displacements[dof_Id]
 
                     # Copy value
-                    self.updating_container.effect[element_ID] = [x for x in effect_temp]
+                    self.updating_container.effect[element_Id] = [x for x in effect_temp]
 
                     # Add effect of index-th modification TUTI +=?????
-                    #self.updating_container.trusses[element_ID].displacements[keypoint_count] += \
-                    #    abs(self.updating_container.effect[element_ID][keypoint_count])
-                    self.updating_container.total_effect[keypoint_count] += self.updating_container.effect[element_ID][keypoint_count]
+                    # self.updating_container.trusses[element_Id].displacements[keypoint_count] += \
+                    #    abs(self.updating_container.effect[element_Id][keypoint_count])
+                    self.updating_container.total_effect[keypoint_count] += self.updating_container.effect[element_Id][keypoint_count]
 
                 except IndexError:
                     print("The mapping data is probably invalid.")
-                    print("Please check the \'arduino_mapping.txt\' input whether the given DOFs are correct or not.")
+                    print("Please check the \'arduino_mapping.txt\' input whether the given dofs are correct or not.")
                     raise IndexError
 
         self.updating_container.effect_ratio = deepcopy(self.updating_container.effect)
@@ -161,8 +153,6 @@ class Truss(TrussFramework):
                 else:
                     self.updating_container.effect_ratio[i][j] = 0
 
-        # print("   \'effect-ratio\' is not used yet")
-
         self.updating_container.sorted_effect_sign = [0]*number_of_keypoints
 
         # Sort by effectiveness
@@ -171,27 +161,28 @@ class Truss(TrussFramework):
             self.updating_container.sorted_effect_sign[i] = [0]*number_of_elements
 
             # Check sign of the effect
-            for ktemp in range(number_of_elements):
-                if self.updating_container.sorted_effect[i][ktemp][i] < 0:
-                    for jtemp in range(number_of_keypoints):
-                        self.updating_container.sorted_effect[i][ktemp][jtemp] =\
-                            abs(self.updating_container.sorted_effect[i][ktemp][jtemp])
+            for k_temp in range(number_of_elements):
+                if self.updating_container.sorted_effect[i][k_temp][i] < 0:
+                    for j_temp in range(number_of_keypoints):
+                        self.updating_container.sorted_effect[i][k_temp][j_temp] =\
+                            abs(self.updating_container.sorted_effect[i][k_temp][j_temp])
 
-                        self.updating_container.sorted_effect_sign[i][ktemp] = -1
+                        self.updating_container.sorted_effect_sign[i][k_temp] = -1
                 else:
-                    self.updating_container.sorted_effect_sign[i][ktemp] = +1
+                    self.updating_container.sorted_effect_sign[i][k_temp] = +1
 
             for j in range(number_of_keypoints):
                 if i != j and j != 0:
                     self.updating_container.sorted_effect[i] =\
-                        swap_columns(sorted(swap_columns(self.updating_container.sorted_effect[i], 0, j), reverse=True), 0, j)
+                        swap_columns(sorted(swap_columns(
+                            self.updating_container.sorted_effect[i], 0, j), reverse=True), 0, j)
             if i != 0:
-                self.updating_container.sorted_effect[i] = \
-                    swap_columns(sorted(swap_columns(self.updating_container.sorted_effect[i], 0, i), reverse=True), 0, i)
+                self.updating_container.sorted_effect[i] =\
+                    swap_columns(sorted(swap_columns(
+                        self.updating_container.sorted_effect[i], 0, i), reverse=True), 0, i)
             else:
-                self.updating_container.sorted_effect[i] = sorted(self.updating_container.sorted_effect[i], reverse=True)
-
-        print('updating_container.modified_structure should be defined here (a.k.a.  .reference)')
+                self.updating_container.sorted_effect[i] =\
+                    sorted(self.updating_container.sorted_effect[i], reverse=True)
 
     def optimize(self, delta):
         """
@@ -201,7 +192,7 @@ class Truss(TrussFramework):
         :return: {Boolean} Shows whether the optimization step successful
         """
 
-        element_ID = self.truss.number_of_elements()
+        element_Id = self.truss.number_of_elements()
         self.updating_container.modifications = [0.0] * self.truss.number_of_elements()
 
         if not self.configuration.simulation:
@@ -225,7 +216,7 @@ class Truss(TrussFramework):
             print("-----")
             print("Step: " + str(j) )
 
-            ratio = [0.]*element_ID
+            ratio = [0]*element_Id
             unit = 0
 
             previous_modifications = self.updating_container.modifications
@@ -267,20 +258,20 @@ class Truss(TrussFramework):
                     raise Exception
 
             for i in range(self.truss.number_of_keypoints()):
-                modified_node_ID = self.updating_container.sorted_effect[0][i][1]
+                modified_node_Id = self.updating_container.sorted_effect[0][i][1]
 
-                ratio[modified_node_ID] = abs(self.updating_container.total_effect[0]/self.updating_container.sorted_effect[0][i][0]) * math.copysign(1, self.updating_container.sorted_effect_sign[i][0])
+                ratio[modified_node_Id] = abs(self.updating_container.total_effect[0]/self.updating_container.sorted_effect[0][i][0]) * math.copysign(1, self.updating_container.sorted_effect_sign[i][0])
 
-                unit += abs(ratio[modified_node_ID]*self.updating_container.sorted_effect[0][i][0])
+                unit += abs(ratio[modified_node_Id]*self.updating_container.sorted_effect[0][i][0])
             print(new_delta)
             scale = new_delta[0]/unit
 
             for i in range(self.truss.number_of_elements()):
-                modified_node_ID = self.updating_container.sorted_effect[0][i][1]
-                self.updating_container.modifications[modified_node_ID] = \
-                    min(abs(previous_modifications[modified_node_ID] - self.updating_container.unit_modification*ratio[modified_node_ID]),
+                modified_node_Id = self.updating_container.sorted_effect[0][i][1]
+                self.updating_container.modifications[modified_node_Id] = \
+                    min(abs(previous_modifications[modified_node_Id] - self.updating_container.unit_modification*ratio[modified_node_Id]),
                         self.updating_container.modification_limit) * \
-                    math.copysign(1, previous_modifications[modified_node_ID] - self.updating_container.unit_modification*ratio[modified_node_ID])
+                    math.copysign(1, previous_modifications[modified_node_Id] - self.updating_container.unit_modification*ratio[modified_node_Id])
             # the last part is already the sign itself without the sign function
 
             print("Ratio: " + str(scale))
@@ -345,7 +336,7 @@ class Truss(TrussFramework):
         """
         General function to manage model updating procedure.
         """
-        self.processed_data = [0.]*1  # *len(self.arduino_mapping)
+        self.processed_data = [0]*1  # *len(self.arduino_mapping)
 
         if not self.configuration.simulation:
             base = self.set_base()

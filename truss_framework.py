@@ -14,13 +14,8 @@ try:
     import numpy
 except ImportError:
     print("NumPy could not be loaded")
-try:
-    from extra_math import invert
-    from extra_math import mat_vec_mult as multiply_matrix_vector
-    from extra_math import swap_col as swap_columns
-except ImportError:
-    print("Input is missing")
-    print("Please check the extra_math.py file.")
+from extra_math import invert
+from extra_math import mat_vec_mult as multiply_matrix_vector
 try:
     import serial
 except ImportError:
@@ -81,7 +76,7 @@ class TrussConfiguration(object):
             self.log = 1  # Logging time
             self.graphics = 1  # Graphical features
             self.solver = 1  # 0: Basic solver, 1: NumPy solver
-            self.OSlib = 1  # Basic OS file features (e.g. file size)
+            self.os_lib = 1  # Basic OS file features (e.g. file size)
             self.updating = 1  # Model Updating: On/ Off
             self.arduino = 0  # Arduino input: On/Off
             self.debug = 1  # Debugging mode
@@ -94,7 +89,7 @@ class TrussConfiguration(object):
             self.log = turned_on
             self.graphics = turned_on
             self.solver = turned_on
-            self.OSlib = turned_on
+            self.os_lib = turned_on
             self.updating = turned_on
             self.arduino = turned_on
             self.debug = turned_off
@@ -107,7 +102,7 @@ class TrussConfiguration(object):
             self.log = turned_off
             self.graphics = turned_off
             self.solver = turned_off
-            self.OSlib = turned_off
+            self.os_lib = turned_off
             self.updating = turned_off
             self.arduino = turned_off
             self.debug = turned_off
@@ -120,7 +115,7 @@ class TrussConfiguration(object):
             self.log = turned_on
             self.graphics = turned_off
             self.solver = turned_off
-            self.OSlib = turned_on
+            self.os_lib = turned_on
             self.updating = turned_off
             self.arduino = turned_off
             self.debug = turned_off
@@ -202,7 +197,7 @@ class TrussModelData(object):
         self.analysis = {}
         self.title = title
         # Truss data
-        self.DOF = 3
+        self.dof = 3
         self.keypoints = []
         self.nodal_connections = []  # Element's end nodes
         self.constraint = []  # Supports
@@ -217,7 +212,7 @@ class TrussModelData(object):
         self.known_f_not_zero = []
         self.stiffness_matrix = []  # Global stiffness matrix
         # self.element_length = []  # Length of the elements
-        self.element_DOF = []
+        self.element_dof = []
         self._norm_stiff = []                  # E/L
         self._cx = []
         self._cy = []
@@ -248,17 +243,17 @@ class TrussModelData(object):
     def number_of_keypoints(self):
         return len(self.keypoints)
 
-    def element_length(self, ID, target='original'):
+    def element_length(self, Id, target='original'):
         if str(target.lower()) == 'original':
-            return math.sqrt(sum([(j-i)**2 for j, i in zip(self.nodal_coord[self.nodal_connections[ID][1]],
-                                                           self.nodal_coord[self.nodal_connections[ID][0]])]))
+            return math.sqrt(sum([(j-i)**2 for j, i in zip(self.nodal_coord[self.nodal_connections[Id][1]],
+                                                           self.nodal_coord[self.nodal_connections[Id][0]])]))
         else:
-            return math.sqrt(sum([(j - i) ** 2 for j, i in zip(self.nodal_coord_def[self.nodal_connections[ID][1]],
-                                                               self.nodal_coord_def[self.nodal_connections[ID][0]])]))
+            return math.sqrt(sum([(j - i) ** 2 for j, i in zip(self.nodal_coord_def[self.nodal_connections[Id][1]],
+                                                               self.nodal_coord_def[self.nodal_connections[Id][0]])]))
 
     def set_postprocess_needed_flag(self):
         """
-        Set portprocess required flag
+        Set postprocess required flag
 
         :return: None
         """
@@ -273,24 +268,23 @@ class TrussModelData(object):
         self._stiff_is_fresh = 0
         self.set_postprocess_needed_flag()
 
-    def set_model_DOF(self, DOF):
+    def set_model_dof(self, dof):
         """
         Setting problem's degree of freedom
 
-        :param DOF: [2 | 3] Model's Degree Of Freedom
+        :param dof: [2 | 3] Model's Degree Of Freedom
         :return: None
         """
-        self.DOF = DOF
-        if self.DOF not in [2, 3]:
-            raise Exception('DOF must be 2 or 3.')
+        self.dof = dof
+        if self.dof not in [2, 3]:
+            raise Exception('dof must be 2 or 3.')
 
         # Set freshness flags after geometry modification
         self.invalidate_stiffness_matrices()
 
-
     def bulk_set_measurement_points(self, measurement_points, io_origin):
         """
-        Set special nodal DOFs
+        Set special nodal dofs
         """
         for location in measurement_points:
             node = int(location[0:len(location)-1])-io_origin
@@ -302,7 +296,7 @@ class TrussModelData(object):
                 self.keypoints.append(node*3+1)
 
             if 'Z' in location:
-                if self.DOF == 3:
+                if self.dof == 3:
                     self.analysis[location] = node*3+2
                     self.keypoints.append(node*3+2)
                 else:
@@ -311,7 +305,7 @@ class TrussModelData(object):
                     raise Exception
 
         if self.number_of_keypoints == 0:
-            print("There is no valid measured DOF. Please check the \'MEASUREMENTS\' section in the input file.")
+            print("There is no valid measured dof. Please check the \'MEASUREMENTS\' section in the input file.")
 
     # TODO: This functions is probably not called although it should be part of the set_base() process
     def bulk_set_elements(self, nodal_connection_list):
@@ -319,7 +313,7 @@ class TrussModelData(object):
         Setting elements (nodal connections) in bulk mode
 
         :param nodal_connection_list: an array of arrays, where each sub-array is a pair of integers, namely [i, j].
-        i, j are the ID's of the nodes and an element is i -> j.
+        i, j are the Id's of the nodes and an element is i -> j.
         :return: None
         """
         # Set attribute
@@ -330,13 +324,13 @@ class TrussModelData(object):
 
         # Creating mapping tool for elements
         for node in self.nodal_connections:
-            self.element_DOF.append(
+            self.element_dof.append(
                 [node[0] * 3, node[0] * 3 + 1, node[0] * 3 + 2, node[1] * 3, node[1] * 3 + 1, node[1] * 3 + 2])
 
         # Initializing defaults for all matrices
         self._init_displacement = [0] * (3 * self.number_of_nodes())
-        self.force = [0.] * (3 * self.number_of_nodes())
-        self.stiffness_matrix = [0.] * (3 * self.number_of_nodes())
+        self.force = [0] * (3 * self.number_of_nodes())
+        self.stiffness_matrix = [0] * (3 * self.number_of_nodes())
         self.known_f_a = []
         self.known_f_not_zero = []
 
@@ -380,11 +374,11 @@ class TrussModelData(object):
         :param forces: matrix of forces in the following pattern: [[location, force], ...]
         :return: None
         """
-        # DOF dependent mapping
+        # dof dependent mapping
         for location, force in forces:
-            if self.DOF == 3:
+            if self.dof == 3:
                 self.force[location] = force
-            elif self.DOF == 2:
+            elif self.dof == 2:
                 self.force[location + (location // 2)] = force
         self.set_postprocess_needed_flag()
 
@@ -396,9 +390,9 @@ class TrussModelData(object):
         :return:
         """
         for location, constraint in constraints:
-            if self.DOF == 3:
+            if self.dof == 3:
                 self.constraint.append([location, constraint])
-            elif self.DOF == 2:
+            elif self.dof == 2:
                 self.constraint.append([location + (location // 2), constraint])
         self.invalidate_stiffness_matrices()
 
@@ -410,40 +404,40 @@ class TrussModelData(object):
         """
         self.set_postprocess_needed_flag()
 
-        if self.DOF == 2:
+        if self.dof == 2:
             for dof_z in range(self.number_of_nodes()):
-                self.constraint.append([int(dof_z*3+2), 0.])
+                self.constraint.append([int(dof_z*3+2), 0])
         self.constraint = list(k for k, _ in itertools.groupby(sorted(self.constraint)))
 
         # Setting known forces
         known_f_a = []
         known_f_not_zero = []
         known_displacement_a = []
-        for location in range(3*self.number_of_nodes()):
+        for location in range(3 * self.number_of_nodes()):
             known_f_a.append(location)
             if self.force[location] != 0:
                 known_f_not_zero.append(location)
         for constraint in self.constraint:
             self._init_displacement[constraint[0]] = constraint[1]
             known_displacement_a.append(constraint[0])
-            try:
+            if constraint[0] in known_f_a:
                 known_f_a.remove(constraint[0])
+            if constraint[0] in known_f_not_zero:
                 known_f_not_zero.remove(constraint[0])
-            except ValueError:
-                pass
+
         self.known_f_a = known_f_a
         self.known_displacement_a = known_displacement_a
         self.known_f_not_zero = known_f_not_zero
 
-        elements_lengths = [0.]*self.number_of_elements()
-        self._norm_stiff = [0.]*self.number_of_elements()
-        self._cx = [0.]*self.number_of_elements()
-        self._cy = [0.]*self.number_of_elements()
-        self._cz = [0.]*self.number_of_elements()
-        self._s_loc = [0.]*self.number_of_elements()
-        local_stiffness_matrix = [0.]*self.number_of_elements()
-        self.stress = [0.]*self.number_of_elements()
-        self.stiffness_matrix = [[0.]*(self.number_of_nodes()*3)]*(self.number_of_nodes()*3)
+        elements_lengths = [0]*self.number_of_elements()
+        self._norm_stiff = [0]*self.number_of_elements()
+        self._cx = [0]*self.number_of_elements()
+        self._cy = [0]*self.number_of_elements()
+        self._cz = [0]*self.number_of_elements()
+        self._s_loc = [0]*self.number_of_elements()
+        local_stiffness_matrix = [0]*self.number_of_elements()
+        self.stress = [0]*self.number_of_elements()
+        self.stiffness_matrix = [[0]*(self.number_of_nodes()*3)]*(self.number_of_nodes()*3)
 
         for i in range(self.number_of_elements()):
             elements_lengths[i] = \
@@ -475,9 +469,9 @@ class TrussModelData(object):
                  self._cy[i]*self._cz[i], self._cz[i]**2]]
 
             local_stiffness_matrix[i] = [[y * self.cross_sectional_area_list[i] * self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
-            ele_dof_vec = self.element_DOF[i]
+            ele_dof_vec = self.element_dof[i]
 
-            stiffness_increment = [0.]*(self.number_of_nodes()*3)
+            stiffness_increment = [0]*(self.number_of_nodes()*3)
 
             for j in range(3*2):
                 for k in range(3*2):
@@ -495,18 +489,15 @@ class TrussModelData(object):
                 print('Stiffness matrix is recalculated')
             self.calculate_stiffness_matrix()
 
-        self.dis_new = [0.]*(self.number_of_nodes()*3-len(self.constraint))
-        self.force_new = [0.]*(self.number_of_nodes()*3-len(self.constraint))
-        self.stiff_new = [[0.]*(self.number_of_nodes()*3-len(self.constraint))]*(self.number_of_nodes()*3-len(self.constraint))
+        self.dis_new = [0]*(self.number_of_nodes()*3-len(self.constraint))
+        self.force_new = [0]*(self.number_of_nodes()*3-len(self.constraint))
+        self.stiff_new = [[0]*(self.number_of_nodes()*3-len(self.constraint))]*(self.number_of_nodes()*3-len(self.constraint))
 
         # known force array
-        for i, DOF in enumerate(self.known_f_a):
-            try:
-                self.force_new[i] = self.force[DOF]
-            except Exception:
-                pass
+        for i, dof in enumerate(self.known_f_a):
+            self.force_new[i] = self.force[dof]
 
-        stiffness_increment = [0.]*(self.number_of_nodes()*3-len(self.constraint))
+        stiffness_increment = [0] * (self.number_of_nodes()*3-len(self.constraint))
         for i, kfai in enumerate(self.known_f_a):
             for j, kfaj in enumerate(self.known_f_a):
                 stiffness_increment[j] = self.stiffness_matrix[kfai][kfaj]
@@ -514,12 +505,8 @@ class TrussModelData(object):
 
         # SOLVING THE STRUCTURE
         if configuration.solver == 0:
-            if configuration.log:
-                print('Built-in solver')
             self.dis_new = multiply_matrix_vector(invert(self.stiff_new), self.force_new)
         else:
-            if configuration.log:
-                print('NumPy solver')
             self.dis_new = numpy.linalg.solve(numpy.array(self.stiff_new), numpy.array(self.force_new))
 
         self.displacements = deepcopy(self._init_displacement)
@@ -563,7 +550,7 @@ class TrussModelData(object):
 
         Last part: Coloring elements for graphical output
         """
-        self.stress = [0.]*self.number_of_elements()
+        self.stress = [0]*self.number_of_elements()
 
         for element in range(self.number_of_elements()):
             self.stress[element] = \
@@ -584,7 +571,7 @@ class ModelUpdatingContainer(object):
         self.modifications = []          # Storing modifications for model updating
         self.read_elements = [0]*9
         self.arduino_mapping = []
-        self.measurement = [0.]
+        self.measurement = [0]
         self.number_of_updates = [0, 0, 0]        # [#Successfully updated model, #Updates with overflow exit,
         self.effect = []
         self.effect_ratio = []
@@ -699,20 +686,20 @@ class TrussFramework(object):
         The order of the commands are indifferent.
 
         Commands and their format (example):
-            DOF - Degree of freedom: 3
+            dof - Degree of freedom: 3
             ELEMENTS - Elements given by end-nodes: 0, 1 | 0, 2 ...
-            COORDINATES - Nodal coordinates: 0., 0., 0., | 0., 3., 0. ...
+            COORDINATES - Nodal coordinates: 0, 0, 0, | 0, 3., 0. ...
             CROSS-SECTIONS - This data will be evaluated in Python: 3.0*(10**(-4)), 5.0*(10**(-4)) ...
             MATERIALS - This data will be evaluated in Python: 70.0*(10**9), 100.0*(10**9) ...
-            FORCES - Selected DOF + Force: 11, +1000000.0 | 12, +1000000.0 ...
-            SUPPORTS - Selected DOF + Prescribed displacements: 0, 0.0 | 1, 0.0 ...
-            SPECDOF - Selected node's DOF will be analysed during Model Updating: 1, xyz | 3 y | 10 xz ...
+            FORCES - Selected dof + Force: 11, +1000000.0 | 12, +1000000.0 ...
+            SUPPORTS - Selected dof + Prescribed displacements: 0, 0.0 | 1, 0.0 ...
+            SPECdof - Selected node's dof will be analysed during Model Updating: 1, xyz | 3 y | 10 xz ...
 
             EOF - For compatibility reasons EOF should be placed after the commands
         """
         self._io_origin = 0
-        _read_element_names = ["Origin", "DOF", "Elements", "Coordinates",
-                               "Cross-sections", "Materials", "Forces", "Supports", "Measured DOFs"]
+        _read_element_names = ["Origin", "dof", "Elements", "Coordinates",
+                               "Cross-sections", "Materials", "Forces", "Supports", "Measured dofs"]
 
         try:
             self.check_folder('Structures')
@@ -728,7 +715,7 @@ class TrussFramework(object):
 
                     if source_line.upper() == "DOF":
                         source_line = sourcefile.readline().strip()
-                        self.truss.set_model_DOF(int(source_line))
+                        self.truss.set_model_dof(int(source_line))
                         self.read_elements[1] = 1
 
                     if source_line.upper() == "ELEMENTS":
@@ -753,7 +740,7 @@ class TrussFramework(object):
                         if len(input_string[0]) == 3:
                             input_number = [[float(x[0]), float(x[1]), float(x[2])] for x in input_string]
                         elif len(input_string[0]) == 2:
-                            input_number = [[float(x[0]), float(x[1]), 0.] for x in input_string]
+                            input_number = [[float(x[0]), float(x[1]), 0] for x in input_string]
                         self.truss.bulk_set_coordinates(input_number)
                         self.read_elements[3] = 1
 
@@ -803,7 +790,7 @@ class TrussFramework(object):
 
                     if source_line.upper() == "MEASUREMENTS":
                         source_line = sourcefile.readline().strip()
-                        self.special_DOF_input_string = source_line
+                        self.special_dof_input_string = source_line
                         self.updating_container.arduino_mapping = source_line.split(',')
                         self.truss.bulk_set_measurement_points(self.updating_container.arduino_mapping, self._io_origin)
                         self.read_elements[8] = 1
@@ -828,7 +815,7 @@ class TrussFramework(object):
         # Read data from Arduino
 
         maxdifference = 0.8          # Maximum input difference threshold in mm
-        data = [0.]*len(self.updating_container.arduino_mapping)
+        data = [0]*len(self.updating_container.arduino_mapping)
         newdata = False
         bigdifference = False
         readerror = False
@@ -861,10 +848,6 @@ class TrussFramework(object):
                         print("Value error... continuing")
                         self.serial_connection.flushInput()
                         time.sleep(0.5)
-                    except Exception:
-                        # print("Type error: " + str(arduino_values) + "... continuing")
-                        self.serial_connection.flushInput()
-                        time.sleep(0.1)
 
             self.serial_connection.flushInput()
 
@@ -909,10 +892,7 @@ class TrussFramework(object):
                 raise Exception('Watchpoint name error')
 
             delta_appendix = float(measured_position) - float(num_displ[dof])
-            try:
-                delta.append(delta_appendix)
-            except Exception:
-                pass
+            delta.append(delta_appendix)
 
         return delta
 
@@ -921,20 +901,18 @@ class TrussFramework(object):
         """
         Simulate data, based on previous measurement
         """
-        data = [0.]*1 #*len(self.updating_container.arduino_mapping)
+        data = [0]*1 #*len(self.updating_container.arduino_mapping)
         try:
             arduino_line = str(arduino_line.split(']')[0])+"]"
             try:
                 arduino_values = eval(arduino_line)
             except SyntaxError:
-                # print('Error: "' + str(arduino_line) + '"')
                 return False
             try:
                 for i in range(len(self.updating_container.arduino_mapping)):
                     data[i] = float(arduino_values[i])
                 self.processed_data = data
-            except Exception:
-                #print("Type error: " + str(arduino_values) + "... continuing")
+            except TypeError:
                 return False
 
             self.updating_container.measurement = data
@@ -962,39 +940,39 @@ class TrussFramework(object):
         while answer_1 not in ['Y', 'N']:
             answer_1 = input('Can we start the calibration? (y/n) ').upper()
         if answer_1 == 'N':
-            try:
-                self.serial_connection.close()
-            except AttributeError:
-                print("Connection is not captured by this thread")
-            raise Exception('Calibration is terminated')
+        try:
+            self.serial_connection.close()
+        except AttributeError:
+            print("Connection is not captured by this thread")
+        raise Exception('Calibration is terminated')
         else:
-            try:
-                self.serial_connection.flushInput()
-                # time.sleep(0.2)
-                arduino_line = ''  # self.serial_connection.readline()
-                while len(arduino_line) == 0:
-                    time.sleep(0.2)
-                    arduino_line = self.serial_connection.readline()
+        try:
+            self.serial_connection.flushInput()
+            # time.sleep(0.2)
+            arduino_line = ''  # self.serial_connection.readline()
+            while len(arduino_line) == 0:
+                time.sleep(0.2)
+                arduino_line = self.serial_connection.readline()
 
-                if len(arduino_line) > 0:
-                    arduino_values = arduino_line.split(',')
-                    del arduino_values[len(arduino_values)-1]               # if needed!!!
-                    if len(arduino_values) == len(self.updating_container.arduino_mapping):
-                        measurement = zip(self.updating_container.arduino_mapping, arduino_values)
-                        print("Calibration result:")
-                        print(measurement)
-                        while accept not in ['Y', 'N']:
-                            accept = input('Ok? Can we start the main part? Put on the loads! (y/n) ').upper()
-                            if accept == 'N':
-                                restart = 'Y'
-                    else:
-                        print("Data error. Calibartion is restarting.")
-                        print("Arduino values:" + str(arduino_values))
-                        restart = 'Y'
+            if len(arduino_line) > 0:
+                arduino_values = arduino_line.split(',')
+                del arduino_values[len(arduino_values)-1]               # if needed!!!
+                if len(arduino_values) == len(self.updating_container.arduino_mapping):
+                    measurement = zip(self.updating_container.arduino_mapping, arduino_values)
+                    print("Calibration result:")
+                    print(measurement)
+                    while accept not in ['Y', 'N']:
+                        accept = input('Ok? Can we start the main part? Put on the loads! (y/n) ').upper()
+                        if accept == 'N':
+                            restart = 'Y'
                 else:
-                    print('The calibration cannot be done: no data')
-                    while restart not in ['Y', 'N']:
-                        restart = input('Do you want to restart calibration? (y/n) ').upper()
+                    print("Data error. Calibartion is restarting.")
+                    print("Arduino values:" + str(arduino_values))
+                    restart = 'Y'
+            else:
+                print('The calibration cannot be done: no data')
+                while restart not in ['Y', 'N']:
+                    restart = input('Do you want to restart calibration? (y/n) ').upper()
             except Exception:
                 print('The calibration cannot be done: exception was raised')
                 while restart not in ['Y', 'N']:
@@ -1066,19 +1044,19 @@ class TrussFramework(object):
             out_materials += str(i) + ', '
         out_forces = ''
         for forcedof, i in enumerate(self.truss.known_f_not_zero):
-            if self.truss.DOF == 3:
+            if self.truss.dof == 3:
                 out_forces += str(forcedof + self._io_origin) + ', ' + str(self.truss.force[forcedof]) + ' | '
-            elif self.truss.DOF == 2 and i % 3 != 2:
+            elif self.truss.dof == 2 and i % 3 != 2:
                 out_forces += str(forcedof - forcedof//3 + self._io_origin) + ', '\
                               + str(self.truss.force[forcedof]) + ' | '
         out_supports = ''
         for i in self.truss.constraint:
-            if self.truss.DOF == 3:
+            if self.truss.dof == 3:
                 out_supports += str(i[0] + self._io_origin) + ', ' + str(i[1]) + ' | '
             elif i[0] % 3 != 2:
                 out_supports += str(i[0] - i[0]//3 + self._io_origin) + ', ' + str(i[1]) + ' | '
         # Not elegant solution
-        out_specdofs = self.special_DOF_input_string
+        out_specdofs = self.special_dof_input_string
         try:
             with open(path, 'w') as outfile:
                 # Writing data
@@ -1088,7 +1066,7 @@ class TrussFramework(object):
                 # for i in range(len(self.truss.force)//3):
                 prev = -1
                 for i in self.truss.known_displacement_a:
-                    if self.truss.DOF == 3 or i % 3 != 2:
+                    if self.truss.dof == 3 or i % 3 != 2:
                         if i//3 != prev:
                             if i < 100:
                                 outfile.write(' ')
@@ -1103,7 +1081,7 @@ class TrussFramework(object):
                                 nodalforce += "{:10.2f}".format(self.truss.force[(i//3)*3+1]) + ', '
                             else:
                                 nodalforce += '            '
-                            if self.truss.DOF != 2 and (i//3)*3+2 in self.truss.known_displacement_a:
+                            if self.truss.dof != 2 and (i//3)*3+2 in self.truss.known_displacement_a:
                                 nodalforce += "{:10.2f}".format(self.truss.force[(i//3)*3+2]) + '\n'
                             else:
                                 nodalforce += '          \n'
@@ -1136,8 +1114,8 @@ class TrussFramework(object):
                 outfile.write('----- Original input: -----\n\n')
                 outfile.write('_ORIGIN\n')
                 outfile.write(str(self._io_origin) + '\n\n')
-                outfile.write('DOF\n')
-                outfile.write(str(self.truss.DOF) + '\n\n')
+                outfile.write('dof\n')
+                outfile.write(str(self.truss.dof) + '\n\n')
                 outfile.write('ELEMENTS\n')
                 outfile.write(out_element + '\n\n')
                 outfile.write('COORDINATES\n')
@@ -1150,7 +1128,7 @@ class TrussFramework(object):
                 outfile.write(out_forces + '\n\n')
                 outfile.write('SUPPORTS\n')
                 outfile.write(out_supports + '\n\n')
-                outfile.write('SPECDOF\n')
+                outfile.write('SPECdof\n')
                 outfile.write(out_specdofs + '\n\n')
                 outfile.write('EOF\n')
         except FileNotFoundError:
