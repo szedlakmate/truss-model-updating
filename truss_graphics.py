@@ -42,9 +42,9 @@ class Arrow3D(FancyArrowPatch):
         """
         plotname = truss.title
         plot_width = 10.0              # Plot width in inches
-        xframe = 0                     # Frame width at X direction | 0: auto
-        yframe = 0                     # Frame width at Y direction | 0: auto
-        zframe = 0                     # Frame width at Z direction | 0: auto
+        xframe = 0.0                     # Frame width at X direction | 0: auto
+        yframe = 0.0                     # Frame width at Y direction | 0: auto
+        zframe = 0.0                     # Frame width at Z direction | 0: auto
         scale_sup = scale_forces * 0.3        # Scale support sign  # All the others are input parameters
 
         # Stress coloring settings [R G B] - Examples considering pressure:
@@ -73,9 +73,12 @@ class Arrow3D(FancyArrowPatch):
         deltax = xmax - xmin
         deltay = ymax - ymin
 
-        xframe = xframe | max(deltax * 0.05, 2)
-        yframe = yframe | max(deltay * 1.5, 2)
-        zframe = zframe | max(deltay * 1.5, 2)
+        if (xframe == 0):
+            xframe = max(deltax * 0.05, 2)
+        if (yframe == 0):
+            yframe = max(deltay * 1.5, 2)
+        if (zframe == 0):
+            zframe = max(deltay * 1.5, 2)
 
         if truss.dof == 3:
             plot_height = plot_width * ((deltay + yframe*2)/(deltax + xframe*2)) * 0.3

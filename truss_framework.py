@@ -698,7 +698,7 @@ class TrussFramework(object):
             EOF - For compatibility reasons EOF should be placed after the commands
         """
         self._io_origin = 0
-        _read_element_names = ["Origin", "dof", "Elements", "Coordinates",
+        _read_element_names = ["Origin", "DOF", "Elements", "Coordinates",
                                "Cross-sections", "Materials", "Forces", "Supports", "Measured dofs"]
 
         try:
@@ -746,9 +746,7 @@ class TrussFramework(object):
 
                     if source_line.upper() == "CROSS-SECTIONS":
                         source_line = sourcefile.readline().strip()
-                        input_string = source_line.split(',')
-                        if len(input_string) == 1:
-                            input_string = source_line.split(';')
+                        input_string = source_line.replace(',', '|').replace(';', '|').split('|')
                         if '' in input_string:
                             input_string.remove('')
                         input_number = [float(eval(x)) for x in input_string]
@@ -757,11 +755,10 @@ class TrussFramework(object):
 
                     if source_line.upper() == "MATERIALS":
                         source_line = sourcefile.readline().strip()
-                        input_string = source_line.split(',')
-                        if len(input_string) == 1:
-                            input_string = source_line.split(';')
+                        input_string = source_line.replace(',', '|').replace(';', '|').split('|')
                         if '' in input_string:
                             input_string.remove('')
+                        print(input_string)
                         input_number = [float(eval(x)) for x in input_string]
                         self.truss.bulk_set_materials(input_number)
                         self.read_elements[5] = 1
@@ -936,43 +933,42 @@ class TrussFramework(object):
         accept = '0'
         print("Before starting the model updating, the measuring tools must be calibrated.")
         print("The calibration should be done in load-free state.")
-
         while answer_1 not in ['Y', 'N']:
             answer_1 = input('Can we start the calibration? (y/n) ').upper()
         if answer_1 == 'N':
-        try:
-            self.serial_connection.close()
-        except AttributeError:
-            print("Connection is not captured by this thread")
-        raise Exception('Calibration is terminated')
+            try:
+                self.serial_connection.close()
+            except AttributeError:
+                print("Connection is not captured by this thread")
+            raise Exception('Calibration is terminated')
         else:
-        try:
-            self.serial_connection.flushInput()
-            # time.sleep(0.2)
-            arduino_line = ''  # self.serial_connection.readline()
-            while len(arduino_line) == 0:
-                time.sleep(0.2)
-                arduino_line = self.serial_connection.readline()
+            try:
+                self.serial_connection.flushInput()
+                # time.sleep(0.2)
+                arduino_line = ''  # self.serial_connection.readline()
+                while len(arduino_line) == 0:
+                    time.sleep(0.2)
+                    arduino_line = self.serial_connection.readline()
 
-            if len(arduino_line) > 0:
-                arduino_values = arduino_line.split(',')
-                del arduino_values[len(arduino_values)-1]               # if needed!!!
-                if len(arduino_values) == len(self.updating_container.arduino_mapping):
-                    measurement = zip(self.updating_container.arduino_mapping, arduino_values)
-                    print("Calibration result:")
-                    print(measurement)
-                    while accept not in ['Y', 'N']:
-                        accept = input('Ok? Can we start the main part? Put on the loads! (y/n) ').upper()
-                        if accept == 'N':
-                            restart = 'Y'
+                if len(arduino_line) > 0:
+                    arduino_values = arduino_line.split(',')
+                    del arduino_values[len(arduino_values) - 1]  # if needed!!!
+                    if len(arduino_values) == len(self.updating_container.arduino_mapping):
+                        measurement = zip(self.updating_container.arduino_mapping, arduino_values)
+                        print("Calibration result:")
+                        print(measurement)
+                        while accept not in ['Y', 'N']:
+                            accept = input('Ok? Can we start the main part? Put on the loads! (y/n) ').upper()
+                            if accept == 'N':
+                                restart = 'Y'
+                    else:
+                        print("Data error. Calibartion is restarting.")
+                        print("Arduino values:" + str(arduino_values))
+                        restart = 'Y'
                 else:
-                    print("Data error. Calibartion is restarting.")
-                    print("Arduino values:" + str(arduino_values))
-                    restart = 'Y'
-            else:
-                print('The calibration cannot be done: no data')
-                while restart not in ['Y', 'N']:
-                    restart = input('Do you want to restart calibration? (y/n) ').upper()
+                    print('The calibration cannot be done: no data')
+                    while restart not in ['Y', 'N']:
+                        restart = input('Do you want to restart calibration? (y/n) ').upper()
             except Exception:
                 print('The calibration cannot be done: exception was raised')
                 while restart not in ['Y', 'N']:
