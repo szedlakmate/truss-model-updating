@@ -468,7 +468,9 @@ class TrussModelData(object):
                 [-self._cx[i]*self._cz[i], -self._cy[i]*self._cz[i], -self._cz[i]**2, self._cx[i]*self._cz[i],
                  self._cy[i]*self._cz[i], self._cz[i]**2]]
 
-            local_stiffness_matrix[i] = [[y * self.cross_sectional_area_list[i] * self._norm_stiff[i] for y in x] for x in self._s_loc[i]]
+            local_stiffness_matrix[i] = [[y * self.cross_sectional_area_list[i] * self._norm_stiff[i]
+                                          for y in x] for x in self._s_loc[i]]
+
             ele_dof_vec = self.element_dof[i]
 
             stiffness_increment = [0]*(self.number_of_nodes()*3)
@@ -476,8 +478,9 @@ class TrussModelData(object):
             for j in range(3*2):
                 for k in range(3*2):
                     stiffness_increment[ele_dof_vec[k]] = local_stiffness_matrix[i][j][k]
-                self.stiffness_matrix[ele_dof_vec[j]] =\
+                self.stiffness_matrix[ele_dof_vec[j]] = \
                     [x + y for x, y in zip(self.stiffness_matrix[ele_dof_vec[j]], stiffness_increment)]
+
         self._stiff_is_fresh = 1
 
     def solve(self, configuration):
@@ -489,15 +492,16 @@ class TrussModelData(object):
                 print('Stiffness matrix is recalculated')
             self.calculate_stiffness_matrix()
 
-        self.dis_new = [0]*(self.number_of_nodes()*3-len(self.constraint))
-        self.force_new = [0]*(self.number_of_nodes()*3-len(self.constraint))
-        self.stiff_new = [[0]*(self.number_of_nodes()*3-len(self.constraint))]*(self.number_of_nodes()*3-len(self.constraint))
+        self.dis_new = [0] * (self.number_of_nodes() * 3 - len(self.constraint))
+        self.force_new = [0] * (self.number_of_nodes() * 3 - len(self.constraint))
+        self.stiff_new = [[0] * (self.number_of_nodes() * 3 - len(self.constraint))] * \
+                         (self.number_of_nodes() * 3 - len(self.constraint))
 
         # known force array
         for i, dof in enumerate(self.known_f_a):
             self.force_new[i] = self.force[dof]
 
-        stiffness_increment = [0] * (self.number_of_nodes()*3-len(self.constraint))
+        stiffness_increment = [0] * (self.number_of_nodes() * 3 - len(self.constraint))
         for i, kfai in enumerate(self.known_f_a):
             for j, kfaj in enumerate(self.known_f_a):
                 stiffness_increment[j] = self.stiffness_matrix[kfai][kfaj]
@@ -522,7 +526,7 @@ class TrussModelData(object):
                  self.nodal_coord[i][1] + self.displacements[i * 3 + 1],
                  self.nodal_coord[i][2] + self.displacements[i * 3 + 2]])
 
-        # Postrpocesses
+        # Postprocesses
         self.post_process()
 
     def post_process(self):
@@ -554,7 +558,7 @@ class TrussModelData(object):
 
         for element in range(self.number_of_elements()):
             self.stress[element] = \
-                (self.element_length(element, 'deformed') - self.element_length(element, 'original')) /\
+                (self.element_length(element, 'deformed') - self.element_length(element, 'original')) / \
                 self.element_length(element, 'original') * self.elastic_modulo[element]
 
         s_max = max([abs(min(self.stress)), max(self.stress), 0.000000001])
@@ -611,6 +615,10 @@ class TrussFramework(object):
             title = input_file
         self.title = title.replace('.str', '')  # Name of structure
         self.configuration = TrussConfiguration(input_file.replace('.str', '') + '.str', compatibility_mode, simulation)
+        self.special_dof_input_string = ''
+
+        # Origin for I/O processes
+        self._io_origin = 0
 
         # Structure
         self.truss = TrussModelData(self.title)
@@ -639,7 +647,7 @@ class TrussFramework(object):
 
     def connect(self, port='', baudrate=9600):
         self.serial_connection = False
-        PORTS = ['COM1', 'COM2', 'COM3']  # List of possible communication ports
+        _ports = ['COM1', 'COM2', 'COM3']  # List of possible communication ports
         port_number = 0
 
         if port != '':
@@ -648,10 +656,10 @@ class TrussFramework(object):
         else:
             while not self.serial_connection:
                 port_number += 1
-                if port_number > len(PORTS):
+                if port_number > len(_ports):
                     port_number = 1
                 time.sleep(0.6)
-                print('Opening serial at port ' + str(PORTS[port_number]))
+                print('Opening serial at port ' + str(_ports[port_number]))
                 self.serial_connection = self._open_serial(port, baudrate)
 
     def disconnect(self):
@@ -682,7 +690,7 @@ class TrussFramework(object):
         All commands must be written with uppercase characters
         *** The values MUST be written in the exact following line of a command
         Only lines with the command and nothing more counts.
-        Everything else will be neglected. Even hastags are useless :)
+        Everything else will be neglected. Even hashtags are useless :)
         The order of the commands are indifferent.
 
         Commands and their format (example):
@@ -725,7 +733,9 @@ class TrussFramework(object):
                             input_string = [x.split(';') for x in source_line.split('|')]
                         if [''] in input_string:
                             input_string.remove([''])
-                        input_number = [[int(x[0]) - self._io_origin, int(x[1]) - self._io_origin] for x in input_string]
+                        input_number = [[int(x[0]) - self._io_origin, int(x[1]) - self._io_origin]
+                                        for x in input_string]
+
                         self.truss.bulk_set_elements(input_number)
                         self.read_elements[2] = 1
 
@@ -804,7 +814,7 @@ class TrussFramework(object):
                     terminate = True
         if terminate:
             raise Exception
-
+    '''
     def readarduino(self, base, save_input):
         """
         Read data from Arduino
@@ -864,7 +874,7 @@ class TrussFramework(object):
             print("Delta: " + str(delta))
 
             return delta
-
+    '''
     def difference(self, num_displ, measurement):
         """
         Calculate the difference between the numerical solution and the real-life measurement.
@@ -873,7 +883,6 @@ class TrussFramework(object):
         :param measurement: [[13X, -2.154], [16Y, 5.256], ...]
         :return: [measurement - calculated] Negative means higher deflections are measured
         """
-        # print(nodenumber option should be added! <XXX>)
         delta = []
 
         for measured_position in measurement:
@@ -893,8 +902,7 @@ class TrussFramework(object):
 
         return delta
 
-
-    def mock_delta(self, arduino_line, previous_line):
+    def mock_delta(self, arduino_line):
         """
         Simulate data, based on previous measurement
         """
@@ -1043,7 +1051,7 @@ class TrussFramework(object):
             if self.truss.dof == 3:
                 out_forces += str(forcedof + self._io_origin) + ', ' + str(self.truss.force[forcedof]) + ' | '
             elif self.truss.dof == 2 and i % 3 != 2:
-                out_forces += str(forcedof - forcedof//3 + self._io_origin) + ', '\
+                out_forces += str(forcedof - forcedof//3 + self._io_origin) + ', ' \
                               + str(self.truss.force[forcedof]) + ' | '
         out_supports = ''
         for i in self.truss.constraint:

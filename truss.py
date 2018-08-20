@@ -43,54 +43,54 @@ class Truss(TrussFramework):
         else:
             return True
 
-    def modify_coordinate(self, node_Id, new_coordinate):
+    def modify_coordinate(self, node_id, new_coordinate):
         """
         Modify one node's coordinates
 
-        :param node_Id: {number} the Id of the changeable node
+        :param node_id: {number} the Id of the changeable node
         :param new_coordinate: {Array<number>} new coordinates wrapped by an array
         :return: {Boolean} True uf the modification was applied, False otherwise.
 
         @example: self.modify_coordinate(5, [1.2, 3.6])  # 2D
         """
         if self._check_coordinates(True):
-            self.truss.nodal_coord[node_Id] = new_coordinate
+            self.truss.nodal_coord[node_id] = new_coordinate
             self.truss.invalidate_stiffness_matrices()
             return True
         else:
             return False
 
-    def modify_cross_section(self, element_Id, new_area):
+    def modify_cross_section(self, element_id, new_area):
         """
         Modifying cross-sections by elements
 
-        :param element_Id: {number} the Id of the changeable element
+        :param element_id: {number} the Id of the changeable element
         :param new_area: {number} the new cross-sectional area
         :return: None
         """
-        self.truss.cross_sectional_area_list[element_Id] = new_area
+        self.truss.cross_sectional_area_list[element_id] = new_area
         self.truss.invalidate_stiffness_matrices()
 
-    def modify_material(self, element_Id, E):
+    def modify_material(self, element_id, E):
         """
         Modifying material data by elements
 
-        :param element_Id: {number} Id of the element which should be modified
+        :param element_id: {number} Id of the element which should be modified
         :param E: {number} Elastic modulo
         :return: None
         """
-        self.truss.elastic_modulo[element_Id] = E
+        self.truss.elastic_modulo[element_id] = E
         self.truss.invalidate_stiffness_matrices()
 
-    def modify_force(self, element_Id, force):
+    def modify_force(self, element_id, force):
         """
         Modifying specific force
 
-        :param element_Id: {number} the Id of the element which should be modified
+        :param element_id: {number} the Id of the element which should be modified
         :param force: {number} new force value
         :return: None
         """
-        self.truss.force[element_Id] = force
+        self.truss.force[element_id] = force
         self.truss.set_postprocess_needed_flag()
 
     def evaluate_updates(self):
@@ -120,24 +120,24 @@ class Truss(TrussFramework):
         effect_temp = [0] * (number_of_keypoints + 1)
 
         # Determine the effects of each modification
-        for element_Id in range(number_of_elements):
+        for element_id in range(number_of_elements):
 
             # Modified element's Id
-            effect_temp[number_of_keypoints] = element_Id
+            effect_temp[number_of_keypoints] = element_id
 
             # Determine displacement vector corresponding to a modification
             for keypoint_count, dof_Id in enumerate(self.truss.keypoints):
                 try:
                     # Pick displacement vector at the measurement point
-                    effect_temp[keypoint_count] = self.updating_container.trusses[element_Id].displacements[dof_Id]
+                    effect_temp[keypoint_count] = self.updating_container.trusses[element_id].displacements[dof_Id]
 
                     # Copy value
-                    self.updating_container.effect[element_Id] = [x for x in effect_temp]
+                    self.updating_container.effect[element_id] = [x for x in effect_temp]
 
-                    # Add effect of index-th modification TUTI +=?????
-                    # self.updating_container.trusses[element_Id].displacements[keypoint_count] += \
-                    #    abs(self.updating_container.effect[element_Id][keypoint_count])
-                    self.updating_container.total_effect[keypoint_count] += self.updating_container.effect[element_Id][keypoint_count]
+                    # Add effect of index-th modification
+                    # TODO: this comment might be false
+                    self.updating_container.total_effect[keypoint_count] +=\
+                        self.updating_container.effect[element_id][keypoint_count]
 
                 except IndexError:
                     print("The mapping data is probably invalid.")
@@ -192,7 +192,7 @@ class Truss(TrussFramework):
         :return: {Boolean} Shows whether the optimization step successful
         """
 
-        element_Id = self.truss.number_of_elements()
+        element_id = self.truss.number_of_elements()
         self.updating_container.modifications = [0.0] * self.truss.number_of_elements()
 
         if not self.configuration.simulation:
@@ -214,9 +214,9 @@ class Truss(TrussFramework):
             print("Error: " + str(error(new_delta)))
 
             print("-----")
-            print("Step: " + str(j) )
+            print("Step: " + str(j))
 
-            ratio = [0]*element_Id
+            ratio = [0]*element_id
             unit = 0
 
             previous_modifications = self.updating_container.modifications
@@ -258,20 +258,23 @@ class Truss(TrussFramework):
                     raise Exception
 
             for i in range(self.truss.number_of_keypoints()):
-                modified_node_Id = self.updating_container.sorted_effect[0][i][1]
+                modified_node_id = self.updating_container.sorted_effect[0][i][1]
 
-                ratio[modified_node_Id] = abs(self.updating_container.total_effect[0]/self.updating_container.sorted_effect[0][i][0]) * math.copysign(1, self.updating_container.sorted_effect_sign[i][0])
+                ratio[modified_node_id] =\
+                    abs(self.updating_container.total_effect[0] / self.updating_container.sorted_effect[0][i][0]) *\
+                    math.copysign(1, self.updating_container.sorted_effect_sign[i][0])
 
-                unit += abs(ratio[modified_node_Id]*self.updating_container.sorted_effect[0][i][0])
+                unit += abs(ratio[modified_node_id]*self.updating_container.sorted_effect[0][i][0])
             print(new_delta)
             scale = new_delta[0]/unit
 
             for i in range(self.truss.number_of_elements()):
-                modified_node_Id = self.updating_container.sorted_effect[0][i][1]
-                self.updating_container.modifications[modified_node_Id] = \
-                    min(abs(previous_modifications[modified_node_Id] - self.updating_container.unit_modification*ratio[modified_node_Id]),
-                        self.updating_container.modification_limit) * \
-                    math.copysign(1, previous_modifications[modified_node_Id] - self.updating_container.unit_modification*ratio[modified_node_Id])
+                modified_node_id = self.updating_container.sorted_effect[0][i][1]
+
+                self.updating_container.modifications[modified_node_id] = \
+                    min(abs(previous_modifications[modified_node_id] - self.updating_container.unit_modification*ratio[modified_node_id]),
+                        self.updating_container.modification_limit) *\
+                    math.copysign(1, previous_modifications[modified_node_id] - self.updating_container.unit_modification*ratio[modified_node_id])
             # the last part is already the sign itself without the sign function
 
             print("Ratio: " + str(scale))
@@ -294,7 +297,8 @@ class Truss(TrussFramework):
         self.updating_container.number_of_updates[0] += 1
         return True
 
-    def start_model_updating(self, unit_modification=0.05, error_limit=1.2, modification_limit=0.7, iteration_limit=100):
+    def start_model_updating(self, unit_modification=0.05, error_limit=1.2,
+                             modification_limit=0.7, iteration_limit=100):
         """
         Configuring the solver. If the iterations do not converge, settings shall be tuned here
 
@@ -343,18 +347,18 @@ class Truss(TrussFramework):
             filemode = 'a'
             # TODO: complete this process
         else:
-            #self.bulk_set_measurement_points()
+            # self.bulk_set_measurement_points()
             base = ['SIMULATION']
             filemode = 'r'
             self.check_folder('Simulation')
-            with open("./Simulation/" + str(self.title) + ' - Input Data.txt', filemode) as input_file:
-                new_line = "[],0.0"
+            with open("./Simulation/" + str(self.title) + ' - Input Data.txt', filemode) as input:
                 for i in range(1000):
                     delta = []
-                    previous_line = new_line
-                    new_line = input_file.readline()
+                    new_line = input.readline()
+
                     if not new_line == '':
-                        delta = self.mock_delta(new_line, previous_line)
+                        delta = self.mock_delta(new_line)
+
                     if delta:
                         if self.updating_container.original_delta == []:
                             self.updating_container.original_delta = delta
