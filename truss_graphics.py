@@ -31,7 +31,7 @@ class Arrow3D(FancyArrowPatch):
         self.set_positions((_xs[0], _ys[0]), (_xs[1], _ys[1]))
         FancyArrowPatch.draw(self, renderer)
 
-    def plotstructure(truss, original=1, result=1, supports=1,
+    def plot_structure(truss, original=1, result=1, supports=1,
                       forces=1, reactions=1, scale_displacements=1, scale_forces=1, z_correction=1, show_values=1, save_plot=1, log=0):
         """
         General plotting method for trusses

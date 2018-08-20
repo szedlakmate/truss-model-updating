@@ -701,7 +701,7 @@ class TrussFramework(object):
             MATERIALS - This data will be evaluated in Python: 70.0*(10**9), 100.0*(10**9) ...
             FORCES - Selected dof + Force: 11, +1000000.0 | 12, +1000000.0 ...
             SUPPORTS - Selected dof + Prescribed displacements: 0, 0.0 | 1, 0.0 ...
-            SPECdof - Selected node's dof will be analysed during Model Updating: 1, xyz | 3 y | 10 xz ...
+            SPECIAL_DOF - Selected node's dof will be analysed during Model Updating: 1, xyz | 3 y | 10 xz ...
 
             EOF - For compatibility reasons EOF should be placed after the commands
         """
@@ -1010,19 +1010,22 @@ class TrussFramework(object):
     def set_base(self):
 
         if self.configuration.simulation:
-            #self.arduino_simulation_thread = self.open_simulation_thread()
-            #self.configuration.previous_line
+            # self.arduino_simulation_thread = self.open_simulation_thread()
+            # self.configuration.previous_line
 
             print("HARD CODED PART 3")
             self.configuration.updating.base = 27
 
-            return 0 #self.mock_delta()
+            return 0  # self.mock_delta()
         else:
             return self.calibrate()
 
-
     def check_folder(self, directory):
-        path = str(os.path.dirname('.')) + '/' + directory.replace('/','').replace('.','') + '/'
+        """
+        :param directory: folder name to be checked
+        :return: None
+        """
+        path = str(os.path.dirname('.')) + '/' + directory.replace('/', '').replace('.', '') + '/'
 
         if not os.path.exists(path):
             os.makedirs(path)
@@ -1037,22 +1040,22 @@ class TrussFramework(object):
         out_element = ''
         for i in self.truss.nodal_connections:
             out_element += str(i[0] + self._io_origin) + ', ' + str(i[1] + self._io_origin) + ' | '
-        out_coords = ''
+        out_coordinates = ''
         for i in self.truss.nodal_coord:
-            out_coords += str(i[0]) + ', ' + str(i[1]) + ', ' + str(i[2]) + ' | '
-        out_crsect = ''
+            out_coordinates += str(i[0]) + ', ' + str(i[1]) + ', ' + str(i[2]) + ' | '
+        out_cross_sections = ''
         for i in self.truss.cross_sectional_area_list:
-            out_crsect += str(i) + ', '
+            out_cross_sections += str(i) + ', '
         out_materials = ''
         for i in self.truss.elastic_modulo:
             out_materials += str(i) + ', '
         out_forces = ''
-        for forcedof, i in enumerate(self.truss.known_f_not_zero):
+        for force_dof, i in enumerate(self.truss.known_f_not_zero):
             if self.truss.dof == 3:
-                out_forces += str(forcedof + self._io_origin) + ', ' + str(self.truss.force[forcedof]) + ' | '
+                out_forces += str(force_dof + self._io_origin) + ', ' + str(self.truss.force[force_dof]) + ' | '
             elif self.truss.dof == 2 and i % 3 != 2:
-                out_forces += str(forcedof - forcedof//3 + self._io_origin) + ', ' \
-                              + str(self.truss.force[forcedof]) + ' | '
+                out_forces += str(force_dof - force_dof//3 + self._io_origin) + ', ' \
+                              + str(self.truss.force[force_dof]) + ' | '
         out_supports = ''
         for i in self.truss.constraint:
             if self.truss.dof == 3:
@@ -1060,7 +1063,7 @@ class TrussFramework(object):
             elif i[0] % 3 != 2:
                 out_supports += str(i[0] - i[0]//3 + self._io_origin) + ', ' + str(i[1]) + ' | '
         # Not elegant solution
-        out_specdofs = self.special_dof_input_string
+        out_special_dofs = self.special_dof_input_string
         try:
             with open(path, 'w') as outfile:
                 # Writing data
@@ -1076,21 +1079,21 @@ class TrussFramework(object):
                                 outfile.write(' ')
                                 if i < 9:
                                     outfile.write(' ')
-                            nodalforce = ''
+                            nodal_force = ''
                             if (i//3)*3+0 in self.truss.known_displacement_a:
-                                nodalforce += "{:10.2f}".format(self.truss.force[(i//3)*3+0]) + ', '
+                                nodal_force += "{:10.2f}".format(self.truss.force[(i//3)*3+0]) + ', '
                             else:
-                                nodalforce += '            '
+                                nodal_force += '            '
                             if (i//3)*3+1 in self.truss.known_displacement_a:
-                                nodalforce += "{:10.2f}".format(self.truss.force[(i//3)*3+1]) + ', '
+                                nodal_force += "{:10.2f}".format(self.truss.force[(i//3)*3+1]) + ', '
                             else:
-                                nodalforce += '            '
+                                nodal_force += '            '
                             if self.truss.dof != 2 and (i//3)*3+2 in self.truss.known_displacement_a:
-                                nodalforce += "{:10.2f}".format(self.truss.force[(i//3)*3+2]) + '\n'
+                                nodal_force += "{:10.2f}".format(self.truss.force[(i//3)*3+2]) + '\n'
                             else:
-                                nodalforce += '          \n'
-                            if nodalforce != '                                  \n':
-                                outfile.write(str(i//3 + self._io_origin) + ', ' + nodalforce)
+                                nodal_force += '          \n'
+                            if nodal_force != '                                  \n':
+                                outfile.write(str(i//3 + self._io_origin) + ', ' + nodal_force)
                         prev = i//3
                 outfile.write('\n')
 
@@ -1100,7 +1103,8 @@ class TrussFramework(object):
                         outfile.write(' ')
                         if i < 9:
                             outfile.write(' ')
-                    outfile.write(str(i + self._io_origin) + ', ' + "{:10.3f}".format(self.truss.displacements[i * 3 + 0]) +
+                    outfile.write(str(i + self._io_origin) + ', ' +
+                                  "{:10.3f}".format(self.truss.displacements[i * 3 + 0]) +
                                   ', ' + "{:10.3f}".format(self.truss.displacements[i * 3 + 1]) +
                                   ', ' + "{:10.3f}".format(self.truss.displacements[i * 3 + 2]) + ', ' + '\n')
                 outfile.write('\n')
@@ -1123,22 +1127,22 @@ class TrussFramework(object):
                 outfile.write('ELEMENTS\n')
                 outfile.write(out_element + '\n\n')
                 outfile.write('COORDINATES\n')
-                outfile.write(out_coords + '\n\n')
+                outfile.write(out_coordinates + '\n\n')
                 outfile.write('CROSS-SECTIONS\n')
-                outfile.write(out_crsect + '\n\n')
+                outfile.write(out_cross_sections + '\n\n')
                 outfile.write('MATERIALS\n')
                 outfile.write(out_materials + '\n\n')
                 outfile.write('FORCES\n')
                 outfile.write(out_forces + '\n\n')
                 outfile.write('SUPPORTS\n')
                 outfile.write(out_supports + '\n\n')
-                outfile.write('SPECdof\n')
-                outfile.write(out_specdofs + '\n\n')
+                outfile.write('SPECIAL_DOF\n')
+                outfile.write(out_special_dofs + '\n\n')
                 outfile.write('EOF\n')
         except FileNotFoundError:
             print("Error: Please manually create the 'Structures' folder"
                   "in the root of the project")
-            print('Missing:\n'+ str(path))
+            print('Missing:\n' + str(path))
             raise FileNotFoundError
 
     def capable(self):
@@ -1173,7 +1177,9 @@ class TrussFramework(object):
             outfile.write("Required iterations: " + str(j) + "\n")
             outfile.write("Measurement: " + str(self.updating_container.measurement) + "\n")
             outfile.write("Original delta: " + str(self.updating_container.original_delta) + "\n")
-            outfile.write("New delta: " + str(self.updating_container.latest_delta) + " (limit: " + str(self.updating_container.error_limit) + ")\n")
+            outfile.write("New delta: " + str(self.updating_container.latest_delta) + " (limit: " +
+                          str(self.updating_container.error_limit) + ")\n")
+
             outfile.write("Final error: " + str(error(self.updating_container.latest_delta)) + "\n")
             outfile.write("Modifications [%]: \n")
             outfile.write(str(self.updating_container.modifications) + "\n")
@@ -1192,7 +1198,7 @@ def plot(truss, original=False, result=False, supports=True, forces=True,
          reactions=True, scale_displacement=1.0, scale_forces=1.0, z_correction=0.3, save=True, label_classes=''):
     """
     Plot function of the Truss class
-    This method calls the more general plotstructure() method.
+    This method calls the more general plot_structure() method.
 
     :param truss: Truss object to be plotted
     :param original: Print original structure?
@@ -1200,8 +1206,8 @@ def plot(truss, original=False, result=False, supports=True, forces=True,
     :param supports: Print supports?
     :param forces: Print forces?
     :param reactions: Print reactions?
-    :param scale_displacement: Sign graphical scalign
-    :param scale_forces: Sign graphical scalign
+    :param scale_displacement: Sign graphical scaling
+    :param scale_forces: Sign graphical scaling
     :param z_correction: Scale everything along the Z-axis
     :param save: Save the plot into a file?
     :param label_classes: HTML styled class definition
@@ -1212,8 +1218,8 @@ def plot(truss, original=False, result=False, supports=True, forces=True,
 
     force_values = True     # Show values of forces
 
-    file_path = Arrow3D.plotstructure(truss, original, result, supports, forces, reactions,
-                                      scale_displacement, scale_forces, z_correction, force_values, save)
+    file_path = Arrow3D.plot_structure(truss, original, result, supports, forces, reactions,
+                                       scale_displacement, scale_forces, z_correction, force_values, save)
 
     # Add labels of plots for optional GIF creating
     path_array = label_classes.split(' ')
@@ -1221,12 +1227,13 @@ def plot(truss, original=False, result=False, supports=True, forces=True,
         truss.plot_data.paths += [file_path]
         truss.plot_data.labels += [label]
 
+
 def animate(truss, label_selector):
     """
     GIF creator
 
-    :param file_paths: Array, pointing to the source files
-    :param gif_name: name of the resulted gif. It will be created in the Results folder.
+    :param truss: Array, pointing to the source files
+    :param label_selector: labels to be filtered
     :return: None
     """
     import imageio
