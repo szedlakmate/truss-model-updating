@@ -136,7 +136,7 @@ class Truss(TrussFramework):
 
                     # Add effect of index-th modification
                     # TODO: this comment might be false
-                    self.updating_container.total_effect[keypoint_count] +=\
+                    self.updating_container.total_effect[keypoint_count] += \
                         self.updating_container.effect[element_id][keypoint_count]
 
                 except IndexError:
@@ -148,7 +148,7 @@ class Truss(TrussFramework):
         for i in range(number_of_elements):
             for j in range(number_of_keypoints):
                 if self.updating_container.total_effect[j] > 0:
-                    self.updating_container.effect_ratio[i][j] =\
+                    self.updating_container.effect_ratio[i][j] = \
                         abs(self.updating_container.effect_ratio[i][j] / self.updating_container.total_effect[j])
                 else:
                     self.updating_container.effect_ratio[i][j] = 0
@@ -164,7 +164,7 @@ class Truss(TrussFramework):
             for k_temp in range(number_of_elements):
                 if self.updating_container.sorted_effect[i][k_temp][i] < 0:
                     for j_temp in range(number_of_keypoints):
-                        self.updating_container.sorted_effect[i][k_temp][j_temp] =\
+                        self.updating_container.sorted_effect[i][k_temp][j_temp] = \
                             abs(self.updating_container.sorted_effect[i][k_temp][j_temp])
 
                         self.updating_container.sorted_effect_sign[i][k_temp] = -1
@@ -173,17 +173,18 @@ class Truss(TrussFramework):
 
             for j in range(number_of_keypoints):
                 if i != j and j != 0:
-                    self.updating_container.sorted_effect[i] =\
+                    self.updating_container.sorted_effect[i] = \
                         swap_columns(sorted(swap_columns(
                             self.updating_container.sorted_effect[i], 0, j), reverse=True), 0, j)
             if i != 0:
-                self.updating_container.sorted_effect[i] =\
+                self.updating_container.sorted_effect[i] = \
                     swap_columns(sorted(swap_columns(
                         self.updating_container.sorted_effect[i], 0, i), reverse=True), 0, i)
             else:
-                self.updating_container.sorted_effect[i] =\
+                self.updating_container.sorted_effect[i] = \
                     sorted(self.updating_container.sorted_effect[i], reverse=True)
 
+    # TODO: negative numbers kill the optimization
     def optimize(self, delta):
         """
         Model updating - core function
@@ -203,6 +204,7 @@ class Truss(TrussFramework):
         new_delta = delta
         j = 0
 
+        print("------------------------------------")
         print("Threshold: %.4f" % self.updating_container.error_limit)
         print("Maximal number of steps: %.0f" % self.updating_container.iteration_limit)
         print("Step: 0/%.0f" % self.updating_container.iteration_limit)
@@ -260,8 +262,8 @@ class Truss(TrussFramework):
             for i in range(self.truss.number_of_keypoints()):
                 modified_node_id = self.updating_container.sorted_effect[0][i][1]
 
-                ratio[modified_node_id] =\
-                    abs(self.updating_container.total_effect[0] / self.updating_container.sorted_effect[0][i][0]) *\
+                ratio[modified_node_id] = \
+                    abs(self.updating_container.total_effect[0] / self.updating_container.sorted_effect[0][i][0]) * \
                     math.copysign(1, self.updating_container.sorted_effect_sign[i][0])
 
                 unit += abs(ratio[modified_node_id]*self.updating_container.sorted_effect[0][i][0])
@@ -277,10 +279,12 @@ class Truss(TrussFramework):
                 modified_node_id = self.updating_container.sorted_effect[0][i][1]
 
                 self.updating_container.modifications[modified_node_id] = \
-                    min(abs(previous_modifications[modified_node_id] - self.updating_container.unit_modification*ratio[modified_node_id]),
+                    min(abs(previous_modifications[modified_node_id] - self.updating_container.unit_modification *
+                            ratio[modified_node_id]),
                         self.updating_container.modification_limit) *\
-                    math.copysign(1, previous_modifications[modified_node_id] - self.updating_container.unit_modification*ratio[modified_node_id])
-            # the last part is already the sign itself without the sign function
+                    math.copysign(1,
+                                  previous_modifications[modified_node_id] - self.updating_container.unit_modification *
+                                  ratio[modified_node_id])  # the last part is already the sign itself
 
             print("Tangent: %.2f" % scale)
 
@@ -290,7 +294,7 @@ class Truss(TrussFramework):
                 self.updating_container.number_of_updates[1] += 1
                 return False
 
-        print("Final error: " + str(error(new_delta)))
+        print("Final error: %.2f" % error(new_delta))
 
         if not self.capable() and j > 1:
             print("Optimization could not be finished successfully.")
@@ -367,8 +371,10 @@ class Truss(TrussFramework):
                     if delta:
                         if self.updating_container.original_delta == []:
                             self.updating_container.original_delta = delta
-                            self.updating_container.latest_delta = delta
-                            self.optimize(delta)
+
+                        self.updating_container.latest_delta = delta
+                        self.optimize(delta)
+                        self.updating_container.reset(self.truss)
 
 
 ##################################
@@ -429,11 +435,9 @@ if __name__ == '__main__':
 
     # Update iteration
     if TRUSS.configuration.updating:
-        TRUSS.start_model_updating(unit_modification=0.05, error_limit=1.2, modification_limit=0.7, iteration_limit=100)
+        TRUSS.start_model_updating(unit_modification=0.05, error_limit=0.9, modification_limit=0.7, iteration_limit=100)
         print("------------------------------------")
         TRUSS.configuration.part_time("Updating numerical model")
-
-    # TODO: plot the updated model
 
     # Closing Arduino port
     if TRUSS.configuration.arduino:

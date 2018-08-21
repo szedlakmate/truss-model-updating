@@ -160,11 +160,10 @@ class TrussConfiguration(object):
         self.TOTAL_TIME = self.TAC - self.TIC
         if self.updating:
             print("Update statistics:\n")
-            print("Totally updated models: " + str(
-                number_of_updates[0] + number_of_updates[1] + number_of_updates[2]))
-            print("  Successfully updated models: " + str(number_of_updates[0]))
-            print("  Updates with running out of possibilities: " + str(number_of_updates[2]))
-            print("  Updates did not finished: " + str(number_of_updates[1]))
+            print("Total number of models: %.0f" % (number_of_updates[0] + number_of_updates[1] + number_of_updates[2]))
+            print("  Successfully updated models: %.0f" % number_of_updates[0])
+            print("  Updates with running out of possibilities: %.0f" % number_of_updates[2])
+            print("  Updates did not finished: %.0f" % number_of_updates[1])
             print("\nTotal time: {:10.3f}".format(self.TOTAL_TIME))
 
         else:
@@ -494,7 +493,7 @@ class TrussModelData(object):
 
         self.dis_new = [0] * (self.number_of_nodes() * 3 - len(self.constraint))
         self.force_new = [0] * (self.number_of_nodes() * 3 - len(self.constraint))
-        self.stiff_new = [[0] * (self.number_of_nodes() * 3 - len(self.constraint))] * \
+        self.stiff_new = [[0] * (self.number_of_nodes() * 3 - len(self.constraint))] *\
                          (self.number_of_nodes() * 3 - len(self.constraint))
 
         # known force array
@@ -584,6 +583,7 @@ class ModelUpdatingContainer(object):
         self.sorted_effect_sign = []
         self.original_delta = []
         self.latest_delta = []
+
         # Solver configuration
         self.unit_modification = 0
         self.error_limit = 0
@@ -591,6 +591,22 @@ class ModelUpdatingContainer(object):
         self.iteration_limit = 0
         self.trusses = []
         self.reference = []
+
+    def reset(self, truss):
+        """
+        Reset container to prepare for model updating
+
+        :return: None
+        """
+        self.modifications = [0.0] * len(self.measurement)
+        # self.measurement = [0.0] * len(self.measurement)
+        self.effect = [0.0] * len(self.effect)
+        self.effect_ratio = [0.0] * len(self.effect_ratio)
+        self.total_effect = [0.0] * len(self.total_effect)
+        self.sorted_effect = [0.0] * len(self.sorted_effect)
+        self.sorted_effect_sign = [0.0] * len(self.sorted_effect_sign)
+        self.trusses = [truss] * truss.number_of_elements()
+        self.reference = [0.0] * len(self.reference)
 
 
 class TrussFramework(object):
@@ -608,7 +624,7 @@ class TrussFramework(object):
         :param title: Title of the structure
         """
         # Serial connection
-        self.serial_connection = False  # Holds serial connection
+        self.serial_connection = serial.Serial()  # Holds serial connection
 
         # Project data
         if title == '':
@@ -906,9 +922,9 @@ class TrussFramework(object):
         """
         Simulate data, based on previous measurement
         """
-        data = [0]*1 #*len(self.updating_container.arduino_mapping)
+        data = [0] * 1  # *len(self.updating_container.arduino_mapping)
         try:
-            arduino_line = str(arduino_line.split(']')[0])+"]"
+            arduino_line = str(arduino_line.split(']')[0]) + "]"
             try:
                 arduino_values = eval(arduino_line)
             except SyntaxError:
@@ -1164,23 +1180,30 @@ class TrussFramework(object):
         with open("./Results/" + self.title + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
             if j > 1:
                 if j <= self.updating_container.iteration_limit and self.capable():
-                    self.updating_container.number_of_updates[0] += 1
-                    outfile.write("Update state: SUCCESSFUL\n")
+                    outfile.write("Update state: Successful\n")
+
                 if not j <= self.updating_container.iteration_limit:
-                    self.updating_container.number_of_updates[1] += 1
                     outfile.write("Update state: Run out of iteration limit\n")
+
                 if not self.capable() and j > 1:
-                    self.updating_container.number_of_updates[2] += 1
                     outfile.write("Update state: No more possible modification\n")
             else:
                 outfile.write("Update state: Optimization was skipped\n")
-            outfile.write("Required iterations: " + str(j) + "\n")
-            outfile.write("Measurement: " + str(self.updating_container.measurement) + "\n")
-            outfile.write("Original delta: " + str(self.updating_container.original_delta) + "\n")
-            outfile.write("New delta: " + str(self.updating_container.latest_delta) + " (limit: " +
-                          str(self.updating_container.error_limit) + ")\n")
 
-            outfile.write("Final error: " + str(error(self.updating_container.latest_delta)) + "\n")
+            measurement_string = ""
+            for element in self.updating_container.measurement:
+                measurement_string += " %.3f" % element
+
+            outfile.write("Required iterations: %.0f\n" % j)
+            outfile.write("Measurement: %s\n" % measurement_string)
+            outfile.write("Original delta: " + str(self.updating_container.original_delta) + "\n")
+            outfile.write("Threshold: %.4f\n" % self.updating_container.error_limit)
+
+            latest_delta_string = ""
+            for element in self.updating_container.latest_delta:
+                latest_delta_string += " %.3f" % element
+            outfile.write("Final error: %s\n")
+
             outfile.write("Modifications [%]: \n")
             outfile.write(str(self.updating_container.modifications) + "\n")
             outfile.write("Original displacements: \n")
@@ -1247,4 +1270,5 @@ def animate(truss, label_selector):
     images = []
     for filename in file_paths:
         images.append(imageio.imread(filename))
-    imageio.mimsave('./Results/' + truss.title + ' - ' + label_selector + ' animation.gif', images, duration=0.33*len(file_paths))
+    imageio.mimsave('./Results/' + truss.title + ' - ' + label_selector + ' animation.gif',
+                    images, duration=0.33*len(file_paths))
