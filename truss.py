@@ -71,15 +71,15 @@ class Truss(TrussFramework):
         self.truss.cross_sectional_area_list[element_id] = new_area
         self.truss.invalidate_stiffness_matrices()
 
-    def modify_material(self, element_id, E):
+    def modify_material(self, element_id, elastic_modulo):
         """
         Modifying material data by elements
 
         :param element_id: {number} Id of the element which should be modified
-        :param E: {number} Elastic modulo
+        :param elastic_modulo: {number} Elastic modulo
         :return: None
         """
-        self.truss.elastic_modulo[element_id] = E
+        self.truss.elastic_modulo[element_id] = elastic_modulo
         self.truss.invalidate_stiffness_matrices()
 
     def modify_force(self, element_id, force):
@@ -203,20 +203,20 @@ class Truss(TrussFramework):
         new_delta = delta
         j = 0
 
-        print("-----")
-        print("Maximal number of steps: " + str(self.updating_container.iteration_limit))
-        print("Step: 0/" + str(self.updating_container.iteration_limit))
+        print("Threshold: %.4f" % self.updating_container.error_limit)
+        print("Maximal number of steps: %.0f" % self.updating_container.iteration_limit)
+        print("Step: 0/%.0f" % self.updating_container.iteration_limit)
 
         # Optimization loop
         while error(new_delta) > self.updating_container.error_limit and (self.capable() or j <= 1):
             j += 1
 
-            print("Error: " + str(error(new_delta)))
+            print("Error: %.2f" % error(new_delta))
 
             print("-----")
-            print("Step: " + str(j))
+            print("Step: %.0f" % j)
 
-            ratio = [0]*element_id
+            ratio = [0] * element_id
             unit = 0
 
             previous_modifications = self.updating_container.modifications
@@ -252,7 +252,7 @@ class Truss(TrussFramework):
 
             for i, effect in enumerate(self.updating_container.total_effect):
                 if effect == 0.0:
-                    print("None of the variables has effect on " + str(self.updating_container.arduino_mapping[i]))
+                    print("None of the variables has effect on %.0f" % self.updating_container.arduino_mapping[i])
                     print("Model updating has no solution.")
                     self.updating_container.number_of_updates[2] += 1
                     raise Exception
@@ -265,7 +265,12 @@ class Truss(TrussFramework):
                     math.copysign(1, self.updating_container.sorted_effect_sign[i][0])
 
                 unit += abs(ratio[modified_node_id]*self.updating_container.sorted_effect[0][i][0])
-            print(new_delta)
+
+            new_delta_string = ""
+            for factor in new_delta:
+                new_delta_string += " %.2f" % factor
+
+            print("Delta: [%s ]" % new_delta_string)
             scale = new_delta[0]/unit
 
             for i in range(self.truss.number_of_elements()):
@@ -277,11 +282,11 @@ class Truss(TrussFramework):
                     math.copysign(1, previous_modifications[modified_node_id] - self.updating_container.unit_modification*ratio[modified_node_id])
             # the last part is already the sign itself without the sign function
 
-            print("Ratio: " + str(scale))
+            print("Tangent: %.2f" % scale)
 
             if j >= self.updating_container.iteration_limit:
                 print("Iteration limit is reached.")
-                print("The remaining error is: " + str(error(new_delta)))
+                print("The remaining error is: %.2f" % error(new_delta))
                 self.updating_container.number_of_updates[1] += 1
                 return False
 
@@ -289,7 +294,7 @@ class Truss(TrussFramework):
 
         if not self.capable() and j > 1:
             print("Optimization could not be finished successfully.")
-            print("The remaining error is: " + str(error(new_delta)))
+            print("The remaining error is: %.2f" % error(new_delta))
             self.updating_container.number_of_updates[2] += 1
             return False
 
@@ -297,7 +302,7 @@ class Truss(TrussFramework):
         self.updating_container.number_of_updates[0] += 1
         return True
 
-    def start_model_updating(self, unit_modification=0.05, error_limit=1.2,
+    def start_model_updating(self, unit_modification=0.05, error_limit=0.9,
                              modification_limit=0.7, iteration_limit=100):
         """
         Configuring the solver. If the iterations do not converge, settings shall be tuned here
@@ -420,8 +425,7 @@ if __name__ == '__main__':
 
     # Write results to file
     TRUSS.write_results()
-    TRUSS.configuration.part_time("Wrote results to the output file : Structures/<title> - Results.txt"
-                                  .format(TRUSS.title))
+    TRUSS.configuration.part_time("Wrote results to the output file: Structures/%s - Results.txt" % TRUSS.title)
 
     # Update iteration
     if TRUSS.configuration.updating:

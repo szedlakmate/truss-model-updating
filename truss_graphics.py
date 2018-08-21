@@ -257,9 +257,9 @@ class Arrow3D(FancyArrowPatch):
 
         # pyplot.show()
         if save_plot:
-            path = './Results/' + plotname + '.png'
+            path = './Results/%s.png' % plotname
             fig.savefig(path)
-            print("'" + plotname + ".png' is saved.")
+            print("'%s.png' is saved." % plotname)
             print('------------------------------------')
 
         return path

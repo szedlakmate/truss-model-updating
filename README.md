@@ -16,7 +16,7 @@ The program has 2 major features:
 General program for solving a truss with the following attributes:
 
 * Geometry (nodes, elements, cross-sections)
-* Materials (E)
+* Materials (elastic_modulo)
 * Supports
 * Forces on the nodes (no moments)
 

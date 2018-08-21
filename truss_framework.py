@@ -159,7 +159,7 @@ class TrussConfiguration(object):
         self.TAC = time.time()
         self.TOTAL_TIME = self.TAC - self.TIC
         if self.updating:
-            print("Update statistics:")
+            print("Update statistics:\n")
             print("Totally updated models: " + str(
                 number_of_updates[0] + number_of_updates[1] + number_of_updates[2]))
             print("  Successfully updated models: " + str(number_of_updates[0]))
@@ -357,14 +357,14 @@ class TrussModelData(object):
         self.cross_sectional_area_list = area_list
         self.invalidate_stiffness_matrices()
 
-    def bulk_set_materials(self, E):
+    def bulk_set_materials(self, elastic_modulo):
         """
         Setting material data in bulk mode
 
-        :param E: array of elastic modulos according to the elements
+        :param elastic_modulo: array of elastic modulos according to the elements
         :return: None
         """
-        self.elastic_modulo = E
+        self.elastic_modulo = elastic_modulo
         self.invalidate_stiffness_matrices()
 
     def bulk_set_forces(self, forces):
@@ -768,7 +768,7 @@ class TrussFramework(object):
                         input_string = source_line.replace(',', '|').replace(';', '|').split('|')
                         if '' in input_string:
                             input_string.remove('')
-                        print(input_string)
+
                         input_number = [float(eval(x)) for x in input_string]
                         self.truss.bulk_set_materials(input_number)
                         self.read_elements[5] = 1
