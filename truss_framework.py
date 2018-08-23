@@ -74,12 +74,12 @@ class TrussConfiguration(object):
             # Modify as needed #
             self.mode_name = "User defined"
             self.log = 1  # Logging time
-            self.graphics = 1  # Graphical features
+            self.graphics = 0  # Graphical features
             self.solver = 1  # 0: Basic solver, 1: NumPy solver
             self.os_lib = 1  # Basic OS file features (e.g. file size)
             self.updating = 1  # Model Updating: On/ Off
             self.arduino = 0  # Arduino input: On/Off
-            self.debug = 1  # Debugging mode
+            self.debug = 0  # Debugging mode
             self.realistic_simulation = 0  # Wait as long as it was originally. Only valid with _SIMULATION = 1
 
         elif self.compatibility_mode == 1:
@@ -232,6 +232,8 @@ class TrussModelData(object):
         self.stress_color = []  # Color mapping for stresses
         # Plot data
         self.plot_data = PlotConfiguration()
+        # Workaround
+        self._original_displacements = None
 
     def number_of_nodes(self):
         # TODO: refactor
@@ -478,8 +480,8 @@ class TrussModelData(object):
 
             stiffness_increment = [0]*(self.number_of_nodes()*3)
 
-            for j in range(3*2):
-                for k in range(3*2):
+            for j in range(3 * 2):
+                for k in range(3 * 2):
                     stiffness_increment[ele_dof_vec[k]] = local_stiffness_matrix[i][j][k]
                 self.stiffness_matrix[ele_dof_vec[j]] = \
                     [x + y for x, y in zip(self.stiffness_matrix[ele_dof_vec[j]], stiffness_increment)]
@@ -585,7 +587,7 @@ class ModelUpdatingContainer(object):
         self.total_effect = []
         self.sorted_effect = []
         self.sorted_effect_sign = []
-        self.original_delta = []
+        self.original_delta = None
         self.latest_delta = []
 
         # Solver configuration
@@ -924,8 +926,11 @@ class TrussFramework(object):
     def mock_delta(self, arduino_line):
         """
         Simulate data, based on previous measurement
+
+        :param arduino_line: raw input string
+        :return: delta
         """
-        data = [0] * 1  # *len(self.updating_container.arduino_mapping)
+        data = [0] * len(self.truss.keypoint_ids)
         try:
             arduino_line = str(arduino_line.split(']')[0]) + "]"
             try:
@@ -941,8 +946,12 @@ class TrussFramework(object):
 
             self.updating_container.measurement = data
 
+            if self.truss._original_displacements is None:
+                self.truss._original_displacements = self.truss.displacements
+
             # Calculate differences
-            delta = self.difference(self.truss.displacements, self.updating_container.measurement)
+            # TODO: self.truss.displacements should be enough
+            delta = self.difference(self.truss._original_displacements, self.updating_container.measurement)
             return delta
 
         except IndexError:
@@ -958,6 +967,8 @@ class TrussFramework(object):
         answer_1 = '0'
         restart = '0'
         accept = '0'
+        measurement = []
+
         print("Before starting the model updating, the measuring tools must be calibrated.")
         print("The calibration should be done in load-free state.")
         while answer_1 not in ['Y', 'N']:
@@ -1210,20 +1221,29 @@ class TrussFramework(object):
             for element in self.updating_container.measurement:
                 measurement_string += " %.3f" % element
 
+            original_delta_string = ""
+            for element in self.updating_container.original_delta:
+                original_delta_string += " %.3f" % element
+
             outfile.write("Required iterations: %.0f\n" % j)
             outfile.write("Measurement: %s\n" % measurement_string)
-            outfile.write("Original delta: " + str(self.updating_container.original_delta) + "\n")
+            outfile.write("Original delta: %s\n" % original_delta_string)
             outfile.write("Threshold: %.4f\n" % self.updating_container.error_limit)
 
             latest_delta_string = ""
             for element in self.updating_container.latest_delta:
                 latest_delta_string += " %.3f" % element
-            outfile.write("Final error: %s\n")
 
+            outfile.write("Final error: %.2f\n" % error(self.updating_container.latest_delta))
             outfile.write("Modifications [%]: \n")
             outfile.write(str(self.updating_container.modifications) + "\n")
-            outfile.write("Original displacements: \n")
-            outfile.write(str(self.truss.displacements) + "\n")
+
+            original_displacements_string = ""
+            for element in self.truss.displacements:
+                original_displacements_string += " %.3f" % element
+
+            outfile.write("Original displacements: \n%s\n" % original_displacements_string)
+
             if j > 1:
                 outfile.write("New displacements: \n")
                 outfile.write(str(self.updating_container.latest_delta) + "\n")

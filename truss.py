@@ -141,7 +141,6 @@ class Truss(TrussFramework):
 
                 except IndexError:
                     print("The mapping data is probably invalid.")
-                    print("Please check the \'arduino_mapping.txt\' input whether the given dofs are correct or not.")
                     raise IndexError
 
         self.updating_container.effect_ratio = deepcopy(self.updating_container.effect)
@@ -203,10 +202,10 @@ class Truss(TrussFramework):
         print("------------------------------------")
         print("Threshold: %.4f" % self.updating_container.error_limit)
         print("Maximal number of steps: %.0f" % self.updating_container.iteration_limit)
-        print("Step: 0/%.0f" % self.updating_container.iteration_limit)
+        print("Step: 0")
 
         # Optimization loop
-        while error(new_delta) > self.updating_container.error_limit and (self.capable() or j <= 1):
+        while error(new_delta) > self.updating_container.error_limit and (self.capable() or j == 0):
             j += 1
 
             print("Error: %.2f" % error(new_delta))
@@ -265,6 +264,7 @@ class Truss(TrussFramework):
                 unit += abs(ratio[modified_node_id]*self.updating_container.sorted_effect[0][i][0])
 
             new_delta_string = ""
+            self.updating_container.latest_delta = new_delta
             for factor in new_delta:
                 new_delta_string += " %.2f" % factor
 
@@ -347,32 +347,28 @@ class Truss(TrussFramework):
         """
         self.processed_data = [0]*1  # *len(self.arduino_mapping)
 
-
         if not self.configuration.simulation:
-            base = self.set_base()
+            # base = self.set_base()
             filemode = 'a'
             # TODO: complete this process
         else:
             # self.bulk_set_measurement_points()
-            base = ['SIMULATION']
+            # base = ['SIMULATION']
             filemode = 'r'
             self.check_folder('Simulation')
 
         self.initiate_output_stream()
 
-        with open("./Simulation/" + str(self.title) + ' - Input Data.txt', filemode) as input:
+        with open("./Simulation/" + str(self.title) + ' - Input Data.txt', filemode) as file_input:
             for i in range(1000):
                 delta = []
-                new_line = input.readline()
+                new_line = file_input.readline()
 
                 if not new_line == '':
                     delta = self.mock_delta(new_line)
 
                 if delta:
-                    if self.updating_container.original_delta == []:
-                        self.updating_container.original_delta = delta
-
-                    self.updating_container.latest_delta = delta
+                    self.updating_container.original_delta = delta
                     self.optimize(delta)
                     self.updating_container.reset(self.truss)
 
@@ -435,7 +431,7 @@ if __name__ == '__main__':
 
     # Update iteration
     if TRUSS.configuration.updating:
-        TRUSS.start_model_updating(unit_modification=0.05, error_limit=0.9, modification_limit=0.7, iteration_limit=100)
+        TRUSS.start_model_updating(unit_modification=0.05, error_limit=0.9, modification_limit=0.7, iteration_limit=20)
         print("------------------------------------")
         TRUSS.configuration.part_time("Updating numerical model")
 
