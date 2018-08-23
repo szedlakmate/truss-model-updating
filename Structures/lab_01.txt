@@ -5,14 +5,14 @@
 # The order of the commands are indifferent.
 #
 # Commands and their format (example):
-# DOF - Degree of freedom: 3
+# dof - Degree of freedom: 3
 # ELEMENTS - Elements given by end-nodes: 0, 1 | 0, 2 ...
-# COORDINATES - Nodal coordinates: 0., 0., 0., | 0., 3., 0. ...
+# COORDINATES - Nodal coordinates: 0, 0, 0, | 0, 3., 0. ...
 # CROSS-SECTIONS - This data will be evaulated in Python: 36, 5.0*(10**(-4)) ...
 # MATERIALS - This data will be evaulated in Python: 1800, 100.0*(10**9) ...
-# FORCES - Selected DOF + Force: 11, +1000000.0 | 12, +1000000.0 ...
-# SUPPORTS - Selected DOF + Prescribed displacement: 0, 0.0 | 1, 0.0 ...
-# SPECDOF - Selected node's DOF will be analysed during Model Updating: 1, xyz | 3, y | 10, xz ...
+# FORCES - Selected dof + Force: 11, +1000000.0 | 12, +1000000.0 ...
+# SUPPORTS - Selected dof + Prescribed displacement: 0, 0.0 | 1, 0.0 ...
+# SPECIAL_DOF - Selected node's dof will be analysed during Model Updating: 1, xyz | 3, y | 10, xz ...
 # EOF - For compatibility reasons EOF should be placed after the commands
 #
 # Optional:         
@@ -22,7 +22,7 @@
 _ORIGIN
 1
 
-DOF
+dof
 2
 
 ELEMENTS
@@ -43,7 +43,7 @@ FORCES
 SUPPORTS
 1, 0.0|2, 0.0|42, 0.0|
 
-SPECDOF
+SPECIAL_DOF
 13, yx |
 
 EOF
