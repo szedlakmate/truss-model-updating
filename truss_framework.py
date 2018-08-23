@@ -198,6 +198,7 @@ class TrussModelData(object):
         # Truss data
         self.dof = 3
         self.keypoints = []
+        self.keypoint_ids = []
         self.nodal_connections = []  # Element's end nodes
         self.constraint = []  # Supports
         self.force = []  # Force
@@ -286,18 +287,21 @@ class TrussModelData(object):
         Set special nodal dofs
         """
         for location in measurement_points:
-            node = int(location[0:len(location)-1])-io_origin
+            self.keypoint_ids.append(location)
+            node = int(location[0:len(location) - 1]) - io_origin
+
             if 'X' in location:
-                self.analysis[location] = node*3+0
-                self.keypoints.append(node*3+0)
+                self.analysis[location] = node * 3 + 0
+                self.keypoints.append(node * 3 + 0)
+
             if 'Y' in location:
-                self.analysis[location] = node*3+1
-                self.keypoints.append(node*3+1)
+                self.analysis[location] = node * 3 + 1
+                self.keypoints.append(node * 3 + 1)
 
             if 'Z' in location:
                 if self.dof == 3:
-                    self.analysis[location] = node*3+2
-                    self.keypoints.append(node*3+2)
+                    self.analysis[location] = node * 3 + 2
+                    self.keypoints.append(node * 3 + 2)
                 else:
                     print("Z-direction is not allowed in 2D structures. "
                           "Please check the 'MEASUREMENTS' section in the input file.")
@@ -405,7 +409,7 @@ class TrussModelData(object):
 
         if self.dof == 2:
             for dof_z in range(self.number_of_nodes()):
-                self.constraint.append([int(dof_z*3+2), 0])
+                self.constraint.append([int(dof_z * 3 + 2), 0])
         self.constraint = list(k for k, _ in itertools.groupby(sorted(self.constraint)))
 
         # Setting known forces
@@ -493,7 +497,7 @@ class TrussModelData(object):
 
         self.dis_new = [0] * (self.number_of_nodes() * 3 - len(self.constraint))
         self.force_new = [0] * (self.number_of_nodes() * 3 - len(self.constraint))
-        self.stiff_new = [[0] * (self.number_of_nodes() * 3 - len(self.constraint))] *\
+        self.stiff_new = [[0] * (self.number_of_nodes() * 3 - len(self.constraint))] * \
                          (self.number_of_nodes() * 3 - len(self.constraint))
 
         # known force array
@@ -901,9 +905,8 @@ class TrussFramework(object):
         """
         delta = []
 
-        for measured_position in measurement:
-            # loc, measured = package[0], package[1]
-            loc = '1Y'
+        for keypoint_count, measured_position in enumerate(measurement):
+            loc = self.truss.keypoint_ids[keypoint_count]
             try:
                 dof = self.truss.analysis[loc.upper()]
             except KeyError:
@@ -1096,16 +1099,16 @@ class TrussFramework(object):
                                 if i < 9:
                                     outfile.write(' ')
                             nodal_force = ''
-                            if (i//3)*3+0 in self.truss.known_displacement_a:
-                                nodal_force += "{:10.2f}".format(self.truss.force[(i//3)*3+0]) + ', '
+                            if (i//3) * 3 + 0 in self.truss.known_displacement_a:
+                                nodal_force += "{:10.2f}".format(self.truss.force[(i//3) * 3 + 0]) + ', '
                             else:
                                 nodal_force += '            '
-                            if (i//3)*3+1 in self.truss.known_displacement_a:
-                                nodal_force += "{:10.2f}".format(self.truss.force[(i//3)*3+1]) + ', '
+                            if (i//3) * 3 + 1 in self.truss.known_displacement_a:
+                                nodal_force += "{:10.2f}".format(self.truss.force[(i//3) * 3 + 1]) + ', '
                             else:
                                 nodal_force += '            '
-                            if self.truss.dof != 2 and (i//3)*3+2 in self.truss.known_displacement_a:
-                                nodal_force += "{:10.2f}".format(self.truss.force[(i//3)*3+2]) + '\n'
+                            if self.truss.dof != 2 and (i//3) * 3 + 2 in self.truss.known_displacement_a:
+                                nodal_force += "{:10.2f}".format(self.truss.force[(i//3) * 3 + 2]) + '\n'
                             else:
                                 nodal_force += '          \n'
                             if nodal_force != '                                  \n':
@@ -1175,9 +1178,22 @@ class TrussFramework(object):
                 # TODO: not to reach this part of the code
         return capable
 
-    def write_output_stream(self, j, appendix):
+    def initiate_output_stream(self):
+        appendix = ""
+        if self.configuration.simulation:
+            appendix = " - SIMULATED"
+
         self.check_folder('Results')
-        with open("./Results/" + self.title + ' - UpdateResults' + appendix + '.txt', 'a') as outfile:
+        with open("./Results/%s - UpdateResults%s.txt" % (self.title, appendix), 'w') as outfile:
+            outfile.write("")
+
+    def write_output_stream(self, j):
+        appendix = ""
+        if self.configuration.simulation:
+            appendix = " - SIMULATED"
+
+        self.check_folder('Results')
+        with open("./Results/%s - UpdateResults%s.txt" % (self.title, appendix), 'a') as outfile:
             if j > 1:
                 if j <= self.updating_container.iteration_limit and self.capable():
                     outfile.write("Update state: Successful\n")

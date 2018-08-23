@@ -218,16 +218,16 @@ class Arrow3D(FancyArrowPatch):
                                 _ax.text(truss.nodal_coord[reaction//3][0],
                                          truss.nodal_coord[reaction//3][1],
                                          truss.nodal_coord[reaction//3][2],
-                                         "{:10.2f}".format(truss.force[(reaction//3)*3+0])+'\n' +
-                                         "{:10.2f}".format(truss.force[(reaction//3)*3+1])+'\n' +
-                                         "{:10.2f}".format(truss.force[(reaction//3)*3+2]),
+                                         "{:10.2f}".format(truss.force[(reaction//3) * 3 + 0])+'\n' +
+                                         "{:10.2f}".format(truss.force[(reaction//3) * 3 + 1])+'\n' +
+                                         "{:10.2f}".format(truss.force[(reaction//3) * 3 + 2]),
                                          fontsize=12, horizontalalignment='right')
                             elif truss.dof == 2:
                                 _ax.text(truss.nodal_coord[reaction//3][0],
                                          truss.nodal_coord[reaction//3][1],
                                          truss.nodal_coord[reaction//3][2],
-                                         "{:10.2f}".format(truss.force[(reaction//3)*3+0])+'\n' +
-                                         "{:10.2f}".format(truss.force[(reaction//3)*3+1]),
+                                         "{:10.2f}".format(truss.force[(reaction//3) * 3 + 0])+'\n' +
+                                         "{:10.2f}".format(truss.force[(reaction//3) * 3 + 1]),
                                          fontsize=12, horizontalalignment='right')
                 e_previous = reaction
 

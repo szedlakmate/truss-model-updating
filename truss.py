@@ -196,12 +196,8 @@ class Truss(TrussFramework):
         element_id = self.truss.number_of_elements()
         self.updating_container.modifications = [0.0] * self.truss.number_of_elements()
 
-        if not self.configuration.simulation:
-            appendix = ""
-        else:
-            appendix = " - SIMULATED"
-
         new_delta = delta
+
         j = 0
 
         print("------------------------------------")
@@ -302,7 +298,7 @@ class Truss(TrussFramework):
             self.updating_container.number_of_updates[2] += 1
             return False
 
-        self.write_output_stream(j, appendix)
+        self.write_output_stream(j)
         self.updating_container.number_of_updates[0] += 1
         return True
 
@@ -351,6 +347,7 @@ class Truss(TrussFramework):
         """
         self.processed_data = [0]*1  # *len(self.arduino_mapping)
 
+
         if not self.configuration.simulation:
             base = self.set_base()
             filemode = 'a'
@@ -360,21 +357,24 @@ class Truss(TrussFramework):
             base = ['SIMULATION']
             filemode = 'r'
             self.check_folder('Simulation')
-            with open("./Simulation/" + str(self.title) + ' - Input Data.txt', filemode) as input:
-                for i in range(1000):
-                    delta = []
-                    new_line = input.readline()
 
-                    if not new_line == '':
-                        delta = self.mock_delta(new_line)
+        self.initiate_output_stream()
 
-                    if delta:
-                        if self.updating_container.original_delta == []:
-                            self.updating_container.original_delta = delta
+        with open("./Simulation/" + str(self.title) + ' - Input Data.txt', filemode) as input:
+            for i in range(1000):
+                delta = []
+                new_line = input.readline()
 
-                        self.updating_container.latest_delta = delta
-                        self.optimize(delta)
-                        self.updating_container.reset(self.truss)
+                if not new_line == '':
+                    delta = self.mock_delta(new_line)
+
+                if delta:
+                    if self.updating_container.original_delta == []:
+                        self.updating_container.original_delta = delta
+
+                    self.updating_container.latest_delta = delta
+                    self.optimize(delta)
+                    self.updating_container.reset(self.truss)
 
 
 ##################################
