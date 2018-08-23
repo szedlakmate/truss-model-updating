@@ -14,7 +14,7 @@ def mat_vec_mult(mat_a, vec_b):
     Source:
     https://stackoverflow.com/questions/10508021/matrix-multiplication-in-python
     """
-    vec_c = [0.] * len(mat_a)
+    vec_c = [0] * len(mat_a)
     for i, row in enumerate(mat_a):
         for j, elem in enumerate(vec_b):
             vec_c[i] += row[j] * elem

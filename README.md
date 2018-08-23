@@ -16,7 +16,7 @@ The program has 2 major features:
 General program for solving a truss with the following attributes:
 
 * Geometry (nodes, elements, cross-sections)
-* Materials (E)
+* Materials (elastic_modulo)
 * Supports
 * Forces on the nodes (no moments)
 
@@ -107,7 +107,7 @@ If needed, please edit the User defined mode only.
 
 ### Compatibility Modes
 
-Mode | Mode's name | Logging | Graphics | Numpy solver | OSlib | Updating | Arduino | Debug | Realistic simulation
+Mode | Mode's name | Logging | Graphics | Numpy solver | os_lib | Updating | Arduino | Debug | Realistic simulation
 :-------: | :---------: | :-----: | :------: | :------: |:------:| :------: | :------: | :------: | :------:
 **0** | User defined* | ✔ | ✔ | ✔ | ✔ |   |   | ✔ |   
 **1** | Informative | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |   | ✔ 
