@@ -1103,7 +1103,7 @@ class TrussFramework(object):
                 # for i in range(len(self.truss.force)//3):
                 prev = -1
                 for i in self.truss.known_displacement_a:
-                    if self.truss.dof == 3 or i % 3 != 2:
+                    if self.truss.dof == 3 or i % 3 < 2:
                         if i//3 != prev:
                             if i < 100:
                                 outfile.write(' ')
@@ -1135,8 +1135,11 @@ class TrussFramework(object):
                             outfile.write(' ')
                     outfile.write(str(i + self._io_origin) + ', ' +
                                   "{:10.3f}".format(self.truss.displacements[i * 3 + 0]) +
-                                  ', ' + "{:10.3f}".format(self.truss.displacements[i * 3 + 1]) +
-                                  ', ' + "{:10.3f}".format(self.truss.displacements[i * 3 + 2]) + ', ' + '\n')
+                                  ', ' + "{:10.3f}".format(self.truss.displacements[i * 3 + 1]) + '\n')
+
+                    if self.truss.dof == 3:
+                        outfile.write(', ' + "{:10.3f}".format(self.truss.displacements[i * 3 + 2]) + '\n')
+
                 outfile.write('\n')
 
                 outfile.write('Stresses\n')
@@ -1239,8 +1242,9 @@ class TrussFramework(object):
             outfile.write(str(self.updating_container.modifications) + "\n")
 
             original_displacements_string = ""
-            for element in self.truss.displacements:
-                original_displacements_string += " %.3f" % element
+            for index, element in enumerate(self.truss.displacements):
+                if self.truss.dof == 3 or index % 3 < 2:
+                    original_displacements_string += " %.3f" % element
 
             outfile.write("Original displacements: \n%s\n" % original_displacements_string)
 
