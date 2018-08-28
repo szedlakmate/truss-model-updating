@@ -611,7 +611,10 @@ class ModelUpdatingContainer(object):
         self.total_effect = [0.0] * len(self.total_effect)
         self.sorted_effect = [0.0] * len(self.sorted_effect)
         self.sorted_effect_sign = [0.0] * len(self.sorted_effect_sign)
-        self.trusses = [truss] * truss.number_of_elements()
+        self.trusses = []
+        for truss_id in range(truss.number_of_elements()):
+            self.trusses.append(deepcopy(truss))
+
         self.reference = [0.0] * len(self.reference)
 
 
@@ -700,7 +703,7 @@ class TrussFramework(object):
         Apply a modification on the index-th structure's index-th parameter
         considering one modifiable parameter on each element
 
-        :param modification: ratio with sign, eg: -0.05 means -0.05% = *(0.95)
+        :param modification: percentage (base: 0%) with sign, eg: -0.05 means -0.05% => *(0.95)
         :param index: --> self.updating_container.trusses[index].elastic_modulo[index] *= (1 + modification)
         :return: None
         """
