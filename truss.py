@@ -137,7 +137,7 @@ class Truss(TrussFramework):
                     # Add effect of index-th modification
                     # TODO: this comment might be false
                     self.updating_container.total_effect[keypoint_count] += \
-                        self.updating_container.effect[element_id][keypoint_count]
+                        effect_temp[keypoint_count]
 
                 except IndexError:
                     print("The mapping data is probably invalid.")
