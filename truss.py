@@ -117,23 +117,17 @@ class Truss(TrussFramework):
         self.updating_container.sorted_effect = \
             [[[0] * number_of_keypoints] * number_of_elements]*number_of_keypoints
 
-        effect_temp = [0] * (number_of_keypoints + 1)
+        effect_temp = [0] * number_of_keypoints
 
         # Determine the effects of each modification
-        for element_id in range(number_of_elements):
-
-            # Modified element's Id
-            effect_temp[number_of_keypoints] = element_id
+        for modification_id in range(number_of_elements):
 
             # Determine displacement vector corresponding to a modification
-            for keypoint_count, dof_Id in enumerate(self.truss.keypoints):
+            for keypoint_count, keypoint_dof in enumerate(self.truss.keypoints):
                 try:
                     # Pick the displacement caused by the modification_id-th modification
                     # [ X. displacement at 1.KP, X. displacement at 2.KP, ... ]
                     effect_temp[keypoint_count] = self.updating_container.trusses[modification_id].displacements[keypoint_dof]
-
-                    # Copy value
-                    self.updating_container.effect[element_id] = [x for x in effect_temp]
 
                     # Add effect of index-th modification
                     # TODO: this comment might be false
@@ -274,14 +268,14 @@ class Truss(TrussFramework):
                     self.updating_container.number_of_updates[2] += 1
                     raise Exception
 
-            for i in range(self.truss.number_of_keypoints()):
-                modified_node_id = self.updating_container.sorted_effect[0][i][1]
+            for key_point in range(self.truss.number_of_keypoints()):
+                for modification_id in range(self.truss.number_of_elements()):
 
-                ratio[modified_node_id] = \
-                    abs(self.updating_container.total_effect[0] / self.updating_container.sorted_effect[0][i][0]) * \
-                    math.copysign(1, self.updating_container.sorted_effect_sign[i][0])
+                    ratio[modification_id] = \
+                        abs(self.updating_container.total_effect[key_point] / self.updating_container.sorted_effect[0][modification_id][key_point]) * \
+                        math.copysign(1, self.updating_container.sorted_effect_sign[key_point][0])
 
-                unit += abs(ratio[modified_node_id]*self.updating_container.sorted_effect[0][i][0])
+                    unit += abs(ratio[modification_id]*self.updating_container.sorted_effect[0][modification_id][key_point])
 
             new_delta_string = ""
             self.updating_container.latest_delta = new_delta
