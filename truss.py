@@ -128,8 +128,9 @@ class Truss(TrussFramework):
             # Determine displacement vector corresponding to a modification
             for keypoint_count, dof_Id in enumerate(self.truss.keypoints):
                 try:
-                    # Pick displacement vector at the measurement point
-                    effect_temp[keypoint_count] = self.updating_container.trusses[element_id].displacements[dof_Id]
+                    # Pick the displacement caused by the modification_id-th modification
+                    # [ X. displacement at 1.KP, X. displacement at 2.KP, ... ]
+                    effect_temp[keypoint_count] = self.updating_container.trusses[modification_id].displacements[keypoint_dof]
 
                     # Copy value
                     self.updating_container.effect[element_id] = [x for x in effect_temp]
@@ -143,6 +144,11 @@ class Truss(TrussFramework):
                     print("The mapping data is probably invalid.")
                     raise IndexError
 
+            # Copy value
+            # [ 1.mod_truss's displacement at 1.KP, 2.mod_truss's displacement at 2.KP, ... ]
+            self.updating_container.effect[modification_id] = deepcopy(effect_temp)
+
+        # [ 0.element[effect, node_id], 1.element[effect, node_id], ... ]
         self.updating_container.effect_ratio = deepcopy(self.updating_container.effect)
         for i in range(number_of_elements):
             for j in range(number_of_keypoints):
@@ -263,7 +269,7 @@ class Truss(TrussFramework):
 
             for i, effect in enumerate(self.updating_container.total_effect):
                 if effect == 0.0:
-                    print("None of the variables has effect on %.0f" % self.updating_container.arduino_mapping[i])
+                    print("None of the variables has effect on node %.0f" % self.updating_container.arduino_mapping[i])
                     print("Model updating has no solution.")
                     self.updating_container.number_of_updates[2] += 1
                     raise Exception
@@ -285,6 +291,7 @@ class Truss(TrussFramework):
             print("Delta: [%s ]" % new_delta_string)
             scale = new_delta[0]/unit
 
+            # sort the effects (max -> min)
             for i in range(self.truss.number_of_elements()):
                 modified_node_id = self.updating_container.sorted_effect[0][i][1]
 
