@@ -155,33 +155,47 @@ class Truss(TrussFramework):
         self.updating_container.sorted_effect_sign = [0]*number_of_keypoints
 
         # Sort by effectiveness
-        for i in range(number_of_keypoints):
-            self.updating_container.sorted_effect[i] = deepcopy(self.updating_container.effect)
-            self.updating_container.sorted_effect_sign[i] = [0]*number_of_elements
+        for modification_id in range(number_of_keypoints):
+            
+            # Store effect in sorted_effect initially
+            self.updating_container.sorted_effect[modification_id] = deepcopy(self.updating_container.effect)
 
-            # Check sign of the effect
-            for k_temp in range(number_of_elements):
-                if self.updating_container.sorted_effect[i][k_temp][i] < 0:
-                    for j_temp in range(number_of_keypoints):
-                        self.updating_container.sorted_effect[i][k_temp][j_temp] = \
-                            abs(self.updating_container.sorted_effect[i][k_temp][j_temp])
+            # Append the modification_id to the sorted_effect to preserve the index
+            self.updating_container.sorted_effect[modification_id].extend([modification_id])
 
-                        self.updating_container.sorted_effect_sign[i][k_temp] = -1
-                else:
-                    self.updating_container.sorted_effect_sign[i][k_temp] = +1
+            # Set default sign to '+'
+            self.updating_container.sorted_effect_sign[modification_id] = [+1] * number_of_elements
 
+            # Note sign of the effect
+            for loop_element in range(number_of_elements):
+                if self.updating_container.sorted_effect[modification_id][loop_element][modification_id] < 0:
+                    for loop_keypoint in range(number_of_keypoints):
+                        
+                        # Set effect's amplitude by setting itself as an absolute value with additional sign
+                        self.updating_container.sorted_effect[modification_id][loop_element][loop_keypoint] = \
+                            abs(self.updating_container.sorted_effect[modification_id][loop_element][loop_keypoint])
+
+                        self.updating_container.sorted_effect_sign[modification_id][loop_element] = -1
+
+            # Sort the effects
             for j in range(number_of_keypoints):
-                if i != j and j != 0:
-                    self.updating_container.sorted_effect[i] = \
+                if modification_id != j and j != 0:
+                    self.updating_container.sorted_effect[modification_id] = \
                         swap_columns(sorted(swap_columns(
-                            self.updating_container.sorted_effect[i], 0, j), reverse=True), 0, j)
-            if i != 0:
-                self.updating_container.sorted_effect[i] = \
+                            self.updating_container.sorted_effect[modification_id], 0, j), reverse=True), 0, j)
+                    # TODO: sign must be swapped as well!!!
+                    
+            if modification_id != 0:
+                self.updating_container.sorted_effect[modification_id] = \
                     swap_columns(sorted(swap_columns(
-                        self.updating_container.sorted_effect[i], 0, i), reverse=True), 0, i)
+                        self.updating_container.sorted_effect[modification_id], 0, modification_id), reverse=True), 0, modification_id)
+                # TODO: sign must be swapped as well!!!
+                
             else:
-                self.updating_container.sorted_effect[i] = \
-                    sorted(self.updating_container.sorted_effect[i], reverse=True)
+                pass
+                #self.updating_container.sorted_effect[modification_id] = \
+                #    sorted(self.updating_container.sorted_effect[modification_id], reverse=True)
+                # TODO: sign must be swapped as well!!!
 
     # TODO: negative numbers kill the optimization
     def optimize(self, delta):
