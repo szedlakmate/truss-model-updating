@@ -334,7 +334,9 @@ class Truss(TrussFramework):
         :param iteration_limit: Setting maximum number of iterations (model updating)
         :return: None
         """
-        self.updating_container.trusses = [self.truss] * self.truss.number_of_elements()
+        self.updating_container.trusses = []
+        for truss_id in range(self.truss.number_of_elements()):
+            self.updating_container.trusses.append(deepcopy(self.truss))
 
         if 0.01 <= abs(unit_modification) < 0.5:
             self.updating_container.unit_modification = unit_modification
